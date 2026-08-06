@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+@theme {
+  /* MLF x SCO palette — see PROJECT_BRIEF section 3 */
+  --color-ink: #0b0a0c;
+  --color-surface: #131417;
+  --color-surface-2: #1b1d21;
+  --color-bone: #f2efe7;
+  --color-muted: #8a8b8f;
+  --color-acid: #57b94a;
+  --color-acid-dim: #2e5f28;
+  --color-danger: #c6472f;
+
+  --font-sans: var(--font-archivo), "Archivo", system-ui, sans-serif;
+
+  --tracking-display: -0.035em;
+  --tracking-label: 0.28em;
+
+  --radius-sm: 2px;
+}
+
+html {
+  background-color: var(--color-ink);
+  color: var(--color-bone);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background-color: var(--color-acid);
+  color: var(--color-ink);
+}
+
+/* Tiny uppercase label — the counterpoint to huge display type */
+.label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+}
+
+.hairline {
+  border-color: color-mix(in srgb, var(--color-bone) 12%, transparent);
+}
+
+/* Intro game overlay ----------------------------------------------- */
+
+.intro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--color-ink);
+}
+
+.intro-overlay.intro-fine {
+  cursor: none;
+}
+
+.intro-overlay.intro-fine button {
+  cursor: none;
+}
+
+.intro-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  touch-action: none;
+}
+
+/* CRT scanlines, very low opacity */
+.intro-scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(242, 239, 231, 0.04) 0px,
+    rgba(242, 239, 231, 0.04) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+.intro-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--color-bone);
+  animation: intro-flash 120ms steps(2, end) forwards;
+}
+
+@keyframes intro-flash {
+  from {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Hard horizontal wipe, left to right, no fade */
+.intro-overlay.intro-wiping {
+  animation: intro-wipe 400ms linear forwards;
+}
+
+@keyframes intro-wipe {
+  from {
+    clip-path: inset(0 0 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 100%);
+  }
+}
