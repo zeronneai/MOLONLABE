@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import Hero from "@/components/home/Hero";
 import Featured from "@/components/home/Featured";
 import FreshArrivals from "@/components/home/FreshArrivals";
