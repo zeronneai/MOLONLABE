@@ -119,6 +119,41 @@ body {
   color: var(--color-acid);
 }
 
+/* Form fields — DESIGN.md section 5: underline only, no boxes, 56px
+   tall, label above in 11px tracked, acid underline on focus. */
+.field-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  color: var(--color-muted);
+}
+.field-input {
+  display: block;
+  width: 100%;
+  height: 56px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-muted) 40%, transparent);
+  color: var(--color-bone);
+  font-size: 16px;
+  transition: border-color 180ms;
+}
+.field-input:focus {
+  outline: none;
+  border-bottom-color: var(--color-acid);
+}
+.field-input.field-error {
+  border-bottom-color: var(--color-danger);
+}
+textarea.field-input {
+  height: auto;
+  min-height: 120px;
+  padding-block: 16px;
+  resize: vertical;
+}
+
 /* Status chip — the one allowed pill */
 .chip {
   display: inline-flex;

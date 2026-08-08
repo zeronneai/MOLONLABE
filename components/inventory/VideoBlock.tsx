@@ -5,17 +5,24 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { track } from "@/lib/analytics";
 
 export default function VideoBlock({
   src,
   poster,
   name,
+  slug,
 }: {
   src: string;
   poster?: string;
   name: string;
+  slug: string;
 }) {
   const [playing, setPlaying] = useState(false);
+  const play = () => {
+    setPlaying(true);
+    track("video_play", { item_slug: slug });
+  };
 
   return (
     <div className="relative aspect-video w-full bg-surface-2">
@@ -32,7 +39,7 @@ export default function VideoBlock({
       ) : (
         <button
           type="button"
-          onClick={() => setPlaying(true)}
+          onClick={play}
           aria-label={`Play video: ${name}`}
           className="group absolute inset-0"
         >

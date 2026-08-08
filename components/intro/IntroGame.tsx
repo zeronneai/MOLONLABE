@@ -17,6 +17,7 @@ import {
 } from "@/lib/game/engine";
 import { renderFrame, type Pointer } from "@/lib/game/render";
 import { LOGO_URL } from "@/lib/brand";
+import { track } from "@/lib/analytics";
 
 const SEEN_KEY = "mlf_intro_seen";
 
@@ -39,6 +40,7 @@ export default function IntroGame() {
   const coarseRef = useRef(false);
   const audioRef = useRef<AudioContext | null>(null);
   const timeoutsRef = useRef<number[]>([]);
+  const startedAtRef = useRef(0);
   const phaseRef = useRef<Phase>("idle");
   phaseRef.current = phase;
 
@@ -55,6 +57,7 @@ export default function IntroGame() {
     setFine(!coarseRef.current);
     // Warm the skull for the completion handoff so it appears instantly.
     new window.Image().src = LOGO_URL;
+    startedAtRef.current = performance.now();
     setPhase("playing");
   }, []);
 
@@ -68,6 +71,9 @@ export default function IntroGame() {
 
   const skip = useCallback(() => {
     markSeen();
+    track("intro_skipped", {
+      elapsed_ms: Math.round(performance.now() - startedAtRef.current),
+    });
     setPhase("done");
   }, []);
 
@@ -169,6 +175,10 @@ export default function IntroGame() {
       playBlip(finished);
       if (finished) {
         markSeen();
+        track("intro_completed", {
+          hits: state.hits,
+          elapsed_ms: Math.round(performance.now() - startedAtRef.current),
+        });
         // Let the last burst breathe, flash, resolve the flash into the
         // skull for ~250ms, then the hard wipe carries it into the site.
         timeouts.push(
