@@ -15,8 +15,22 @@
 
   --tracking-display: -0.035em;
   --tracking-label: 0.28em;
+}
 
-  --radius-sm: 2px;
+:root {
+  /* Page left/right margin. Content hangs from the left rule; images
+     escape it with the .bleed-* helpers. */
+  --pad-x: 1.25rem;
+}
+@media (min-width: 640px) {
+  :root {
+    --pad-x: 2.5rem;
+  }
+}
+@media (min-width: 1024px) {
+  :root {
+    --pad-x: 4rem;
+  }
 }
 
 html {
@@ -34,16 +48,180 @@ body {
   color: var(--color-ink);
 }
 
+.px-page {
+  padding-inline: var(--pad-x);
+}
+.pl-page {
+  padding-left: var(--pad-x);
+}
+.pr-page {
+  padding-right: var(--pad-x);
+}
+.bleed-x {
+  margin-inline: calc(var(--pad-x) * -1);
+}
+
 /* Tiny uppercase label — the counterpoint to huge display type */
 .label {
-  font-size: 0.6875rem;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: var(--tracking-label);
 }
 
+/* Hairlines: 0.5px --muted at 22% */
 .hairline {
-  border-color: color-mix(in srgb, var(--color-bone) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-muted) 22%, transparent);
+}
+
+.display {
+  font-weight: 800;
+  letter-spacing: var(--tracking-display);
+  line-height: 0.92;
+}
+
+/* CTAs — DESIGN.md section 1. Primary: bordered rectangle, transparent
+   fill, 56px tall. Secondary: text with a 6px underline offset. */
+.cta-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 56px;
+  padding-inline: 2rem;
+  border: 1px solid var(--color-bone);
+  color: var(--color-bone);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  transition: color 180ms, border-color 180ms;
+}
+.cta-primary:hover,
+.cta-primary:focus-visible {
+  border-color: var(--color-acid);
+  color: var(--color-acid);
+}
+.cta-secondary {
+  display: inline-flex;
+  align-items: center;
+  height: 56px;
+  color: var(--color-bone);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  text-decoration: underline;
+  text-underline-offset: 6px;
+  transition: color 180ms;
+}
+.cta-secondary:hover,
+.cta-secondary:focus-visible {
+  color: var(--color-acid);
+}
+
+/* Status chip — the one allowed pill */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding-inline: 12px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+}
+
+/* Section reveal — DESIGN.md section 6 */
+.reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 500ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 500ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* Hero scroll indicator: thin vertical rule, animates downward on a loop */
+.scroll-rule {
+  position: relative;
+  width: 1px;
+  height: 72px;
+  background: color-mix(in srgb, var(--color-muted) 30%, transparent);
+  overflow: hidden;
+}
+.scroll-rule::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 28px;
+  background: var(--color-bone);
+  animation: scroll-rule-drop 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+@keyframes scroll-rule-drop {
+  from {
+    transform: translateY(-28px);
+  }
+  to {
+    transform: translateY(72px);
+  }
+}
+
+/* Brands marquee */
+.marquee {
+  overflow: hidden;
+  white-space: nowrap;
+}
+.marquee-track {
+  display: inline-flex;
+  align-items: baseline;
+  width: max-content;
+  animation: marquee-scroll 45s linear infinite;
+}
+@keyframes marquee-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Editorial index rows: hovered row brightens and shifts, siblings dim */
+.edx-row .edx-name {
+  transition: transform 180ms, color 180ms;
+}
+.edx:has(.edx-row:hover) .edx-row:not(:hover) {
+  opacity: 0.45;
+}
+.edx-row {
+  transition: opacity 180ms;
+}
+.edx-row:hover .edx-name {
+  transform: translateX(12px);
+  color: var(--color-bone);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .scroll-rule::after,
+  .marquee-track {
+    animation: none;
+  }
+  .edx-row .edx-name,
+  .edx-row {
+    transition: none;
+  }
 }
 
 /* Intro game overlay ----------------------------------------------- */
@@ -100,6 +278,17 @@ body {
   to {
     opacity: 0;
   }
+}
+
+/* The handoff: the flash resolves into the skull before the wipe fires */
+.intro-skull {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  height: 128px;
+  width: auto;
+  pointer-events: none;
 }
 
 /* Hard horizontal wipe, left to right, no fade */

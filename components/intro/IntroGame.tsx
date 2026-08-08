@@ -16,6 +16,7 @@ import {
   type GameState,
 } from "@/lib/game/engine";
 import { renderFrame, type Pointer } from "@/lib/game/render";
+import { LOGO_URL } from "@/lib/brand";
 
 const SEEN_KEY = "mlf_intro_seen";
 
@@ -24,6 +25,7 @@ type Phase = "idle" | "playing" | "wiping" | "done";
 export default function IntroGame() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [flash, setFlash] = useState(false);
+  const [skull, setSkull] = useState(false);
   const [fine, setFine] = useState(false);
 
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -51,6 +53,8 @@ export default function IntroGame() {
     }
     coarseRef.current = window.matchMedia("(pointer: coarse)").matches;
     setFine(!coarseRef.current);
+    // Warm the skull for the completion handoff so it appears instantly.
+    new window.Image().src = LOGO_URL;
     setPhase("playing");
   }, []);
 
@@ -165,10 +169,12 @@ export default function IntroGame() {
       playBlip(finished);
       if (finished) {
         markSeen();
-        // Let the last burst breathe, then flash, then a hard wipe.
+        // Let the last burst breathe, flash, resolve the flash into the
+        // skull for ~250ms, then the hard wipe carries it into the site.
         timeouts.push(
-          window.setTimeout(() => setFlash(true), 280),
-          window.setTimeout(() => setPhase("wiping"), 400),
+          window.setTimeout(() => setFlash(true), 260),
+          window.setTimeout(() => setSkull(true), 330),
+          window.setTimeout(() => setPhase("wiping"), 590),
         );
       }
     };
@@ -244,6 +250,10 @@ export default function IntroGame() {
     >
       <canvas ref={canvasRef} className="intro-canvas" aria-hidden="true" />
       <div className="intro-scanlines" aria-hidden="true" />
+      {skull && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={LOGO_URL} alt="" className="intro-skull" aria-hidden="true" />
+      )}
       {flash && <div className="intro-flash" aria-hidden="true" />}
       <button
         ref={skipRef}
