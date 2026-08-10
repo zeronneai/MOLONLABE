@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo } from "next/font/google";
 import "./globals.css";
-import Header from "@/components/layout/Header";
-import Footer from "@/components/layout/Footer";
-import IntroGame from "@/components/intro/IntroGame";
 import { LOGO_URL } from "@/lib/brand";
 
 const archivo = Archivo({
@@ -25,12 +22,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={archivo.variable}>
-      <body className="bg-ink text-bone min-h-dvh flex flex-col">
-        <Header />
-        <main className="flex-1">{children}</main>
-        <Footer />
-        <IntroGame />
-      </body>
+      <body className="bg-ink text-bone min-h-dvh">{children}</body>
     </html>
   );
 }

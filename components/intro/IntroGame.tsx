@@ -4,6 +4,7 @@
 // Remove the <IntroGame /> line in app/layout.tsx to drop the whole feature.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import {
   ALIEN_COUNT,
   STEP,
@@ -24,6 +25,7 @@ const SEEN_KEY = "mlf_intro_seen";
 type Phase = "idle" | "playing" | "wiping" | "done";
 
 export default function IntroGame() {
+  const pathname = usePathname();
   const [phase, setPhase] = useState<Phase>("idle");
   const [flash, setFlash] = useState(false);
   const [skull, setSkull] = useState(false);
@@ -46,6 +48,12 @@ export default function IntroGame() {
 
   // Decide once, after hydration, whether to show the game at all.
   useEffect(() => {
+    if (phaseRef.current !== "idle") return;
+    // Never over the admin — the owner is here to work, not to play.
+    if (pathname.startsWith("/admin")) {
+      setPhase("done");
+      return;
+    }
     const force = new URLSearchParams(window.location.search).get("intro") === "1";
     const seen = window.localStorage.getItem(SEEN_KEY) === "1";
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -59,7 +67,7 @@ export default function IntroGame() {
     new window.Image().src = LOGO_URL;
     startedAtRef.current = performance.now();
     setPhase("playing");
-  }, []);
+  }, [pathname]);
 
   const markSeen = () => {
     try {
