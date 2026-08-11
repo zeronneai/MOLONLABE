@@ -7,8 +7,8 @@ import { SESSION_MAX_AGE } from "@/lib/supabase/config";
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
   if (!url || !key) return response; // unconfigured: /admin renders its notice
 
   const supabase = createServerClient(url, key, {

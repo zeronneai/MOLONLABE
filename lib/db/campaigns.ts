@@ -1,4 +1,5 @@
 import { getSupabase } from "@/lib/supabase/server";
+import { logDbError } from "@/lib/db/log";
 import type { CampaignRow, ItemRow } from "@/lib/database.types";
 
 export type LiveCampaign = CampaignRow & { item: ItemRow | null };
@@ -14,7 +15,7 @@ export async function getLiveCampaign(): Promise<LiveCampaign | null> {
     .limit(1)
     .maybeSingle();
   if (error) {
-    console.error("getLiveCampaign:", error.message);
+    logDbError("getLiveCampaign", error);
     return null;
   }
   return data as LiveCampaign | null;
@@ -25,7 +26,7 @@ export async function getEntryCount(campaignId: string): Promise<number> {
   if (!sb) return 0;
   const { data, error } = await sb.rpc("entry_count", { campaign: campaignId });
   if (error) {
-    console.error("getEntryCount:", error.message);
+    logDbError("getEntryCount", error);
     return 0;
   }
   return data ?? 0;

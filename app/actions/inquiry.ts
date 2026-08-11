@@ -4,6 +4,7 @@ import { inquirySchema, type FormState } from "@/lib/forms/schema";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { getSupabase } from "@/lib/supabase/server";
 import { notifyOwner } from "@/lib/notify";
+import { logDbError } from "@/lib/db/log";
 import type { InquiryInsert } from "@/lib/database.types";
 
 export async function submitInquiry(
@@ -60,7 +61,7 @@ export async function submitInquiry(
 
   const { error } = await sb.from("inquiries").insert(row);
   if (error) {
-    console.error("submitInquiry insert:", error.message);
+    logDbError("submitInquiry insert", error);
     return {
       status: "error",
       message:

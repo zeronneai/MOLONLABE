@@ -114,11 +114,11 @@ export default function ImageUploader({ initial }: { initial: string[] }) {
       const path = `items/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.webp`;
       patch(key, { status: "uploading" });
       await uploadXhr(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`,
+        `${(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim()}/storage/v1/object/${BUCKET}/${path}`,
         blob,
         {
           authorization: `Bearer ${token}`,
-          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
+          apikey: (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "").trim(),
           "content-type": "image/webp",
           "x-upsert": "false",
         },

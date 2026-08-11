@@ -8,8 +8,8 @@ import { SESSION_MAX_AGE } from "./config";
 // components, server actions, and route handlers. RLS runs as
 // `authenticated`.
 export async function getSessionSupabase(): Promise<SupabaseClient<Database> | null> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
   if (!url || !key) return null;
   const cookieStore = await cookies();
   return createServerClient<Database>(url, key, {

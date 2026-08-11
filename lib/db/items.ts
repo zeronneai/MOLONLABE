@@ -1,4 +1,5 @@
 import { getSupabase } from "@/lib/supabase/server";
+import { logDbError } from "@/lib/db/log";
 import type { ItemRow, ItemStatus } from "@/lib/database.types";
 import type { IndexItem } from "@/components/inventory/EditorialIndex";
 
@@ -15,7 +16,7 @@ export async function getVisibleItems(): Promise<ItemRow[]> {
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });
   if (error) {
-    console.error("getVisibleItems:", error.message);
+    logDbError("getVisibleItems", error);
     return [];
   }
   return data;
@@ -31,7 +32,7 @@ export async function getFreshArrivals(limit = 6): Promise<ItemRow[]> {
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) {
-    console.error("getFreshArrivals:", error.message);
+    logDbError("getFreshArrivals", error);
     return [];
   }
   return data;
@@ -47,7 +48,7 @@ export async function getItemBySlug(slug: string): Promise<ItemRow | null> {
     .neq("status", "hidden")
     .maybeSingle();
   if (error) {
-    console.error("getItemBySlug:", error.message);
+    logDbError("getItemBySlug", error);
     return null;
   }
   return data;
@@ -69,7 +70,7 @@ export async function getRelatedItems(
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) {
-    console.error("getRelatedItems:", error.message);
+    logDbError("getRelatedItems", error);
     return [];
   }
   return data;
