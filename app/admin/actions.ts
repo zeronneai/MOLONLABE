@@ -12,9 +12,11 @@ import type { Database, Json } from "@/lib/database.types";
 import {
   CATEGORIES,
   CAMPAIGN_STATUSES,
+  DEFAULT_EXCLUSION_NOTE,
   ITEM_STATUSES,
   type ActionState,
 } from "@/lib/admin/constants";
+import { DIFFICULTY_RANGES } from "@/lib/game/settings";
 
 export type { ActionState };
 
@@ -187,6 +189,114 @@ export async function setCampaignStatus(id: string, status: string): Promise<voi
   if (error) console.error("setCampaignStatus:", error.message);
   revalidatePublic();
   revalidatePath("/admin/featured");
+}
+
+// --- Game & Offer ----------------------------------------------------------
+
+async function readSetting(
+  sb: SupabaseClient<Database>,
+  key: string,
+): Promise<Record<string, unknown>> {
+  const { data } = await sb.from("settings").select("value").eq("key", key).maybeSingle();
+  return data?.value && typeof data.value === "object" && !Array.isArray(data.value)
+    ? (data.value as Record<string, unknown>)
+    : {};
+}
+
+async function writeSetting(
+  sb: SupabaseClient<Database>,
+  key: string,
+  value: Json,
+): Promise<boolean> {
+  const { error } = await sb
+    .from("settings")
+    .upsert({ key, value }, { onConflict: "key" });
+  if (error) console.error(`writeSetting ${key}:`, error.message);
+  return !error;
+}
+
+function revalidateGame() {
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/game");
+}
+
+/** The kill switch: flips only `enabled`, touches nothing else. */
+export async function toggleGameOffer(enabled: boolean): Promise<void> {
+  const sb = await requireClient();
+  if (!sb) return;
+  const current = await readSetting(sb, "game_offer");
+  await writeSetting(sb, "game_offer", { ...current, enabled } as Json);
+  revalidateGame();
+}
+
+export async function saveGameOffer(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const sb = await requireClient();
+  if (!sb) return { status: "error", message: "Not signed in." };
+
+  const code = String(formData.get("code") ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "");
+  if (!code) return { status: "error", message: "The code can't be empty." };
+  const value = String(formData.get("value") ?? "").trim();
+  if (!value) return { status: "error", message: "Describe the reward in plain language." };
+  const expires = String(formData.get("expires") ?? "").trim() || null;
+  const note = String(formData.get("note") ?? "").trim() || DEFAULT_EXCLUSION_NOTE;
+
+  const current = await readSetting(sb, "game_offer");
+  const ok = await writeSetting(sb, "game_offer", {
+    enabled: current.enabled === true, // the form never flips the switch
+    code,
+    value,
+    expires,
+    note,
+  } as Json);
+  if (!ok) return { status: "error", message: "Save failed — try again." };
+  revalidateGame();
+  return { status: "idle", message: "Saved." };
+}
+
+export async function saveGameDifficulty(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const sb = await requireClient();
+  if (!sb) return { status: "error", message: "Not signed in." };
+
+  const mode = String(formData.get("mode") ?? "");
+  if (mode !== "desktop" && mode !== "mobile")
+    return { status: "error", message: "Bad mode." };
+
+  const clampField = (name: keyof typeof DIFFICULTY_RANGES) => {
+    const raw = Number(formData.get(name));
+    const range = DIFFICULTY_RANGES[name];
+    if (!Number.isFinite(raw)) return null;
+    return Math.min(range.max, Math.max(range.min, Math.round(raw)));
+  };
+  const roundSeconds = Number(formData.get("roundSeconds"));
+  const roundMs = Number.isFinite(roundSeconds)
+    ? Math.min(
+        DIFFICULTY_RANGES.roundMs.max,
+        Math.max(DIFFICULTY_RANGES.roundMs.min, Math.round(roundSeconds) * 1000),
+      )
+    : null;
+  const targetCount = clampField("targetCount");
+  const popMs = clampField("popMs");
+  const magSize = clampField("magSize");
+  if (roundMs === null || targetCount === null || popMs === null || magSize === null)
+    return { status: "error", message: "Every field needs a number." };
+
+  const current = await readSetting(sb, "game_difficulty");
+  const ok = await writeSetting(sb, "game_difficulty", {
+    ...current,
+    [mode]: { roundMs, targetCount, popMs, magSize },
+  } as Json);
+  if (!ok) return { status: "error", message: "Save failed — try again." };
+  revalidateGame();
+  return { status: "idle", message: "Saved." };
 }
 
 export async function saveCampaign(

@@ -2,15 +2,7 @@
 // pausing the animation loop pauses the round. Difficulty knobs live in
 // config.ts — tune there, not here.
 
-import {
-  GO_MS,
-  MAG_SIZE,
-  READY_MS,
-  RELOAD_MS,
-  RISE_MS,
-  ROUND_MS,
-  type Tuning,
-} from "./config";
+import { GO_MS, READY_MS, RELOAD_MS, RISE_MS, type Tuning } from "./config";
 import { ALIEN_COLS, ALIEN_ROWS, BURST_COLORS } from "./sprites";
 import type { SpawnPoint } from "./scene";
 
@@ -97,7 +89,7 @@ export function createArcade(
     nextSpawnAt: 0,
     hits: 0,
     shots: 0,
-    ammo: MAG_SIZE,
+    ammo: tuning.magSize,
     reloadUntil: 0,
     gun: { recoil: 0, flashT: 0 },
     particles: [],
@@ -125,7 +117,7 @@ export function roundRemaining(state: ArcadeState): number {
 /** Interval between spawns, accelerating over the round. */
 function spawnInterval(state: ArcadeState): number {
   const progress =
-    1 - roundRemaining(state) / (ROUND_MS / 1000) || 0;
+    1 - roundRemaining(state) / (state.tuning.roundMs / 1000) || 0;
   const ms =
     state.tuning.spawnStartMs +
     (state.tuning.spawnEndMs - state.tuning.spawnStartMs) * Math.min(1, progress);
@@ -139,7 +131,7 @@ export function update(state: ArcadeState, dt: number): void {
     state.readyT += dt;
     if (state.readyT >= (READY_MS + GO_MS) / 1000) {
       state.phase = "playing";
-      state.roundEndsAt = state.t + ROUND_MS / 1000;
+      state.roundEndsAt = state.t + state.tuning.roundMs / 1000;
       state.nextSpawnAt = state.t + 0.25;
     }
   }
@@ -148,7 +140,7 @@ export function update(state: ArcadeState, dt: number): void {
     // reload completes
     if (state.reloadUntil > 0 && state.t >= state.reloadUntil) {
       state.reloadUntil = 0;
-      state.ammo = MAG_SIZE;
+      state.ammo = state.tuning.magSize;
     }
 
     // spawns

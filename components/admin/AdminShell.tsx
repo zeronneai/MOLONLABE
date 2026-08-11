@@ -10,6 +10,7 @@ const tabs = [
   { href: "/admin/featured", label: "Featured" },
   { href: "/admin/inquiries", label: "Inquiries" },
   { href: "/admin/entrants", label: "Entrants" },
+  { href: "/admin/game", label: "Game & Offer" },
 ];
 
 export default function AdminShell({

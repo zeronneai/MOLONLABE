@@ -6,12 +6,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import {
-  DESKTOP_TUNING,
-  DISCOUNT_PLACEHOLDER,
-  MOBILE_TUNING,
-  ROUND_MS,
-} from "@/lib/game/config";
+import { DESKTOP_TUNING, MOBILE_TUNING } from "@/lib/game/config";
+import type { GameSettings } from "@/lib/game/settings";
+import { recordGameEvent } from "@/app/actions/game";
 import {
   STEP,
   addRipple,
@@ -32,11 +29,11 @@ const SEEN_KEY = "mlf_intro_seen";
 
 type Phase = "idle" | "arcade" | "won" | "lost" | "handoff" | "wiping" | "done";
 
-// TODO next step: replace with the owner-controlled settings table.
-const discount = DISCOUNT_PLACEHOLDER;
-
-export default function IntroGame() {
+export default function IntroGame({ settings }: { settings?: GameSettings }) {
   const pathname = usePathname();
+  const difficulty = settings?.difficulty ?? { desktop: DESKTOP_TUNING, mobile: MOBILE_TUNING };
+  // When the offer is off, the server never serializes the code at all.
+  const offer = settings?.offer ?? { enabled: false as const };
   const [phase, setPhase] = useState<Phase>("idle");
   const [fine, setFine] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -107,7 +104,7 @@ export default function IntroGame() {
       stateRef.current = createArcade(
         state.w,
         state.h,
-        coarseRef.current ? MOBILE_TUNING : DESKTOP_TUNING,
+        coarseRef.current ? difficulty.mobile : difficulty.desktop,
         scene.spawnPoints,
       );
     }
@@ -162,7 +159,7 @@ export default function IntroGame() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const tuning = coarseRef.current ? MOBILE_TUNING : DESKTOP_TUNING;
+    const tuning = coarseRef.current ? difficulty.mobile : difficulty.desktop;
 
     const size = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -203,7 +200,12 @@ export default function IntroGame() {
           hits: state.hits,
           elapsed_ms: Math.round(performance.now() - startedAtRef.current),
         });
-        if (state.phase === "won") sound("win");
+        const mode = coarseRef.current ? "mobile" : "desktop";
+        void recordGameEvent("played", mode);
+        if (state.phase === "won") {
+          sound("win");
+          void recordGameEvent("won", mode);
+        }
         setPhase(state.phase);
         return; // stop the loop; last frame stays behind the result card
       }
@@ -325,9 +327,11 @@ export default function IntroGame() {
   }, []);
 
   const copyCode = async () => {
+    if (!offer.enabled) return;
     try {
-      await navigator.clipboard.writeText(discount.code);
+      await navigator.clipboard.writeText(offer.code);
       setCopied(true);
+      void recordGameEvent("code_copied", coarseRef.current ? "mobile" : "desktop");
     } catch {
       // clipboard unavailable — the code is on screen either way
     }
@@ -335,7 +339,7 @@ export default function IntroGame() {
 
   if (phase === "idle" || phase === "done") return null;
 
-  const tuning = coarseRef.current ? MOBILE_TUNING : DESKTOP_TUNING;
+  const tuning = coarseRef.current ? difficulty.mobile : difficulty.desktop;
 
   return (
     <div
@@ -356,10 +360,10 @@ export default function IntroGame() {
       {phase === "won" && (
         <div className="intro-result">
           <p className="label text-acid">Cleared</p>
-          {discount.enabled ? (
+          {offer.enabled ? (
             <>
               <h2 className="display mt-4 text-center text-3xl sm:text-4xl">
-                {discount.value}
+                {offer.value.toUpperCase()}
               </h2>
               <button
                 type="button"
@@ -367,12 +371,21 @@ export default function IntroGame() {
                 className="intro-code mt-8"
                 aria-live="polite"
               >
-                <span className="font-extrabold tracking-[0.2em]">{discount.code}</span>
+                <span className="font-extrabold tracking-[0.2em]">{offer.code}</span>
                 <span className="label mt-2 block text-muted">
                   {copied ? "Copied" : "Tap to copy"}
                 </span>
               </button>
-              <p className="label mt-6 text-muted">{discount.expires}</p>
+              <p className="mt-6 max-w-xs text-center text-xs text-muted">{offer.note}</p>
+              {offer.expires && (
+                <p className="label mt-3 text-muted">
+                  Through{" "}
+                  {new Date(offer.expires + "T12:00:00").toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </p>
+              )}
             </>
           ) : (
             <h2 className="display mt-4 text-center text-3xl sm:text-4xl">
@@ -390,7 +403,7 @@ export default function IntroGame() {
           <p className="label text-danger">Time</p>
           <h2 className="display mt-4 text-center text-3xl sm:text-4xl">NICE TRY.</h2>
           <p className="label mt-4 text-muted">
-            {lastHits} of {tuning.targetCount} in {(ROUND_MS / 1000).toFixed(0)} seconds
+            {lastHits} of {tuning.targetCount} in {(tuning.roundMs / 1000).toFixed(0)} seconds
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
             <button type="button" onClick={retry} className="cta-primary">

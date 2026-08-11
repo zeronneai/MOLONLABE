@@ -203,6 +203,45 @@ export interface Database {
           },
         ];
       };
+      settings: {
+        Row: {
+          key: string;
+          value: Json;
+          updated_at: string | null;
+        };
+        Insert: {
+          key: string;
+          value?: Json;
+          updated_at?: string | null;
+        };
+        Update: {
+          key?: string;
+          value?: Json;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
+      game_events: {
+        Row: {
+          id: string;
+          kind: string;
+          mode: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          kind: string;
+          mode?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          kind?: string;
+          mode?: string | null;
+          created_at?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {

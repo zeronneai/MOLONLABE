@@ -1,4 +1,4 @@
-import { GO_MS, MAG_SIZE, READY_MS, RELOAD_MS } from "./config";
+import { GO_MS, READY_MS, RELOAD_MS } from "./config";
 import { drawAlien, drawMuzzleFlash, drawPistol, PISTOL_COLS, PISTOL_ROWS } from "./sprites";
 import { drawPixelText, textWidthCells } from "./font";
 import {
@@ -152,7 +152,7 @@ function drawHud(ctx: CanvasRenderingContext2D, state: ArcadeState): void {
   // ammo pips, bottom left
   const pipW = cell * 2;
   const pipH = cell * 4;
-  for (let i = 0; i < MAG_SIZE; i++) {
+  for (let i = 0; i < state.tuning.magSize; i++) {
     const x = cell * 4 + i * pipW * 1.6;
     const y = h - pipH - cell * 4;
     if (i < state.ammo) {
