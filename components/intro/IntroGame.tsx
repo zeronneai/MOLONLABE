@@ -12,7 +12,6 @@ import { recordGameEvent } from "@/app/actions/game";
 import {
   STEP,
   addRipple,
-  cellSize,
   createArcade,
   fire,
   resizeArcade,
@@ -20,14 +19,29 @@ import {
   type ArcadeState,
   type ShotResult,
 } from "@/lib/game/engine";
-import { buildScene, type Scene } from "@/lib/game/scene";
-import { renderFrame, type Pointer } from "@/lib/game/render";
+import {
+  buildScene,
+  loadBackground,
+  loadGameArt,
+  type GameArt,
+  type Scene,
+} from "@/lib/game/scene";
+import { PARALLAX } from "@/lib/game/assets";
+import { renderFrame, type Pointer, type ViewFx } from "@/lib/game/render";
 import { LOGO_URL } from "@/lib/brand";
 import { track } from "@/lib/analytics";
 
 const SEEN_KEY = "mlf_intro_seen";
 
-type Phase = "idle" | "arcade" | "won" | "lost" | "handoff" | "wiping" | "done";
+type Phase =
+  | "idle"
+  | "loading"
+  | "arcade"
+  | "won"
+  | "lost"
+  | "handoff"
+  | "wiping"
+  | "done";
 
 export default function IntroGame({ settings }: { settings?: GameSettings }) {
   const pathname = usePathname();
@@ -44,6 +58,9 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
   const skipRef = useRef<HTMLButtonElement>(null);
   const stateRef = useRef<ArcadeState | null>(null);
   const sceneRef = useRef<Scene | null>(null);
+  const artRef = useRef<GameArt | null>(null);
+  const lookRef = useRef({ x: 0, y: 0 });
+  const lookTargetRef = useRef({ x: 0, y: 0 });
   const pointerRef = useRef<Pointer>({ x: 0, y: 0, type: "", inside: false });
   const rafRef = useRef(0);
   const lastRef = useRef<number | null>(null);
@@ -73,8 +90,28 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
     setFine(!coarseRef.current);
     new window.Image().src = LOGO_URL; // warm the skull for the handoff
     startedAtRef.current = performance.now();
-    setPhase("arcade");
+    setPhase("loading");
   }, [pathname]);
+
+  // Preload every asset before the round starts. Any failure skips the
+  // game entirely — the site is never blocked by missing art.
+  useEffect(() => {
+    if (phase !== "loading") return;
+    let cancelled = false;
+    const portrait = window.matchMedia("(orientation: portrait)").matches;
+    loadGameArt(portrait)
+      .then((art) => {
+        if (cancelled) return;
+        artRef.current = art;
+        setPhase("arcade");
+      })
+      .catch(() => {
+        if (!cancelled) setPhase("done");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [phase]);
 
   const markSeen = () => {
     try {
@@ -162,17 +199,35 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
     const tuning = coarseRef.current ? difficulty.mobile : difficulty.desktop;
 
     const size = () => {
+      const art = artRef.current;
+      if (!art) return;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const w = window.innerWidth;
       const h = window.innerHeight;
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      sceneRef.current = buildScene(w, h, cellSize(w, h), dpr);
+      sceneRef.current = buildScene(art, w, h);
       if (stateRef.current) {
         resizeArcade(stateRef.current, w, h, sceneRef.current.spawnPoints);
       } else {
         stateRef.current = createArcade(w, h, tuning, sceneRef.current.spawnPoints);
+      }
+    };
+    const onResize = () => {
+      const art = artRef.current;
+      if (!art) return;
+      const portrait = window.matchMedia("(orientation: portrait)").matches;
+      if (portrait !== art.portrait) {
+        // orientation flipped: reload the matching background, then rebuild
+        loadBackground(portrait)
+          .then((bg) => {
+            artRef.current = { ...art, bg, portrait };
+            size();
+          })
+          .catch(() => size()); // keep the old background rather than dying
+      } else {
+        size();
       }
     };
     if (!stateRef.current || !sceneRef.current) {
@@ -191,7 +246,17 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
         update(state, STEP);
         accRef.current -= STEP;
       }
-      renderFrame(ctx, state, scene, pointerRef.current);
+      // mouse-look: layers ease toward the cursor (desktop only)
+      lookRef.current.x +=
+        (lookTargetRef.current.x - lookRef.current.x) * PARALLAX.smoothing;
+      lookRef.current.y +=
+        (lookTargetRef.current.y - lookRef.current.y) * PARALLAX.smoothing;
+      const fx: ViewFx = {
+        lookX: coarseRef.current ? 0 : lookRef.current.x,
+        lookY: coarseRef.current ? 0 : lookRef.current.y,
+        parallax: !coarseRef.current,
+      };
+      renderFrame(ctx, state, scene, pointerRef.current, fx);
 
       if (state.phase === "won" || state.phase === "lost") {
         setLastHits(state.hits);
@@ -215,6 +280,10 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
 
     const onPointerMove = (e: PointerEvent) => {
       pointerRef.current = { x: e.clientX, y: e.clientY, type: e.pointerType, inside: true };
+      lookTargetRef.current = {
+        x: e.clientX - window.innerWidth / 2,
+        y: e.clientY - window.innerHeight / 2,
+      };
     };
     const onPointerLeave = () => {
       pointerRef.current.inside = false;
@@ -264,7 +333,7 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
     overlay.addEventListener("pointerleave", onPointerLeave);
     overlay.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("resize", size);
+    window.addEventListener("resize", onResize);
     document.addEventListener("visibilitychange", onVisibility);
 
     skipRef.current?.focus();
@@ -278,15 +347,15 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
       overlay.removeEventListener("pointerleave", onPointerLeave);
       overlay.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("resize", size);
+      window.removeEventListener("resize", onResize);
       document.removeEventListener("visibilitychange", onVisibility);
       document.body.style.overflow = prevOverflow;
     };
   }, [phase, skip]);
 
-  // Result screens: Esc still skips, focus stays inside the overlay.
+  // Result screens and loading: Esc still skips, focus stays inside.
   useEffect(() => {
-    if (phase !== "won" && phase !== "lost") return;
+    if (phase !== "won" && phase !== "lost" && phase !== "loading") return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -356,6 +425,15 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
     >
       <canvas ref={canvasRef} className="intro-canvas" aria-hidden="true" />
       <div className="intro-scanlines" aria-hidden="true" />
+
+      {phase === "loading" && (
+        <div className="intro-result" aria-label="Loading">
+          <p className="label text-muted">Loading</p>
+          <div className="intro-loadbar mt-6" aria-hidden="true">
+            <span />
+          </div>
+        </div>
+      )}
 
       {phase === "won" && (
         <div className="intro-result">

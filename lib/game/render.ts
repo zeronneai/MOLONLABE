@@ -1,5 +1,10 @@
+// Frame renderer over the photographic scene. Order: background → aliens
+// → occluders (bg-speed patches, then the fg crate band) → pistol →
+// muzzle bloom → HUD → vignette, chromatic fringe, grain → reticle.
+// Desktop gets mouse-look parallax; mobile renders everything fixed.
+
 import { GO_MS, READY_MS, RELOAD_MS } from "./config";
-import { drawAlien, drawMuzzleFlash, drawPistol, PISTOL_COLS, PISTOL_ROWS } from "./sprites";
+import { PARALLAX, PISTOL_LAYOUT } from "./assets";
 import { drawPixelText, textWidthCells } from "./font";
 import {
   RIPPLE_TTL,
@@ -23,38 +28,132 @@ export interface Pointer {
   inside: boolean;
 }
 
+export interface ViewFx {
+  /** smoothed cursor offset from centre, px (0,0 on mobile) */
+  lookX: number;
+  lookY: number;
+  parallax: boolean;
+}
+
+// prerendered overlays, rebuilt on resize
+let fxCanvas: HTMLCanvasElement | null = null;
+let fxKey = "";
+let grainTile: HTMLCanvasElement | null = null;
+
+function buildGrain(): HTMLCanvasElement {
+  const tile = document.createElement("canvas");
+  tile.width = 128;
+  tile.height = 128;
+  const ctx = tile.getContext("2d")!;
+  const data = ctx.createImageData(128, 128);
+  for (let i = 0; i < data.data.length; i += 4) {
+    const v = Math.floor(Math.random() * 255);
+    data.data[i] = v;
+    data.data[i + 1] = v;
+    data.data[i + 2] = v;
+    data.data[i + 3] = 10; // light grain
+  }
+  ctx.putImageData(data, 0, 0);
+  return tile;
+}
+
+/** Vignette + subtle chromatic fringe at the edges, prerendered. */
+function buildFx(w: number, h: number): HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  const r = Math.hypot(w, h) / 2;
+
+  const ring = (cx: number, cy: number, color: string, alpha: number) => {
+    const g = ctx.createRadialGradient(cx, cy, r * 0.45, cx, cy, r);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(1, color.replace("A", String(alpha)));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  };
+  // chromatic fringe: offset warm/cool rings under the vignette
+  ring(w / 2 - 2, h / 2, "rgba(198,71,47,A)", 0.1);
+  ring(w / 2 + 2, h / 2, "rgba(74,141,185,A)", 0.1);
+  ring(w / 2, h / 2, "rgba(11,10,12,A)", 0.62);
+  return canvas;
+}
+
 export function renderFrame(
   ctx: CanvasRenderingContext2D,
   state: ArcadeState,
   scene: Scene,
   pointer: Pointer,
+  fx: ViewFx,
 ): void {
-  const { w, h, cell } = state;
-  ctx.imageSmoothingEnabled = false;
+  const { w, h } = state;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "medium";
 
+  const bgOff = { x: fx.lookX * PARALLAX.bg, y: fx.lookY * PARALLAX.bg };
+  const fgOff = { x: fx.lookX * PARALLAX.fg, y: fx.lookY * PARALLAX.fg };
+
+  // screen shake follows recoil
+  const shake = state.gun.recoil;
+  const shakeX = shake > 0.02 ? (Math.random() - 0.5) * 7 * shake : 0;
+  const shakeY = shake > 0.02 ? (Math.random() - 0.5) * 7 * shake : 0;
+
+  ctx.save();
+  ctx.translate(shakeX, shakeY);
+
+  // background
   ctx.fillStyle = INK;
-  ctx.fillRect(0, 0, w, h);
-  ctx.drawImage(scene.back, 0, 0, w, h);
+  ctx.fillRect(-8, -8, w + 16, h + 16);
+  const { dx, dy, dw, dh } = scene.bgDraw;
+  ctx.drawImage(scene.art.bg, dx + bgOff.x, dy + bgOff.y, dw, dh);
 
-  // aliens rise between the back and front layers
+  // aliens (bg layer speed)
   for (const target of state.targets) {
+    if (riseProgress(target) <= 0.01) continue;
     const sp = state.spawnPoints[target.sp];
     const box = targetCenter(state, target);
-    if (riseProgress(target) > 0.01) {
-      drawAlien(ctx, box.x, box.y, cell * sp.scale);
+    const px = box.x + bgOff.x;
+    const py = box.y + bgOff.y;
+    ctx.save();
+    if (sp.anchor.flip) {
+      ctx.translate(px, py);
+      ctx.scale(-1, 1);
+      ctx.drawImage(sp.sprite, -box.w / 2, -box.h / 2, box.w, box.h);
+    } else {
+      ctx.drawImage(sp.sprite, px - box.w / 2, py - box.h / 2, box.w, box.h);
     }
+    ctx.restore();
   }
 
-  ctx.drawImage(scene.front, 0, 0, w, h);
-
-  // burst particles, snapped to the pixel grid
-  const grain = Math.max(3, cell - 1);
+  // hit particles (bg layer)
   for (const p of state.particles) {
     ctx.globalAlpha = 1 - p.age / p.ttl;
     ctx.fillStyle = p.color;
-    ctx.fillRect(Math.floor(p.x / grain) * grain, Math.floor(p.y / grain) * grain, grain, grain);
+    const size = 5;
+    ctx.fillRect(
+      Math.floor((p.x + bgOff.x) / size) * size,
+      Math.floor((p.y + bgOff.y) / size) * size,
+      size,
+      size,
+    );
   }
   ctx.globalAlpha = 1;
+
+  // occluders: re-cropped background regions hide the ragged lower edges
+  for (const oc of scene.occluders) {
+    const off = oc.layer === "fg" ? fgOff : bgOff;
+    ctx.drawImage(
+      scene.art.bg,
+      oc.sx,
+      oc.sy,
+      oc.sw,
+      oc.sh,
+      oc.dx + off.x,
+      oc.dy + off.y,
+      oc.dw,
+      oc.dh,
+    );
+  }
 
   // tap ripples
   for (const r of state.ripples) {
@@ -65,59 +164,120 @@ export function renderFrame(
   }
   ctx.globalAlpha = 1;
 
-  drawGun(ctx, state);
+  drawPistolLayer(ctx, state, scene, fx);
+  ctx.restore(); // end shake
+
   drawHud(ctx, state);
+
+  // post: vignette + chromatic fringe, then drifting grain
+  if (fxKey !== `${w}x${h}` || !fxCanvas) {
+    fxCanvas = buildFx(w, h);
+    fxKey = `${w}x${h}`;
+  }
+  ctx.drawImage(fxCanvas, 0, 0);
+  grainTile ??= buildGrain();
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  const gx = -Math.floor(Math.random() * 128);
+  const gy = -Math.floor(Math.random() * 128);
+  for (let ty = gy; ty < h; ty += 128) {
+    for (let tx = gx; tx < w; tx += 128) {
+      ctx.drawImage(grainTile, tx, ty);
+    }
+  }
+  ctx.restore();
 
   if (pointer.inside && (pointer.type === "mouse" || pointer.type === "pen")) {
     drawCrosshair(ctx, pointer.x, pointer.y);
   }
 }
 
-// --- gun -------------------------------------------------------------------
+// --- pistol ---------------------------------------------------------------
 
-function drawGun(ctx: CanvasRenderingContext2D, state: ArcadeState): void {
-  const { w, h, cell } = state;
-  const gc = cell * 1.7;
-  const gunH = PISTOL_ROWS * gc;
-  const cx = w / 2;
+function drawPistolLayer(
+  ctx: CanvasRenderingContext2D,
+  state: ArcadeState,
+  scene: Scene,
+  fx: ViewFx,
+): void {
+  const { w, h } = state;
+  const P = PISTOL_LAYOUT;
+  const img = scene.art.pistol;
 
-  // reload: gun dips down and comes back
+  const displayH = h * (scene.art.portrait ? P.heightFracMobile : P.heightFrac);
+  const scale = displayH / Math.max(1, img.naturalHeight);
+  const displayW = img.naturalWidth * scale;
+
+  // reload dip
   let reloadDip = 0;
+  let reloadProgress = 0;
   if (state.reloadUntil > 0) {
-    const total = RELOAD_MS / 1000;
-    const progress = 1 - (state.reloadUntil - state.t) / total;
-    reloadDip = Math.sin(Math.PI * Math.min(1, Math.max(0, progress))) * gunH * 0.65;
+    reloadProgress = Math.min(
+      1,
+      Math.max(0, 1 - (state.reloadUntil - state.t) / (RELOAD_MS / 1000)),
+    );
+    reloadDip = Math.sin(Math.PI * reloadProgress) * displayH * 0.35;
   }
-  const recoilKick = state.gun.recoil * cell * 3.5;
-  const topY = h - gunH + recoilKick + reloadDip;
 
-  drawPistol(ctx, cx, topY, gc);
+  const rotation =
+    ((P.rotationDeg - state.gun.recoil * P.recoilTwistDeg) * Math.PI) / 180;
+  // recoil pushes back along the barrel axis (down-right of the up-left barrel)
+  const kick = state.gun.recoil * P.recoilKickPx;
+  const kickX = -Math.sin(rotation) * kick;
+  const kickY = Math.cos(rotation) * kick;
+
+  const aimX = fx.parallax ? fx.lookX * P.aimShift : 0;
+  const aimY = fx.parallax ? fx.lookY * P.aimShift * 0.6 : 0;
+
+  const pivotX = w * P.anchorX + aimX + kickX;
+  const pivotY = h + displayH * P.pivotBelow + aimY + kickY + reloadDip;
+
+  ctx.save();
+  ctx.translate(pivotX, pivotY);
+  ctx.rotate(rotation);
+  // pivot sits at the grip: horizontal centre, bottom of the sprite
+  ctx.drawImage(img, -displayW / 2, -displayH, displayW, displayH);
+
+  // muzzle bloom lights the scene on fire
   if (state.gun.flashT > 0) {
-    drawMuzzleFlash(ctx, cx, topY - cell, cell, state.gun.flashT / 0.09);
+    const mx = -displayW / 2 + displayW * P.muzzle.x;
+    const my = -displayH + displayH * P.muzzle.y;
+    const strength = state.gun.flashT / 0.09;
+    ctx.globalCompositeOperation = "lighter";
+    const r = Math.min(w, h) * 0.5 * strength;
+    const bloom = ctx.createRadialGradient(mx, my, 0, mx, my, r);
+    bloom.addColorStop(0, `rgba(255, 244, 214, ${0.85 * strength})`);
+    bloom.addColorStop(0.25, `rgba(255, 214, 140, ${0.35 * strength})`);
+    bloom.addColorStop(1, "rgba(255, 200, 120, 0)");
+    ctx.fillStyle = bloom;
+    ctx.fillRect(mx - r, my - r, r * 2, r * 2);
+    ctx.globalCompositeOperation = "source-over";
   }
+  ctx.restore();
 
   if (state.reloadUntil > 0) {
-    const total = RELOAD_MS / 1000;
-    const progress = 1 - (state.reloadUntil - state.t) / total;
-    const barW = PISTOL_COLS * gc * 0.9;
-    const barY = h - gunH - cell * 6;
-    drawPixelText(ctx, "RELOADING", cx, barY - cell * 4, Math.max(2, cell - 3), MUTED);
-    ctx.fillStyle = "rgba(138,139,143,0.25)";
-    ctx.fillRect(Math.round(cx - barW / 2), Math.round(barY), Math.round(barW), cell);
+    const barW = Math.min(w * 0.32, 320);
+    const barY = h - 40;
+    const cx = w * 0.62;
+    drawPixelText(ctx, "RELOADING", cx, barY - 26, 3, MUTED);
+    ctx.fillStyle = "rgba(138,139,143,0.3)";
+    ctx.fillRect(Math.round(cx - barW / 2), barY, barW, 5);
     ctx.fillStyle = ACID;
-    ctx.fillRect(Math.round(cx - barW / 2), Math.round(barY), Math.round(barW * progress), cell);
+    ctx.fillRect(Math.round(cx - barW / 2), barY, Math.round(barW * reloadProgress), 5);
   }
 }
 
-// --- HUD -------------------------------------------------------------------
+// --- HUD ------------------------------------------------------------------
 
 function drawHud(ctx: CanvasRenderingContext2D, state: ArcadeState): void {
   const { w, h, cell, tuning } = state;
 
   if (state.phase === "ready") {
-    const readyS = READY_MS / 1000;
-    const label = state.readyT < readyS ? "READY" : "GO!";
+    const label = state.readyT < READY_MS / 1000 ? "READY" : "GO!";
     const scale = Math.max(4, cell + 1);
+    // backing strip keeps pixel text readable over the photo
+    ctx.fillStyle = "rgba(11,10,12,0.55)";
+    ctx.fillRect(0, h * 0.26, w, scale * 12 + 40);
     drawPixelText(ctx, label, w / 2, h * 0.3, scale, label === "GO!" ? ACID : BONE);
     drawPixelText(
       ctx,
@@ -129,45 +289,45 @@ function drawHud(ctx: CanvasRenderingContext2D, state: ArcadeState): void {
     );
     return;
   }
-
   if (state.phase !== "playing") return;
 
-  // timer, top center — reads like a shot clock
   const remaining = roundRemaining(state);
-  const timerText = remaining.toFixed(1);
-  const timerScale = Math.max(3, cell - 1);
   const urgent = remaining < 3;
-  drawPixelText(ctx, timerText, w / 2, cell * 4, timerScale, urgent ? DANGER : BONE);
+  const timerScale = Math.max(3, cell - 1);
+  shadowText(ctx, remaining.toFixed(1), w / 2, 22, timerScale, urgent ? DANGER : BONE);
 
-  // hit counter, top left
-  drawPixelText(
-    ctx,
-    `${state.hits} / ${tuning.targetCount}`,
-    (textWidthCells(`${state.hits} / ${tuning.targetCount}`) * 3) / 2 + cell * 4,
-    cell * 4,
-    3,
-    ACID,
-  );
+  const counter = `${state.hits} / ${tuning.targetCount}`;
+  shadowText(ctx, counter, (textWidthCells(counter) * 3) / 2 + 24, 22, 3, ACID);
 
   // ammo pips, bottom left
-  const pipW = cell * 2;
-  const pipH = cell * 4;
+  const pipW = 9;
+  const pipH = 20;
   for (let i = 0; i < state.tuning.magSize; i++) {
-    const x = cell * 4 + i * pipW * 1.6;
-    const y = h - pipH - cell * 4;
+    const x = 24 + i * pipW * 1.7;
+    const y = h - pipH - 24;
     if (i < state.ammo) {
       ctx.fillStyle = BONE;
-      ctx.fillRect(Math.round(x), Math.round(y), pipW, pipH);
+      ctx.fillRect(x, y, pipW, pipH);
       ctx.fillStyle = ACID;
-      ctx.fillRect(Math.round(x), Math.round(y), pipW, cell);
+      ctx.fillRect(x, y, pipW, 5);
     } else {
-      ctx.fillStyle = "rgba(138,139,143,0.3)";
-      ctx.fillRect(Math.round(x), Math.round(y), pipW, 1);
-      ctx.fillRect(Math.round(x), Math.round(y + pipH - 1), pipW, 1);
-      ctx.fillRect(Math.round(x), Math.round(y), 1, pipH);
-      ctx.fillRect(Math.round(x + pipW - 1), Math.round(y), 1, pipH);
+      ctx.strokeStyle = "rgba(242,239,231,0.35)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 0.5, y + 0.5, pipW - 1, pipH - 1);
     }
   }
+}
+
+function shadowText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  cx: number,
+  topY: number,
+  scale: number,
+  color: string,
+): void {
+  drawPixelText(ctx, text, cx + 2, topY + 2, scale, "rgba(11,10,12,0.8)");
+  drawPixelText(ctx, text, cx, topY, scale, color);
 }
 
 // --- reticle & ripple ------------------------------------------------------

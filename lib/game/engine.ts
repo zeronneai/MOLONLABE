@@ -3,7 +3,7 @@
 // config.ts — tune there, not here.
 
 import { GO_MS, READY_MS, RELOAD_MS, RISE_MS, type Tuning } from "./config";
-import { ALIEN_COLS, ALIEN_ROWS, BURST_COLORS } from "./sprites";
+import { BURST_COLORS } from "./assets";
 import type { SpawnPoint } from "./scene";
 
 export const STEP = 1 / 120; // fixed timestep, seconds
@@ -211,16 +211,20 @@ export function riseProgress(target: Target): number {
   return Math.max(0, Math.min(1, target.progress));
 }
 
-/** Alien center position for a target, in CSS px. */
+/** Alien center position for a target, in CSS px. Fully up, the lower
+ * third stays behind the cover line (the occluder hides the ragged edge). */
 export function targetCenter(
   state: ArcadeState,
   target: Target,
 ): { x: number; y: number; w: number; h: number } {
   const sp = state.spawnPoints[target.sp];
-  const cw = ALIEN_COLS * state.cell * sp.scale;
-  const chh = ALIEN_ROWS * state.cell * sp.scale;
   const rise = riseProgress(target);
-  return { x: sp.x, y: sp.coverY - chh * rise + chh / 2, w: cw, h: chh };
+  return {
+    x: sp.x,
+    y: sp.coverY + sp.h / 2 - rise * sp.h * 0.67,
+    w: sp.w,
+    h: sp.h,
+  };
 }
 
 export function fire(state: ArcadeState, x: number, y: number): ShotResult {
@@ -246,7 +250,7 @@ export function fire(state: ArcadeState, x: number, y: number): ShotResult {
       y >= topY &&
       y <= sp.coverY + box.h * 0.1
     ) {
-      burst(state, box.x, box.y - box.h * 0.1, sp.scale);
+      burst(state, box.x, box.y - box.h * 0.1, sp.anchor.scale);
       target.state = "ducking";
       target.progress = 0; // vanishes; the burst sells the hit
       state.hits += 1;
