@@ -110,5 +110,16 @@ export const PARALLAX = {
 
 export const ASSET_LOAD_TIMEOUT_MS = 10_000;
 
+// --- Scope end-frame -------------------------------------------------------
+// The game resolves into a scope view with an alien in the crosshairs; the
+// hero scrub's first frame is the same scope view, so the wipe reads as one
+// continuous shot. Tune these against the video's actual first frame.
+export const SCOPE_END = {
+  circleFrac: 0.72, // scope circle diameter / min(viewport w, h)
+  alienFrac: 0.24, // alien width / scope circle diameter
+  alienYShift: 0.04, // alien centre offset below scope centre (fraction of circle)
+  holdMs: 550, // how long the scope holds before the wipe fires
+};
+
 // Hit-burst palette (pixel particles read well over the photo)
 export const BURST_COLORS = ["#57b94a", "#57b94a", "#2e5f28", "#0b0a0c", "#f2efe7"];

@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import Hero from "@/components/home/Hero";
+import HeroScrub from "@/components/home/HeroScrub";
 import Featured from "@/components/home/Featured";
 import FreshArrivals from "@/components/home/FreshArrivals";
 import ShopStory from "@/components/home/ShopStory";
@@ -10,7 +10,7 @@ import VisitSection from "@/components/home/VisitSection";
 export default function Home() {
   return (
     <>
-      <Hero />
+      <HeroScrub />
       <Featured />
       <FreshArrivals />
       <ShopStory />

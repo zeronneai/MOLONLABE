@@ -26,7 +26,7 @@ import {
   type GameArt,
   type Scene,
 } from "@/lib/game/scene";
-import { PARALLAX } from "@/lib/game/assets";
+import { GAME_ASSETS, PARALLAX, SCOPE_END } from "@/lib/game/assets";
 import { renderFrame, type Pointer, type ViewFx } from "@/lib/game/render";
 import { LOGO_URL } from "@/lib/brand";
 import { track } from "@/lib/analytics";
@@ -39,7 +39,8 @@ type Phase =
   | "arcade"
   | "won"
   | "lost"
-  | "handoff"
+  | "handoff" // skull beat
+  | "scope" // resolves into the scope view that matches the hero's first frame
   | "wiping"
   | "done";
 
@@ -126,11 +127,13 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
     track("intro_skipped", {
       elapsed_ms: Math.round(performance.now() - startedAtRef.current),
     });
+    window.scrollTo(0, 0); // hero scrub must start at frame 0
     setPhase("done");
   }, []);
 
   const finishToSite = useCallback(() => {
     markSeen();
+    window.scrollTo(0, 0); // before the wipe finishes: scrub starts at frame 0
     setPhase("handoff");
   }, []);
 
@@ -337,8 +340,6 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
     document.addEventListener("visibilitychange", onVisibility);
 
     skipRef.current?.focus();
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
 
     return () => {
       cancelAnimationFrame(rafRef.current);
@@ -349,9 +350,24 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("resize", onResize);
       document.removeEventListener("visibilitychange", onVisibility);
-      document.body.style.overflow = prevOverflow;
     };
   }, [phase, skip]);
+
+  // Body scroll stays locked for the overlay's whole lifetime — otherwise
+  // scrolling behind the game advances the hero scrub underneath, and the
+  // site would be revealed mid-sequence.
+  useEffect(() => {
+    if (phase === "idle" || phase === "done") return;
+    // html AND body: overflow on body alone doesn't stop window scrolling
+    const prevBody = document.body.style.overflow;
+    const prevHtml = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevBody;
+      document.documentElement.style.overflow = prevHtml;
+    };
+  }, [phase]);
 
   // Result screens and loading: Esc still skips, focus stays inside.
   useEffect(() => {
@@ -373,19 +389,23 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
         focusables[next].focus();
       }
     };
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKeyDown);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = prevOverflow;
     };
   }, [phase, skip]);
 
-  // Skull handoff: brief beat, then the hard wipe.
+  // Skull beat, then the scope view, then the hard wipe. The scope frame
+  // matches the hero scrub's first frame so the wipe reads as one shot.
   useEffect(() => {
     if (phase !== "handoff") return;
-    const id = window.setTimeout(() => setPhase("wiping"), 320);
+    const id = window.setTimeout(() => setPhase("scope"), 320);
+    return () => window.clearTimeout(id);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "scope") return;
+    const id = window.setTimeout(() => setPhase("wiping"), SCOPE_END.holdMs);
     return () => window.clearTimeout(id);
   }, [phase]);
 
@@ -494,14 +514,39 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
         </div>
       )}
 
-      {(phase === "handoff" || phase === "wiping") && (
+      {phase === "handoff" && (
         <div className="absolute inset-0 bg-ink">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={LOGO_URL} alt="" className="intro-skull" aria-hidden="true" />
         </div>
       )}
 
-      {phase !== "handoff" && phase !== "wiping" && (
+      {(phase === "scope" || phase === "wiping") && (
+        <div className="intro-scope" aria-hidden="true">
+          <div
+            className="intro-scope-circle"
+            style={{
+              width: `min(${SCOPE_END.circleFrac * 100}vw, ${SCOPE_END.circleFrac * 100}vh)`,
+              height: `min(${SCOPE_END.circleFrac * 100}vw, ${SCOPE_END.circleFrac * 100}vh)`,
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={GAME_ASSETS.alienB}
+              alt=""
+              className="intro-scope-alien"
+              style={{
+                width: `${SCOPE_END.alienFrac * 100}%`,
+                transform: `translate(-50%, calc(-50% + ${SCOPE_END.alienYShift * 100}%))`,
+              }}
+            />
+            <span className="intro-scope-line-h" />
+            <span className="intro-scope-line-v" />
+          </div>
+        </div>
+      )}
+
+      {phase !== "handoff" && phase !== "scope" && phase !== "wiping" && (
         <button
           ref={skipRef}
           type="button"
