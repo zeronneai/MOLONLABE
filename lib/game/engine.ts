@@ -1,19 +1,32 @@
-import { ALIEN_COLS, ALIEN_ROWS, BURST_COLORS } from "./sprites";
+// Whack-a-mole round engine. All times are seconds of simulated time, so
+// pausing the animation loop pauses the round. Difficulty knobs live in
+// config.ts — tune there, not here.
 
-export const ALIEN_COUNT = 4;
+import {
+  GO_MS,
+  MAG_SIZE,
+  READY_MS,
+  RELOAD_MS,
+  RISE_MS,
+  ROUND_MS,
+  type Tuning,
+} from "./config";
+import { ALIEN_COLS, ALIEN_ROWS, BURST_COLORS } from "./sprites";
+import type { SpawnPoint } from "./scene";
+
 export const STEP = 1 / 120; // fixed timestep, seconds
+
 const GRAVITY = 340;
 const RIPPLE_TTL = 0.45;
 
-export interface Alien {
-  bx: number; // base position; sine drift is applied on top
-  by: number;
-  vx: number;
-  vy: number;
-  phase: number;
-  freq: number;
-  amp: number;
-  alive: boolean;
+export type TargetState = "rising" | "up" | "ducking";
+
+export interface Target {
+  sp: number; // spawn point index
+  state: TargetState;
+  progress: number; // rise/duck progress 0..1
+  upFor: number; // seconds this one stays up
+  upTime: number; // time spent fully up
 }
 
 export interface Particle {
@@ -32,90 +45,163 @@ export interface Ripple {
   age: number;
 }
 
-export interface GameState {
+export type RoundPhase = "ready" | "playing" | "won" | "lost";
+export type ShotResult = "hit" | "miss" | "reloading" | "blocked";
+
+export interface ArcadeState {
   w: number;
   h: number;
-  cell: number; // size of one sprite pixel, px
+  cell: number;
+  tuning: Tuning;
+  spawnPoints: SpawnPoint[];
   t: number;
+  phase: RoundPhase;
+  readyT: number;
+  roundEndsAt: number;
+  targets: Target[];
+  nextSpawnAt: number;
   hits: number;
-  aliens: Alien[];
+  shots: number;
+  ammo: number;
+  reloadUntil: number; // 0 = not reloading
+  gun: { recoil: number; flashT: number };
   particles: Particle[];
   ripples: Ripple[];
-  stars: { x: number; y: number; size: number }[]; // normalized 0..1 coords
 }
 
 function rand(min: number, max: number): number {
   return min + Math.random() * (max - min);
 }
 
-function cellSize(w: number, h: number): number {
-  return Math.max(3, Math.min(7, Math.floor(Math.min(w, h) / 90)));
+export function cellSize(w: number, h: number): number {
+  return Math.max(3, Math.min(7, Math.floor(Math.min(w, h) / 110)));
 }
 
-export function createGame(w: number, h: number): GameState {
-  const cell = cellSize(w, h);
-  // One alien per quadrant so they start spread out.
-  const quads = [
-    [0.25, 0.4],
-    [0.75, 0.35],
-    [0.3, 0.72],
-    [0.7, 0.68],
-  ];
-  const aliens: Alien[] = quads.map(([qx, qy]) => ({
-    bx: w * qx + rand(-w * 0.06, w * 0.06),
-    by: h * qy + rand(-h * 0.04, h * 0.04),
-    vx: rand(45, 95) * (Math.random() < 0.5 ? -1 : 1),
-    vy: rand(18, 40) * (Math.random() < 0.5 ? -1 : 1),
-    phase: rand(0, Math.PI * 2),
-    freq: rand(0.9, 2.1),
-    amp: rand(18, 52),
-    alive: true,
-  }));
-  const stars = Array.from({ length: 44 }, () => ({
-    x: Math.random(),
-    y: Math.random(),
-    size: Math.random() < 0.25 ? 3 : 2,
-  }));
-  return { w, h, cell, t: 0, hits: 0, aliens, particles: [], ripples: [], stars };
-}
-
-export function resizeGame(state: GameState, w: number, h: number): void {
-  state.w = w;
-  state.h = h;
-  state.cell = cellSize(w, h);
-  for (const a of state.aliens) {
-    a.bx = Math.min(Math.max(a.bx, 0), w);
-    a.by = Math.min(Math.max(a.by, 0), h);
-  }
-}
-
-export function alienPos(state: GameState, a: Alien): { x: number; y: number } {
+export function createArcade(
+  w: number,
+  h: number,
+  tuning: Tuning,
+  spawnPoints: SpawnPoint[],
+): ArcadeState {
   return {
-    x: a.bx + Math.sin(state.t * a.freq * 0.7 + a.phase) * a.amp * 0.5,
-    y: a.by + Math.sin(state.t * a.freq + a.phase) * a.amp,
+    w,
+    h,
+    cell: cellSize(w, h),
+    tuning,
+    spawnPoints,
+    t: 0,
+    phase: "ready",
+    readyT: 0,
+    roundEndsAt: 0,
+    targets: [],
+    nextSpawnAt: 0,
+    hits: 0,
+    shots: 0,
+    ammo: MAG_SIZE,
+    reloadUntil: 0,
+    gun: { recoil: 0, flashT: 0 },
+    particles: [],
+    ripples: [],
   };
 }
 
-export function update(state: GameState, dt: number): void {
+export function resizeArcade(
+  state: ArcadeState,
+  w: number,
+  h: number,
+  spawnPoints: SpawnPoint[],
+): void {
+  state.w = w;
+  state.h = h;
+  state.cell = cellSize(w, h);
+  state.spawnPoints = spawnPoints;
+  state.targets = []; // spawn points moved; clear cleanly
+}
+
+export function roundRemaining(state: ArcadeState): number {
+  return Math.max(0, state.roundEndsAt - state.t);
+}
+
+/** Interval between spawns, accelerating over the round. */
+function spawnInterval(state: ArcadeState): number {
+  const progress =
+    1 - roundRemaining(state) / (ROUND_MS / 1000) || 0;
+  const ms =
+    state.tuning.spawnStartMs +
+    (state.tuning.spawnEndMs - state.tuning.spawnStartMs) * Math.min(1, progress);
+  return (ms / 1000) * rand(0.85, 1.15);
+}
+
+export function update(state: ArcadeState, dt: number): void {
   state.t += dt;
 
-  const halfW = (ALIEN_COLS * state.cell) / 2;
-  const halfH = (ALIEN_ROWS * state.cell) / 2;
-  for (const a of state.aliens) {
-    if (!a.alive) continue;
-    a.bx += a.vx * dt;
-    a.by += a.vy * dt;
-    // Bounce the base point, leaving room for the sine drift on top.
-    const minX = halfW + a.amp * 0.5;
-    const maxX = state.w - minX;
-    const minY = halfH + a.amp + 90; // keep clear of the prompt text
-    const maxY = state.h - halfH - a.amp;
-    if (a.bx < minX) { a.bx = minX; a.vx = Math.abs(a.vx); }
-    if (a.bx > maxX) { a.bx = maxX; a.vx = -Math.abs(a.vx); }
-    if (a.by < minY) { a.by = minY; a.vy = Math.abs(a.vy); }
-    if (a.by > maxY) { a.by = maxY; a.vy = -Math.abs(a.vy); }
+  if (state.phase === "ready") {
+    state.readyT += dt;
+    if (state.readyT >= (READY_MS + GO_MS) / 1000) {
+      state.phase = "playing";
+      state.roundEndsAt = state.t + ROUND_MS / 1000;
+      state.nextSpawnAt = state.t + 0.25;
+    }
   }
 
+  if (state.phase === "playing") {
+    // reload completes
+    if (state.reloadUntil > 0 && state.t >= state.reloadUntil) {
+      state.reloadUntil = 0;
+      state.ammo = MAG_SIZE;
+    }
+
+    // spawns
+    const upCount = state.targets.length;
+    if (state.t >= state.nextSpawnAt && upCount < state.tuning.maxUp) {
+      const used = new Set(state.targets.map((tg) => tg.sp));
+      const free = state.spawnPoints
+        .map((_, i) => i)
+        .filter((i) => !used.has(i));
+      if (free.length > 0) {
+        state.targets.push({
+          sp: free[Math.floor(Math.random() * free.length)],
+          state: "rising",
+          progress: 0,
+          upFor: rand(state.tuning.popMinMs, state.tuning.popMaxMs) / 1000,
+          upTime: 0,
+        });
+      }
+      state.nextSpawnAt = state.t + spawnInterval(state);
+    }
+
+    // target lifecycle
+    const riseS = RISE_MS / 1000;
+    for (const target of state.targets) {
+      if (target.state === "rising") {
+        target.progress += dt / riseS;
+        if (target.progress >= 1) {
+          target.progress = 1;
+          target.state = "up";
+        }
+      } else if (target.state === "up") {
+        target.upTime += dt;
+        if (target.upTime >= target.upFor) target.state = "ducking";
+      } else {
+        target.progress -= dt / riseS;
+      }
+    }
+    state.targets = state.targets.filter(
+      (tg) => !(tg.state === "ducking" && tg.progress <= 0),
+    );
+
+    // round timer
+    if (roundRemaining(state) <= 0) {
+      state.phase = state.hits >= state.tuning.targetCount ? "won" : "lost";
+      state.targets = [];
+    }
+  }
+
+  // gun animation
+  state.gun.recoil = Math.max(0, state.gun.recoil - dt * 7);
+  state.gun.flashT = Math.max(0, state.gun.flashT - dt);
+
+  // particles
   for (const p of state.particles) {
     p.age += dt;
     p.vy += GRAVITY * dt;
@@ -128,49 +214,81 @@ export function update(state: GameState, dt: number): void {
   state.ripples = state.ripples.filter((r) => r.age < RIPPLE_TTL);
 }
 
-/** Returns the index of the alien under (x, y), or -1. */
-export function hitTest(
-  state: GameState,
-  x: number,
-  y: number,
-  coarse: boolean,
-): number {
-  // Roughly 40% larger hit boxes on coarse pointers.
-  const grow = coarse ? 1.4 : 1;
-  const halfW = ((ALIEN_COLS * state.cell) / 2) * grow;
-  const halfH = ((ALIEN_ROWS * state.cell) / 2) * grow;
-  for (let i = 0; i < state.aliens.length; i++) {
-    const a = state.aliens[i];
-    if (!a.alive) continue;
-    const pos = alienPos(state, a);
-    if (Math.abs(x - pos.x) <= halfW && Math.abs(y - pos.y) <= halfH) return i;
-  }
-  return -1;
+/** How far up a target currently is, 0..1. */
+export function riseProgress(target: Target): number {
+  return Math.max(0, Math.min(1, target.progress));
 }
 
-/** Kill an alien: mark it dead, bump the counter, scatter pixel particles. */
-export function killAlien(state: GameState, index: number): void {
-  const a = state.aliens[index];
-  if (!a.alive) return;
-  a.alive = false;
-  state.hits += 1;
-  const pos = alienPos(state, a);
-  for (let i = 0; i < 30; i++) {
+/** Alien center position for a target, in CSS px. */
+export function targetCenter(
+  state: ArcadeState,
+  target: Target,
+): { x: number; y: number; w: number; h: number } {
+  const sp = state.spawnPoints[target.sp];
+  const cw = ALIEN_COLS * state.cell * sp.scale;
+  const chh = ALIEN_ROWS * state.cell * sp.scale;
+  const rise = riseProgress(target);
+  return { x: sp.x, y: sp.coverY - chh * rise + chh / 2, w: cw, h: chh };
+}
+
+export function fire(state: ArcadeState, x: number, y: number): ShotResult {
+  if (state.phase !== "playing") return "blocked";
+  if (state.reloadUntil > 0) return "reloading";
+
+  state.ammo -= 1;
+  state.shots += 1;
+  state.gun.recoil = 1;
+  state.gun.flashT = 0.09;
+
+  let result: ShotResult = "miss";
+  const grow = state.tuning.hitboxGrow;
+  for (const target of state.targets) {
+    if (target.state === "ducking") continue;
+    const box = targetCenter(state, target);
+    const sp = state.spawnPoints[target.sp];
+    const halfW = (box.w / 2) * grow;
+    const topY = box.y - (box.h / 2) * grow;
+    // hittable region: grown box, clipped at the cover line
+    if (
+      Math.abs(x - box.x) <= halfW &&
+      y >= topY &&
+      y <= sp.coverY + box.h * 0.1
+    ) {
+      burst(state, box.x, box.y - box.h * 0.1, sp.scale);
+      target.state = "ducking";
+      target.progress = 0; // vanishes; the burst sells the hit
+      state.hits += 1;
+      result = "hit";
+      break;
+    }
+  }
+
+  if (state.hits >= state.tuning.targetCount) {
+    state.phase = "won";
+    state.targets = [];
+  } else if (state.ammo <= 0) {
+    state.reloadUntil = state.t + RELOAD_MS / 1000;
+  }
+  return result;
+}
+
+function burst(state: ArcadeState, x: number, y: number, scale: number): void {
+  for (let i = 0; i < 26; i++) {
     const angle = rand(0, Math.PI * 2);
-    const speed = rand(70, 300);
+    const speed = rand(70, 300) * scale;
     state.particles.push({
-      x: pos.x + rand(-8, 8),
-      y: pos.y + rand(-8, 8),
+      x: x + rand(-8, 8),
+      y: y + rand(-8, 8),
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed - 60,
       age: 0,
-      ttl: rand(0.45, 0.85),
+      ttl: rand(0.4, 0.8),
       color: BURST_COLORS[Math.floor(Math.random() * BURST_COLORS.length)],
     });
   }
 }
 
-export function addRipple(state: GameState, x: number, y: number): void {
+export function addRipple(state: ArcadeState, x: number, y: number): void {
   state.ripples.push({ x, y, age: 0 });
 }
 

@@ -347,21 +347,32 @@ textarea.field-input {
   );
 }
 
-.intro-flash {
+/* Result cards (win / lose) over the frozen last frame */
+.intro-result {
   position: absolute;
   inset: 0;
-  pointer-events: none;
-  background: var(--color-bone);
-  animation: intro-flash 120ms steps(2, end) forwards;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: rgba(11, 10, 12, 0.88);
+  cursor: auto;
 }
 
-@keyframes intro-flash {
-  from {
-    opacity: 0.9;
-  }
-  to {
-    opacity: 0;
-  }
+.intro-code {
+  display: block;
+  min-width: 220px;
+  padding: 18px 28px;
+  border: 1px dashed var(--color-acid);
+  color: var(--color-bone);
+  font-size: 22px;
+  text-align: center;
+  transition: background 180ms;
+}
+.intro-code:hover,
+.intro-code:focus-visible {
+  background: rgba(87, 185, 74, 0.08);
 }
 
 /* The handoff: the flash resolves into the skull before the wipe fires */
