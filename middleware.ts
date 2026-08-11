@@ -31,8 +31,7 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isLogin = path === "/admin";
-  const isAuthFlow = path.startsWith("/admin/auth");
-  if (!user && !isLogin && !isAuthFlow) {
+  if (!user && !isLogin) {
     const redirect = request.nextUrl.clone();
     redirect.pathname = "/admin";
     redirect.search = "";
