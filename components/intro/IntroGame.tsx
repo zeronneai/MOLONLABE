@@ -532,7 +532,7 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={GAME_ASSETS.alienB}
+              src={GAME_ASSETS.alien2}
               alt=""
               className="intro-scope-alien"
               style={{

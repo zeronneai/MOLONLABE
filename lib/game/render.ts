@@ -114,8 +114,17 @@ export function renderFrame(
     const box = targetCenter(state, target);
     const px = box.x + bgOff.x;
     const py = box.y + bgOff.y;
+    // soft dark halo behind pale sprites so they never vanish into a lit case
+    if (sp.anchor.darkDrop) {
+      const r = box.w * 0.85;
+      const halo = ctx.createRadialGradient(px, py, 0, px, py, r);
+      halo.addColorStop(0, "rgba(11, 10, 12, 0.5)");
+      halo.addColorStop(1, "rgba(11, 10, 12, 0)");
+      ctx.fillStyle = halo;
+      ctx.fillRect(px - r, py - r, r * 2, r * 2);
+    }
     ctx.save();
-    if (sp.anchor.flip) {
+    if (target.flip) {
       ctx.translate(px, py);
       ctx.scale(-1, 1);
       ctx.drawImage(sp.sprite, -box.w / 2, -box.h / 2, box.w, box.h);
@@ -139,7 +148,7 @@ export function renderFrame(
   }
   ctx.globalAlpha = 1;
 
-  // occluders: re-cropped background regions hide the ragged lower edges
+  // occluders: re-cropped background regions the rise-mode aliens emerge behind
   for (const oc of scene.occluders) {
     const off = oc.layer === "fg" ? fgOff : bgOff;
     ctx.drawImage(

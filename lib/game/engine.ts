@@ -19,6 +19,7 @@ export interface Target {
   progress: number; // rise/duck progress 0..1
   upFor: number; // seconds this one stays up
   upTime: number; // time spent fully up
+  flip: boolean; // mirrored horizontally, randomized per spawn
 }
 
 export interface Particle {
@@ -157,6 +158,7 @@ export function update(state: ArcadeState, dt: number): void {
           progress: 0,
           upFor: rand(state.tuning.popMinMs, state.tuning.popMaxMs) / 1000,
           upTime: 0,
+          flip: Math.random() < 0.5,
         });
       }
       state.nextSpawnAt = state.t + spawnInterval(state);
@@ -211,17 +213,28 @@ export function riseProgress(target: Target): number {
   return Math.max(0, Math.min(1, target.progress));
 }
 
-/** Alien center position for a target, in CSS px. Fully up, the lower
- * third stays behind the cover line (the occluder hides the ragged edge). */
+/** Alien center position and size for a target, in CSS px.
+ * 'rise' anchors translate up from behind their occluder, exposing
+ * anchor.expose of the sprite when fully up. 'pop' anchors grow in place
+ * on their floor line — no cover needed with clean-edged sprites. */
 export function targetCenter(
   state: ArcadeState,
   target: Target,
 ): { x: number; y: number; w: number; h: number } {
   const sp = state.spawnPoints[target.sp];
   const rise = riseProgress(target);
+  if (sp.anchor.mode === "pop") {
+    const k = 0.45 + 0.55 * rise;
+    return {
+      x: sp.x,
+      y: sp.coverY - (sp.h * k) / 2,
+      w: sp.w * k,
+      h: sp.h * k,
+    };
+  }
   return {
     x: sp.x,
-    y: sp.coverY + sp.h / 2 - rise * sp.h * 0.67,
+    y: sp.coverY + sp.h / 2 - rise * sp.h * sp.anchor.expose,
     w: sp.w,
     h: sp.h,
   };

@@ -1,7 +1,7 @@
 // Scene assembly over the photographed backgrounds: loads assets, builds
 // tinted sprite variants, and maps normalized anchors/occluders into
 // viewport pixels. Occluders are regions of the background re-cropped and
-// drawn on top of the aliens, hiding the cutouts' ragged lower edges.
+// drawn on top of the aliens so rise-mode spawns emerge from behind cover.
 
 import {
   ASSET_LOAD_TIMEOUT_MS,
@@ -37,8 +37,9 @@ export interface Occluder {
 export interface GameArt {
   bg: HTMLImageElement;
   portrait: boolean;
-  alienA: HTMLImageElement;
-  alienB: HTMLImageElement;
+  alien1: HTMLImageElement;
+  alien2: HTMLImageElement;
+  alien3: HTMLImageElement;
   pistol: HTMLImageElement;
 }
 
@@ -72,13 +73,14 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 
 /** Preload everything for one orientation. Rejects → the game is skipped. */
 export async function loadGameArt(portrait: boolean): Promise<GameArt> {
-  const [bg, alienA, alienB, pistol] = await Promise.all([
+  const [bg, alien1, alien2, alien3, pistol] = await Promise.all([
     loadImage(portrait ? GAME_ASSETS.bgMobile : GAME_ASSETS.bgDesktop),
-    loadImage(GAME_ASSETS.alienA),
-    loadImage(GAME_ASSETS.alienB),
+    loadImage(GAME_ASSETS.alien1),
+    loadImage(GAME_ASSETS.alien2),
+    loadImage(GAME_ASSETS.alien3),
     loadImage(GAME_ASSETS.pistol),
   ]);
-  return { bg, portrait, alienA, alienB, pistol };
+  return { bg, portrait, alien1, alien2, alien3, pistol };
 }
 
 /** Load just the other orientation's background (device rotated mid-game). */
@@ -112,8 +114,9 @@ export function buildScene(art: GameArt, w: number, h: number): Scene {
   const anchors = art.portrait ? SPAWN_ANCHORS_MOBILE : SPAWN_ANCHORS_DESKTOP;
   const bgDraw = coverFit(art.bg, w, h);
 
+  const sources = { "1": art.alien1, "2": art.alien2, "3": art.alien3 } as const;
   const spawnPoints: SpawnPoint[] = anchors.map((anchor) => {
-    const source = anchor.sprite === "A" ? art.alienA : art.alienB;
+    const source = sources[anchor.sprite];
     const aspect = source.naturalHeight / Math.max(1, source.naturalWidth);
     const width = Math.min(w, h) * 0.24 * anchor.scale;
     return {
@@ -138,12 +141,14 @@ export function buildScene(art: GameArt, w: number, h: number): Scene {
     };
   };
 
-  const occluders: Occluder[] = anchors.map((anchor) => {
+  // open (pop) anchors have no occluder — clean-edged sprites don't need one
+  const occluders: Occluder[] = anchors.flatMap((anchor) => {
+    if (!anchor.occluder) return [];
     const dx = anchor.occluder.x * w;
     const dy = anchor.occluder.y * h;
     const dw = anchor.occluder.w * w;
     const dh = anchor.occluder.h * h;
-    return { ...toSource(dx, dy, dw, dh), dx, dy, dw, dh, layer: anchor.occluder.layer };
+    return [{ ...toSource(dx, dy, dw, dh), dx, dy, dw, dh, layer: anchor.occluder.layer }];
   });
 
   return { art, bgDraw, spawnPoints, occluders };
