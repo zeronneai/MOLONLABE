@@ -254,7 +254,10 @@ textarea.field-input {
   }
 }
 
-/* Inventory filters: plain text labels, no backgrounds */
+/* Inventory filters: plain text labels, no backgrounds.
+   `.filter-tap` is the admin variant — same mark, but the link owns a 44px
+   tap area and the inner `.filter-label` keeps the underline on the text,
+   so the phone gets a real target without changing the drawing. */
 .filter-label {
   font-size: 11px;
   font-weight: 600;
@@ -265,10 +268,17 @@ textarea.field-input {
   border-bottom: 1px solid transparent;
   transition: color 180ms, border-color 180ms;
 }
-.filter-label:hover {
+.filter-tap {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.filter-label:hover,
+.filter-tap:hover > .filter-label {
   color: var(--color-bone);
 }
-.filter-label[aria-pressed="true"] {
+.filter-label[aria-pressed="true"],
+.filter-tap[aria-pressed="true"] > .filter-label {
   color: var(--color-acid);
   border-bottom-color: var(--color-acid);
 }

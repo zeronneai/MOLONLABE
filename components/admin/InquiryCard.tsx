@@ -38,19 +38,24 @@ export default function InquiryCard({
         {inquiry.type}
         {itemName ? ` · ${itemName}` : ""}
       </p>
-      <p className="mt-2 text-sm text-muted">
-        <a href={`mailto:${inquiry.email}`} className="underline underline-offset-4">
+      {/* Calling or emailing is the actual job here, so both are full-height
+          tap targets rather than inline text in a sentence. */}
+      <div className="mt-2 flex flex-wrap items-center gap-x-6">
+        <a
+          href={`mailto:${inquiry.email}`}
+          className="inline-flex h-11 items-center text-sm underline underline-offset-4 hover:text-acid"
+        >
           {inquiry.email}
         </a>
         {inquiry.phone && (
-          <>
-            {" · "}
-            <a href={`tel:${inquiry.phone}`} className="underline underline-offset-4">
-              {inquiry.phone}
-            </a>
-          </>
+          <a
+            href={`tel:${inquiry.phone}`}
+            className="inline-flex h-11 items-center text-sm underline underline-offset-4 hover:text-acid"
+          >
+            {inquiry.phone}
+          </a>
         )}
-      </p>
+      </div>
       {inquiry.message && (
         <p className="mt-3 max-w-[60ch] text-sm leading-relaxed">{inquiry.message}</p>
       )}

@@ -46,22 +46,22 @@ export default async function AdminInventory({
         {status && <input type="hidden" name="status" value={status} />}
       </form>
 
-      <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2">
+      <div className="mt-4 flex flex-wrap gap-x-6">
         <Link
           href={`/admin/inventory${q ? `?q=${encodeURIComponent(q)}` : ""}`}
-          className="filter-label"
+          className="filter-tap"
           aria-pressed={!status}
         >
-          All
+          <span className="filter-label">All</span>
         </Link>
         {ITEM_STATUSES.map((s) => (
           <Link
             key={s}
             href={`/admin/inventory?${new URLSearchParams({ ...(q ? { q } : {}), status: s })}`}
-            className="filter-label"
+            className="filter-tap"
             aria-pressed={status === s}
           >
-            {s}
+            <span className="filter-label">{s}</span>
           </Link>
         ))}
       </div>
