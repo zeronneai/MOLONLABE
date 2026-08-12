@@ -60,18 +60,14 @@ export default function InquiryCard({
         <p className="mt-3 max-w-[60ch] text-sm leading-relaxed">{inquiry.message}</p>
       )}
 
-      <div className="mt-4 flex" role="group" aria-label="Inquiry status">
+      <div className="seg mt-4" role="group" aria-label="Inquiry status">
         {STATUSES.map((s) => (
           <button
             key={s}
             type="button"
             aria-pressed={inquiry.status === s}
             onClick={() => start(() => setInquiryStatus(inquiry.id, s))}
-            className={`label h-11 border px-4 transition-colors ${
-              inquiry.status === s
-                ? "border-acid text-acid"
-                : "hairline text-muted hover:text-bone"
-            }`}
+            className={`control control-sm ${s === "new" ? "tone-caution" : "tone-acid"}`}
           >
             {s}
           </button>

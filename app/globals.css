@@ -9,7 +9,15 @@
   --color-muted: #8a8b8f;
   --color-acid: #57b94a;
   --color-acid-dim: #2e5f28;
+  --color-acid-deep: #2e5f28;
+  --color-amber: #c08a2e;
   --color-danger: #c6472f;
+
+  /* Control materials — DESIGN.md section 1. Buttons are raised, fields
+     are sunken; that contrast is most of the effect. */
+  --color-surface-raised: #1f2227;
+  --color-surface-sunken: #131418;
+  --color-steel: #3a4048;
 
   --font-sans: var(--font-archivo), "Archivo", system-ui, sans-serif;
 
@@ -21,6 +29,17 @@
   /* Page left/right margin. Content hangs from the left rule; images
      escape it with the .bleed-* helpers. */
   --pad-x: 1.25rem;
+
+  /* The edge pair. A 1px light line along the top and a 1px dark line
+     along the bottom is what reads as a physical surface; inverting them
+     is what reads as depressed. Never used as a drop shadow. */
+  --edge-light: rgba(255, 255, 255, 0.1);
+  --edge-dark: rgba(0, 0, 0, 0.55);
+  --raised-hover: #262a30;
+
+  /* ~2% fractal noise over raised surfaces: kills the flat digital look
+     for about 300 bytes and no requests. */
+  --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
 }
 @media (min-width: 640px) {
   :root {
@@ -80,26 +99,162 @@ body {
   line-height: 0.92;
 }
 
-/* CTAs — DESIGN.md section 1. Primary: bordered rectangle, transparent
-   fill, 56px tall. Secondary: text with a 6px underline offset. */
-.cta-primary {
+/* Controls — DESIGN.md section 1.
+   Anatomy: solid --surface-raised fill, 1px --steel border, a 1px inset
+   highlight along the top and a 1px inset shadow along the bottom. Hover
+   lifts the fill one step and the border takes the semantic colour. Press
+   translates down 1px and inverts the edges, so it genuinely depresses.
+   Radius never exceeds 2px; the shadows are always inset. */
+.cta-primary,
+.control {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   height: 56px;
   padding-inline: 2rem;
-  border: 1px solid var(--color-bone);
+  border: 1px solid var(--color-steel);
+  border-radius: 2px;
+  background-color: var(--color-surface-raised);
+  background-image: var(--noise);
+  box-shadow:
+    inset 0 1px 0 var(--edge-light),
+    inset 0 -1px 0 var(--edge-dark);
   color: var(--color-bone);
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: var(--tracking-label);
-  transition: color 180ms, border-color 180ms;
+  transition:
+    background-color 140ms,
+    border-color 140ms,
+    color 140ms,
+    box-shadow 140ms,
+    transform 60ms;
 }
 .cta-primary:hover,
-.cta-primary:focus-visible {
+.control:hover {
+  background-color: var(--raised-hover);
+  border-color: var(--color-muted);
+}
+.cta-primary:active,
+.control:active {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 1px 0 var(--edge-dark),
+    inset 0 -1px 0 var(--edge-light);
+}
+.cta-primary:disabled,
+.control:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.cta-primary:disabled:active,
+.control:disabled:active {
+  transform: none;
+}
+
+/* Acid is confirm and go: the single primary action on a screen. Exactly
+   one of these per view. Its bottom edge is a darker shade of the same
+   material rather than a black line — machined, not printed. */
+.control-go {
+  background-color: var(--color-acid);
+  border-color: var(--color-acid-deep);
+  color: var(--color-ink);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -2px 0 var(--color-acid-deep);
+}
+.control-go:hover {
+  background-color: #63c955;
+  border-color: var(--color-acid-deep);
+}
+.control-go:active {
+  background-color: var(--color-acid);
+  box-shadow:
+    inset 0 2px 0 var(--color-acid-deep),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Amber is caution and pending. */
+.control-caution {
+  color: var(--color-amber);
+}
+.control-caution:hover {
+  border-color: var(--color-amber);
+}
+
+/* Danger is destructive only, never decorative. */
+.control-danger {
+  color: var(--color-danger);
+}
+.control-danger:hover {
+  border-color: var(--color-danger);
+}
+/* The committing step of a destructive flow, inside its confirmation. */
+.control-danger-fill {
+  background-color: var(--color-danger);
+  border-color: #8f2f1c;
+  color: var(--color-bone);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -2px 0 #8f2f1c;
+}
+.control-danger-fill:hover {
+  background-color: #d4553c;
+  border-color: #8f2f1c;
+}
+.control-danger-fill:active {
+  box-shadow:
+    inset 0 2px 0 #8f2f1c,
+    inset 0 -1px 0 rgba(255, 255, 255, 0.16);
+}
+
+/* Compact control: the phone minimum, for toggles and row actions. */
+.control-sm {
+  height: 44px;
+  padding-inline: 0.875rem;
+}
+
+/* Segmented switches (status toggles). The selected segment is depressed
+   — sunken fill, inverted edges — and carries the semantic colour, so the
+   state is legible without reading the label. Not an acid *fill*: the one
+   acid fill on a screen belongs to its primary action. */
+.seg {
+  display: inline-flex;
+}
+.seg > .control {
+  border-radius: 0;
+  margin-left: -1px;
+}
+.seg > .control:first-child {
+  border-radius: 2px 0 0 2px;
+  margin-left: 0;
+}
+.seg > .control:last-child {
+  border-radius: 0 2px 2px 0;
+}
+.seg > .control[aria-pressed="true"] {
+  background-color: var(--color-surface-sunken);
+  box-shadow:
+    inset 0 2px 3px rgba(0, 0, 0, 0.55),
+    inset 0 -1px 0 var(--edge-light);
+  transform: none;
+  position: relative;
+  z-index: 1;
+}
+/* Tone is per segment, not per group: within one switch, available reads
+   acid, reserved reads amber and sold reads danger. */
+.control[aria-pressed="true"].tone-acid {
   border-color: var(--color-acid);
   color: var(--color-acid);
+}
+.control[aria-pressed="true"].tone-caution {
+  border-color: var(--color-amber);
+  color: var(--color-amber);
+}
+.control[aria-pressed="true"].tone-danger {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
 }
 .cta-secondary {
   display: inline-flex;
@@ -129,20 +284,33 @@ body {
   letter-spacing: var(--tracking-label);
   color: var(--color-muted);
 }
+/* Inputs are the inverse of buttons: a --surface-sunken fill with an
+   inset shadow along the top edge, so they read as recessed into the
+   panel while controls sit proud of it. The underline stays — it is
+   still the field's identity, and it is where focus reads. */
 .field-input {
   display: block;
   width: 100%;
   height: 56px;
-  background: transparent;
+  padding-inline: 14px;
+  background-color: var(--color-surface-sunken);
   border: 0;
   border-bottom: 1px solid color-mix(in srgb, var(--color-muted) 40%, transparent);
+  border-radius: 2px 2px 0 0;
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(0, 0, 0, 0.6);
   color: var(--color-bone);
   font-size: 16px;
-  transition: border-color 180ms;
+  transition: border-color 180ms, background-color 180ms;
 }
 .field-input:focus {
   outline: none;
+  background-color: #16181d;
   border-bottom-color: var(--color-acid);
+}
+.field-input::placeholder {
+  color: color-mix(in srgb, var(--color-muted) 75%, transparent);
 }
 .field-input.field-error {
   border-bottom-color: var(--color-danger);
@@ -150,7 +318,7 @@ body {
 textarea.field-input {
   height: auto;
   min-height: 120px;
-  padding-block: 16px;
+  padding-block: 14px;
   resize: vertical;
 }
 

@@ -134,7 +134,7 @@ export default function AdminLogin() {
         <button
           type="submit"
           disabled={busy || locked}
-          className="cta-primary mt-8 disabled:opacity-50"
+          className="cta-primary control-go mt-8"
         >
           {busy ? "Signing in…" : "Sign in"}
         </button>

@@ -6,6 +6,11 @@ import { setCampaignStatus } from "@/app/admin/actions";
 import { CAMPAIGN_STATUSES } from "@/lib/admin/constants";
 import type { CampaignRow } from "@/lib/database.types";
 
+const CAMPAIGN_TONE: Record<string, string> = {
+  live: "tone-acid",
+  awarded: "tone-caution",
+};
+
 const fmt = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—";
 
@@ -36,20 +41,14 @@ export default function CampaignCard({
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-3">
-        <div className="flex" role="group" aria-label="Campaign status">
+        <div className="seg" role="group" aria-label="Campaign status">
           {CAMPAIGN_STATUSES.map((s) => (
             <button
               key={s}
               type="button"
               aria-pressed={campaign.status === s}
               onClick={() => start(() => setCampaignStatus(campaign.id, s))}
-              className={`label h-11 border px-3 transition-colors ${
-                campaign.status === s
-                  ? s === "live"
-                    ? "border-acid text-acid"
-                    : "border-bone text-bone"
-                  : "hairline text-muted hover:text-bone"
-              }`}
+              className={`control control-sm ${CAMPAIGN_TONE[s] ?? ""}`}
             >
               {s}
             </button>
@@ -64,7 +63,7 @@ export default function CampaignCard({
           </a>
           <Link
             href={`/admin/featured/${campaign.id}`}
-            className="label flex h-11 items-center border hairline px-4 text-bone hover:border-acid hover:text-acid"
+            className="control control-sm ml-2"
           >
             Edit
           </Link>

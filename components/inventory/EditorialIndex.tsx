@@ -19,7 +19,7 @@ export interface IndexItem {
 
 const STATUS_COLOR: Record<IndexItem["status"], string> = {
   available: "text-acid",
-  reserved: "text-muted",
+  reserved: "text-amber",
   sold: "text-danger",
 };
 

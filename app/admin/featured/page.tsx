@@ -26,7 +26,7 @@ export default async function AdminFeatured() {
     <div className="mx-auto max-w-2xl">
       <div className="flex items-center justify-between gap-4">
         <h1 className="display text-2xl">FEATURED</h1>
-        <Link href="/admin/featured/new" className="cta-primary !h-11 !px-5">
+        <Link href="/admin/featured/new" className="cta-primary control-go !h-11 !px-5">
           + New
         </Link>
       </div>

@@ -95,7 +95,7 @@ export default function CampaignForm({
         </p>
       )}
 
-      <button type="submit" disabled={pending} className="cta-primary mt-10 w-full sm:w-auto disabled:opacity-50">
+      <button type="submit" disabled={pending} className="cta-primary control-go mt-10 w-full sm:w-auto">
         {pending ? "Saving…" : campaign ? "Save changes" : "Create campaign"}
       </button>
     </form>

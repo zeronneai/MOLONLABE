@@ -37,17 +37,44 @@ Every one of these is a decision that a default build gets wrong.
 
 **Sections do not share a height.** A section is as tall as it needs to be. One might be 40vh, the next 90vh. Equal-height stacked sections are what makes a page feel like a template.
 
-**Rules, not shadows.** Hairlines at 0.5px `--muted` at 22% opacity separate content. `box-shadow` is banned outside of focus states.
+**Rules, not shadows — in content.** Hairlines at 0.5px `--muted` at 22% opacity separate content. Nothing in a content area ever floats: no drop shadow anywhere on the site, ever. Controls are the one exception, and only with *inset* shadows — see the control system below. An element must never appear lifted off the page.
 
-**Corners: 0px.** No `rounded-lg` anywhere. The only exception is the status chip, which is a pill because it needs to read as a chip.
+**Corners: 0px in content, 2px maximum on controls.** No `rounded-lg` anywhere. Content is square. Controls take a 2px radius, which is the largest that still reads as machined rather than soft. The status chip stays a pill because it needs to read as a chip.
 
 **Type does the work.** Headline 800 weight, `clamp(2.5rem, 6vw, 5.5rem)`, tracking `-0.035em`, `line-height: 0.92`. Labels 600 weight, 11px, `letter-spacing: 0.28em`, uppercase, `--muted`. The gap between those two sizes IS the design. Nothing between 14px and 40px should appear in a headline position.
 
 **Images bleed.** Any image that is not a product thumbnail runs to at least one page edge. Images floating inside padded containers with rounded corners is the default look we are avoiding.
 
-**Green is a scalpel.** `--acid` appears on: active nav state, status chips, entry counters, form focus rings, and the small labels above sections. Never as a button fill, never as a large area, never as text on a light background.
+**Green is a scalpel.** `--acid` appears on: active nav state, status chips, entry counters, form focus rings, the small labels above sections, and exactly one filled button per view. Never as a large area, never as text on a light background, never on two buttons in the same view.
 
-**Buttons are not pills.** Primary CTA is a 1px `--bone` bordered rectangle, transparent fill, uppercase label at 11px with 0.28em tracking, 56px tall. On hover the border and text swap to `--acid` and the fill stays transparent. Secondary CTA is text with an underline offset of 6px.
+### The control system
+
+Depth through material, not skeuomorphism. These are machined metal controls on a piece of equipment, not glossy web buttons. No large radii, no glow, no drop shadows floating an element off the page, no gradients as decoration.
+
+**Tokens.**
+
+```
+--surface-raised: #1F2227    --edge-light: rgba(255,255,255,0.10)
+--surface-sunken: #131418    --edge-dark:  rgba(0,0,0,0.55)
+--steel:          #3A4048    --acid:       #57B94A
+--amber:          #C08A2E    --acid-deep:  #2E5F28
+--danger:         #C6472F
+```
+
+**Button anatomy.** Solid `--surface-raised` fill, 1px `--steel` border, a 1px inset highlight along the top edge in `--edge-light`, a 1px inset shadow along the bottom in `--edge-dark`. That top-light bottom-dark pair is what reads as a physical surface. Radius 2px maximum, 56px tall (44px for the compact `.control-sm` used in rows and toggles). On hover the fill lifts one step and the border takes the semantic colour. On press the element translates down 1px and the edges invert, so it genuinely depresses. Class: `.control` (and `.cta-primary`, which is the same material).
+
+**Fields are the inverse.** `--surface-sunken` fill with an inset shadow along the top edge, so inputs read as recessed while buttons sit proud. That contrast is most of the effect. The underline stays — it is still the field's identity and where focus reads, in `--acid`. This supersedes the underline-only description in section 5.
+
+**Noise.** A ~2% fractal-noise tile sits over every raised surface, generated as an inline SVG data URI. It kills the flat digital look at no request cost.
+
+**Semantic colour, one meaning each.**
+
+- **Acid** is confirm and go: the single primary action on a screen, and the `available` status. Exactly one acid *fill* per view, never two. Selected status segments take acid as border and text, not as a fill — the fill is reserved for the primary action.
+- **Amber** is caution and pending: `reserved` status, unsaved changes, an expiring offer, a `new` inquiry.
+- **Danger** is destructive only: delete, and the `sold` status. Never decorative.
+- **Steel** is everything else: secondary actions, neutral controls. Archive is steel; save is acid; delete is danger.
+
+**Secondary CTA** stays text with a 6px underline offset — it is a link, not a control.
 
 ---
 
@@ -179,14 +206,21 @@ Mobile: logo left, hamburger right. The menu opens as a full-screen `--ink` pane
 If any of these appear in the codebase, the design has drifted:
 
 - `rounded-lg`, `rounded-xl`, `rounded-full` outside the status chip
-- `shadow-md`, `shadow-lg`, or any `box-shadow` outside focus rings
+- A radius above 2px on a control, or any radius at all on content
+- `shadow-md`, `shadow-lg`, or **any non-inset `box-shadow`** — controls use
+  inset edges only, and nothing on the site floats off the page
+- A glow, a soft outer shadow, or a bevel wide enough to read as 3D
 - `grid-cols-3` with cards for the inventory listing
 - `max-w-7xl mx-auto` wrapping a whole page
 - `text-center` on any section other than the intro game
-- A gradient used as a decorative background rather than an image scrim
+- A gradient used as decoration rather than an image scrim or a control's
+  edge pair
 - Emoji anywhere in the UI
 - A default Google Maps embed
-- `--acid` used as a button fill or as a large background area
+- More than one `--acid` filled button in a single view, or `--acid` as a
+  large background area
+- `--amber` or `--danger` used for anything but their one meaning: caution
+  and destruction. Never decorative
 - Any font that is not Archivo
 
 ---

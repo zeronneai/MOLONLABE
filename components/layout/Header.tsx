@@ -71,7 +71,7 @@ export default function Header() {
           </nav>
           <Link
             href="/visit"
-            className="label inline-flex h-11 items-center border border-bone px-5 text-bone transition-colors hover:border-acid hover:text-acid"
+            className="control control-sm"
           >
             Visit
           </Link>

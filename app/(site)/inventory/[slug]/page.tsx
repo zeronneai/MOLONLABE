@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 const SHOP_PHONE = "+19150000000"; // TODO: confirm the shop's public number
 const STATUS_COLOR = {
   available: "text-acid",
-  reserved: "text-muted",
+  reserved: "text-amber",
   sold: "text-danger",
 } as const;
 

@@ -22,8 +22,8 @@ export function OfferSwitch({ enabled }: { enabled: boolean }) {
       aria-pressed={enabled}
       disabled={pending}
       onClick={() => start(() => toggleGameOffer(!enabled))}
-      className={`flex h-14 w-full items-center justify-between border px-5 transition-colors disabled:opacity-60 ${
-        enabled ? "border-acid" : "border-danger"
+      className={`control w-full justify-between !px-5 ${
+        enabled ? "tone-acid" : "tone-danger"
       }`}
     >
       <span className="label">{enabled ? "Offer is live" : "Offer is off"}</span>

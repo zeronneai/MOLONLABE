@@ -17,6 +17,13 @@ import { showToast } from "@/components/admin/Toast";
 import { ARCHIVED_STATUS, ITEM_LIVE_STATUSES } from "@/lib/admin/constants";
 import type { ItemRow } from "@/lib/database.types";
 
+// One meaning per colour: go, caution, destructive.
+const STATUS_TONE: Record<string, string> = {
+  available: "tone-acid",
+  reserved: "tone-caution",
+  sold: "tone-danger",
+};
+
 export default function ItemAdminCard({ item }: { item: ItemRow }) {
   const [pending, start] = useTransition();
   const archived = item.status === ARCHIVED_STATUS;
@@ -73,67 +80,61 @@ export default function ItemAdminCard({ item }: { item: ItemRow }) {
           <button
             type="button"
             onClick={() => start(() => restoreItem(item.id, "available"))}
-            className="label h-11 border border-acid px-4 text-acid transition-colors"
+            className="control control-sm"
           >
             Restore
           </button>
         ) : (
-          <div className="flex" role="group" aria-label="Status">
+          // The depressed segment carries its status colour, so the state
+          // reads without parsing the label.
+          <div className="seg" role="group" aria-label="Status">
             {ITEM_LIVE_STATUSES.map((s) => (
               <button
                 key={s}
                 type="button"
                 aria-pressed={item.status === s}
                 onClick={() => start(() => setItemStatus(item.id, s))}
-                className={`label h-11 border px-3 transition-colors ${
-                  item.status === s
-                    ? s === "sold"
-                      ? "border-danger text-danger"
-                      : "border-acid text-acid"
-                    : "hairline text-muted hover:text-bone"
-                }`}
+                className={`control control-sm ${STATUS_TONE[s]}`}
               >
                 {s === "available" ? "Avail" : s}
               </button>
             ))}
           </div>
         )}
-        <div className="ml-auto flex items-center">
-          <button
-            type="button"
-            aria-label="Move up"
-            onClick={() => start(() => moveItem(item.id, "up"))}
-            className="flex h-11 w-11 items-center justify-center text-muted hover:text-bone"
-          >
-            ↑
-          </button>
-          <button
-            type="button"
-            aria-label="Move down"
-            onClick={() => start(() => moveItem(item.id, "down"))}
-            className="flex h-11 w-11 items-center justify-center text-muted hover:text-bone"
-          >
-            ↓
-          </button>
+        <div className="ml-auto flex items-center gap-2">
+          <div className="seg">
+            <button
+              type="button"
+              aria-label="Move up"
+              onClick={() => start(() => moveItem(item.id, "up"))}
+              className="control control-sm !px-3"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              aria-label="Move down"
+              onClick={() => start(() => moveItem(item.id, "down"))}
+              className="control control-sm !px-3"
+            >
+              ↓
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => start(() => duplicateItem(item.id))}
-            className="label h-11 px-3 text-muted hover:text-bone"
+            className="control control-sm"
           >
             Dup
           </button>
           {!archived && (
-            <button
-              type="button"
-              onClick={archive}
-              className="label h-11 px-3 text-muted hover:text-bone"
-            >
+            <button type="button" onClick={archive} className="control control-sm">
               Archive
             </button>
           )}
           <Link
             href={`/admin/inventory/${item.id}`}
-            className="label flex h-11 items-center border hairline px-4 text-bone hover:border-acid hover:text-acid"
+            className="control control-sm"
           >
             Edit
           </Link>

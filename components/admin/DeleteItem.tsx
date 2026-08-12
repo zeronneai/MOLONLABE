@@ -60,7 +60,7 @@ export default function DeleteItem({
         disabled={blocked || pending}
         aria-disabled={blocked}
         onClick={() => setConfirming(true)}
-        className="label mt-6 flex h-14 items-center border border-danger px-6 text-danger transition-colors hover:bg-danger/10 disabled:cursor-not-allowed disabled:border-muted disabled:text-muted disabled:hover:bg-transparent"
+        className="control control-danger mt-6"
       >
         Delete this item
       </button>
@@ -90,7 +90,7 @@ export default function DeleteItem({
               <button
                 type="submit"
                 disabled={pending}
-                className="label flex h-14 flex-1 items-center justify-center border border-danger px-6 text-danger disabled:opacity-50"
+                className="control control-danger-fill flex-1"
               >
                 {pending ? "Deleting…" : "Delete"}
               </button>
@@ -98,7 +98,7 @@ export default function DeleteItem({
                 ref={cancelRef}
                 type="button"
                 onClick={() => setConfirming(false)}
-                className="label flex h-14 flex-1 items-center justify-center border hairline px-6 text-bone"
+                className="control flex-1"
               >
                 Cancel
               </button>

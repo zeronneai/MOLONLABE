@@ -167,7 +167,7 @@ export default function ItemForm({ item }: { item?: ItemRow }) {
         </p>
       )}
 
-      <button type="submit" disabled={pending} className="cta-primary mt-10 w-full sm:w-auto disabled:opacity-50">
+      <button type="submit" disabled={pending} className="cta-primary control-go mt-10 w-full sm:w-auto">
         {pending ? "Saving…" : item ? "Save changes" : "Add item"}
       </button>
     </form>
