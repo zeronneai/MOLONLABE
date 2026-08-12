@@ -450,3 +450,58 @@ export async function saveCampaign(
   revalidatePath("/admin/featured");
   redirect("/admin/featured");
 }
+
+// --- The draw --------------------------------------------------------------
+
+/**
+ * Pick a winner at random, weighted by entry_count, and record it. Every
+ * entry is one ticket in the hat, which is what makes a free entry
+ * genuinely equal to a purchased one. Refuses to draw twice for the same
+ * campaign — a second winner would have to be a deliberate act, not a
+ * double-tap.
+ */
+export async function drawWinner(campaignId: string): Promise<void> {
+  const sb = await requireClient();
+  if (!sb) return;
+
+  const { data: already } = await sb
+    .from("winners")
+    .select("id")
+    .eq("campaign_id", campaignId)
+    .maybeSingle();
+  if (already) {
+    console.error("drawWinner: campaign already has a winner");
+    return;
+  }
+
+  const { data: entrants, error } = await sb
+    .from("entrants")
+    .select("id, first_name, last_name, entry_count")
+    .eq("campaign_id", campaignId);
+  if (error || !entrants || entrants.length === 0) {
+    if (error) console.error("drawWinner:", error.message);
+    return;
+  }
+
+  const total = entrants.reduce((sum, e) => sum + Math.max(1, e.entry_count ?? 1), 0);
+  let ticket = Math.floor(Math.random() * total);
+  const winner =
+    entrants.find((e) => {
+      ticket -= Math.max(1, e.entry_count ?? 1);
+      return ticket < 0;
+    }) ?? entrants[0];
+
+  const { error: insertError } = await sb.from("winners").insert({
+    campaign_id: campaignId,
+    entrant_id: winner.id,
+    display_name: `${winner.first_name} ${winner.last_name}`.trim(),
+  });
+  if (insertError) {
+    console.error("drawWinner insert:", insertError.message);
+    return;
+  }
+
+  await sb.from("campaigns").update({ status: "awarded" }).eq("id", campaignId);
+  revalidatePublic();
+  revalidatePath("/admin/featured");
+}

@@ -81,7 +81,14 @@ export default function Footer() {
         <div>
           <h2 className="label text-acid">Legal</h2>
           <ul className="mt-5 space-y-3 text-sm text-muted">
-            <li>Sweepstakes rules — coming soon</li>
+            <li>
+              <Link
+                href="/sweepstakes-rules"
+                className="label text-muted transition-colors hover:text-bone"
+              >
+                Sweepstakes rules
+              </Link>
+            </li>
             <li>Privacy policy — coming soon</li>
             <li>Built by Purple Roots Agency</li>
           </ul>

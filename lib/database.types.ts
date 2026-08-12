@@ -124,6 +124,7 @@ export interface Database {
           email: string;
           phone: string | null;
           entry_count: number;
+          entry_method: string;
           source: string | null;
           created_at: string | null;
         };
@@ -135,6 +136,7 @@ export interface Database {
           email: string;
           phone?: string | null;
           entry_count?: number;
+          entry_method?: string;
           source?: string | null;
           created_at?: string | null;
         };
@@ -158,6 +160,36 @@ export interface Database {
             referencedColumns: ["id"];
           },
         ];
+      };
+      winners: {
+        Row: {
+          id: string;
+          campaign_id: string;
+          entrant_id: string | null;
+          display_name: string;
+          photo_url: string | null;
+          note: string | null;
+          drawn_at: string;
+        };
+        Insert: {
+          id?: string;
+          campaign_id: string;
+          entrant_id?: string | null;
+          display_name: string;
+          photo_url?: string | null;
+          note?: string | null;
+          drawn_at?: string;
+        };
+        Update: {
+          id?: string;
+          campaign_id?: string;
+          entrant_id?: string | null;
+          display_name?: string;
+          photo_url?: string | null;
+          note?: string | null;
+          drawn_at?: string;
+        };
+        Relationships: [];
       };
       inquiries: {
         Row: {
@@ -249,6 +281,10 @@ export interface Database {
         Args: { campaign: string };
         Returns: number;
       };
+      entrant_count: {
+        Args: { campaign: string };
+        Returns: number;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
@@ -257,7 +293,9 @@ export interface Database {
 
 export type ItemRow = Database["public"]["Tables"]["items"]["Row"];
 export type CampaignRow = Database["public"]["Tables"]["campaigns"]["Row"];
+export type EntrantRow = Database["public"]["Tables"]["entrants"]["Row"];
 export type EntrantInsert = Database["public"]["Tables"]["entrants"]["Insert"];
+export type WinnerRow = Database["public"]["Tables"]["winners"]["Row"];
 export type InquiryInsert = Database["public"]["Tables"]["inquiries"]["Insert"];
 
 export type ItemStatus = "available" | "reserved" | "sold";
