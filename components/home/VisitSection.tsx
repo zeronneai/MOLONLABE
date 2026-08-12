@@ -1,9 +1,10 @@
 import Reveal from "@/components/motion/Reveal";
+import { SHOP_PHONE_DISPLAY, SHOP_PHONE_HREF } from "@/lib/brand";
 
 const DIRECTIONS_URL =
   "https://www.google.com/maps/dir/?api=1&destination=10024+Montana+Ave,+El+Paso,+TX";
 
-export default function VisitSection() {
+export default function VisitSection({ primary = false }: { primary?: boolean } = {}) {
   return (
     <section className="grid min-h-[80vh] lg:grid-cols-2">
       {/* Contact hangs from the left rule */}
@@ -17,6 +18,13 @@ export default function VisitSection() {
           </h2>
           <address className="mt-6 max-w-md text-lg not-italic text-muted">
             10024 Montana Ave, El Paso, TX
+            <br />
+            <a
+              href={SHOP_PHONE_HREF}
+              className="inline-flex h-11 items-center text-bone underline underline-offset-4 hover:text-acid"
+            >
+              {SHOP_PHONE_DISPLAY}
+            </a>
           </address>
         </Reveal>
 
@@ -36,14 +44,14 @@ export default function VisitSection() {
             </div>
           </dl>
           <div className="mt-12 flex flex-wrap items-center gap-x-10 gap-y-4">
-            <a href="tel:+19150000000" className="cta-primary">
+            <a href={SHOP_PHONE_HREF} className={`cta-primary${primary ? " control-go" : ""}`}>
               Call the shop
             </a>
             <a
               href={DIRECTIONS_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="cta-secondary"
+              className="cta-primary"
             >
               Get directions →
             </a>

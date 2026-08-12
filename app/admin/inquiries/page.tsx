@@ -24,15 +24,15 @@ export default async function AdminInquiries({
     <div className="mx-auto max-w-2xl">
       <h1 className="display text-2xl">INQUIRIES</h1>
 
-      <div className="mt-6 flex flex-wrap gap-x-6">
+      <div className="mt-6 flex flex-wrap gap-2">
         {["", "new", "contacted", "closed"].map((s) => (
           <a
             key={s || "all"}
             href={`/admin/inquiries${s ? `?status=${s}` : ""}`}
-            className="filter-tap"
+            className="control control-sm tone-acid"
             aria-pressed={status === s}
           >
-            <span className="filter-label">{s || "All"}</span>
+            {s || "All"}
           </a>
         ))}
       </div>

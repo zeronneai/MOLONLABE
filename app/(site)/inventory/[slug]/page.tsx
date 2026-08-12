@@ -16,7 +16,6 @@ import ItemCtas from "@/components/inventory/ItemCtas";
 
 export const dynamic = "force-dynamic";
 
-const SHOP_PHONE = "+19150000000"; // TODO: confirm the shop's public number
 const STATUS_COLOR = {
   available: "text-acid",
   reserved: "text-amber",
@@ -120,8 +119,7 @@ export default async function ItemPage({ params }: Params) {
           itemId={item.id}
           itemName={item.name}
           itemSlug={item.slug}
-          phone={SHOP_PHONE}
-        />
+                  />
 
         {related.length > 0 && (
           <section className="mt-16 pb-16">

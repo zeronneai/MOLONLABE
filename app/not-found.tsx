@@ -14,7 +14,7 @@ export default function NotFound() {
         fast around here.
       </p>
       <div className="mt-12 flex flex-wrap items-center gap-x-10 gap-y-4">
-        <Link href="/inventory" className="cta-primary">
+        <Link href="/inventory" className="cta-primary control-go">
           View inventory
         </Link>
         <Link href="/" className="cta-secondary">

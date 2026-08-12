@@ -447,7 +447,7 @@ export default function HeroScrub() {
             ))}
           </h1>
           <div className="mt-10 flex flex-wrap items-center gap-x-10 gap-y-4">
-            <Link href="/inventory" className="cta-primary">
+            <Link href="/inventory" className="cta-primary control-go">
               {heroCopy.primaryCta}
             </Link>
             <Link href="/featured" className="cta-secondary">

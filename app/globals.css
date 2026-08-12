@@ -233,8 +233,12 @@ body {
 .seg > .control:last-child {
   border-radius: 0 2px 2px 0;
 }
-.seg > .control[aria-pressed="true"] {
+/* A selected control is a depressed one, inside a switch or standing
+   alone (filters, toggles). Neutral by default; tone-* names the meaning. */
+.control[aria-pressed="true"] {
   background-color: var(--color-surface-sunken);
+  border-color: var(--color-muted);
+  color: var(--color-bone);
   box-shadow:
     inset 0 2px 3px rgba(0, 0, 0, 0.55),
     inset 0 -1px 0 var(--edge-light);
@@ -284,6 +288,15 @@ body {
   letter-spacing: var(--tracking-label);
   color: var(--color-muted);
 }
+/* A recessed panel: drop zones and readouts, the same material as a
+   field but sized by its contents. */
+.field-well {
+  background-color: var(--color-surface-sunken);
+  border: 1px solid var(--color-steel);
+  border-radius: 2px;
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
+}
+
 /* Inputs are the inverse of buttons: a --surface-sunken fill with an
    inset shadow along the top edge, so they read as recessed into the
    panel while controls sit proud of it. The underline stays — it is

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function VisitPage() {
   return (
     <div className="pt-[72px]">
-      <VisitSection />
+      <VisitSection primary />
     </div>
   );
 }

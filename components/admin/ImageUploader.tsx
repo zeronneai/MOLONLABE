@@ -256,7 +256,7 @@ export default function ImageUploader({ initial }: { initial: string[] }) {
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="flex aspect-[4/3] flex-col items-center justify-center border border-dashed hairline text-muted transition-colors hover:border-acid hover:text-acid"
+          className="field-well flex aspect-[4/3] flex-col items-center justify-center text-muted transition-colors hover:text-acid"
         >
           <span className="text-2xl leading-none">+</span>
           <span className="label mt-2">Add photos</span>

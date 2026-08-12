@@ -136,7 +136,7 @@ export default function ItemForm({ item }: { item?: ItemRow }) {
               type="button"
               aria-label="Remove spec"
               onClick={() => setSpecs((s) => s.filter((_, j) => j !== i))}
-              className="flex h-14 w-11 items-center justify-center text-danger"
+              className="control control-danger !h-14 !px-4"
             >
               ✕
             </button>

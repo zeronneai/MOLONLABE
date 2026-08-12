@@ -74,7 +74,15 @@ Depth through material, not skeuomorphism. These are machined metal controls on 
 - **Danger** is destructive only: delete, and the `sold` status. Never decorative.
 - **Steel** is everything else: secondary actions, neutral controls. Archive is steel; save is acid; delete is danger.
 
-**Secondary CTA** stays text with a 6px underline offset — it is a link, not a control.
+**Where it applies.** Everywhere an interactive element exists: CTAs, form
+submits, filters, admin row actions, status switches, the intro game's
+buttons, and the entry program. Filters are controls, not text labels —
+the selected one depresses and reads acid, which is the active-nav use of
+the colour. Drop zones and readouts use `.field-well`, the sunken panel.
+
+**Secondary CTA** stays text with a 6px underline offset — it is a link, not a control. If it reads as an action rather than a link, it is a steel control instead.
+
+**The one-acid rule in practice.** Home: the hero CTA. Detail: `INQUIRE ABOUT THIS`. Any form: its submit. Admin list: `+ Add` / `+ New`. Admin record: Save. Lose card: Retry. `VisitSection` takes a `primary` prop because it appears both on home, where the hero owns the acid, and on `/visit`, where calling is the point.
 
 ---
 
@@ -221,6 +229,9 @@ If any of these appear in the codebase, the design has drifted:
   large background area
 - `--amber` or `--danger` used for anything but their one meaning: caution
   and destruction. Never decorative
+- A transparent bordered rectangle used as a button — that is the old
+  system and the thing this replaced. Every interactive element is a
+  `.control`, a `.cta-primary`, or a text link
 - Any font that is not Archivo
 
 ---

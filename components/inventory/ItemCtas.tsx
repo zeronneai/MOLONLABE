@@ -7,23 +7,24 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import InquiryForm from "@/components/forms/InquiryForm";
+import {
+  SHOP_PHONE_HREF,
+  WHATSAPP_ENABLED,
+  whatsappUrl,
+} from "@/lib/brand";
 import { track } from "@/lib/analytics";
 
 export default function ItemCtas({
   itemId,
   itemName,
   itemSlug,
-  phone,
 }: {
   itemId: string;
   itemName: string;
   itemSlug: string;
-  phone: string;
 }) {
   const [open, setOpen] = useState(false);
-  const whatsapp = `https://wa.me/${phone.replace("+", "")}?text=${encodeURIComponent(
-    `Inquiring about the ${itemName} (${itemSlug})`,
-  )}`;
+  const whatsapp = whatsappUrl(`Inquiring about the ${itemName} (${itemSlug})`);
 
   useEffect(() => {
     if (!open) return;
@@ -40,7 +41,7 @@ export default function ItemCtas({
   }, [open]);
 
   const callProps = {
-    href: `tel:${phone}`,
+    href: SHOP_PHONE_HREF,
     onClick: () => track("click_to_call", { source: "detail" as const }),
   };
   const waProps = {
@@ -66,9 +67,11 @@ export default function ItemCtas({
         <a {...callProps} className="cta-primary">
           Call
         </a>
-        <a {...waProps} className="cta-primary">
-          WhatsApp
-        </a>
+        {WHATSAPP_ENABLED && (
+          <a {...waProps} className="cta-primary">
+            WhatsApp
+          </a>
+        )}
       </div>
 
       {/* Mobile: fixed bottom action bar */}

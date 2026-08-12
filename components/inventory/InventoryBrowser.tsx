@@ -42,7 +42,7 @@ export default function InventoryBrowser({ items }: { items: IndexItem[] }) {
       <div
         role="group"
         aria-label="Filter by category"
-        className="flex flex-wrap gap-x-8 gap-y-3"
+        className="flex flex-wrap gap-2"
       >
         {FILTERS.map((f) => (
           <button
@@ -50,7 +50,7 @@ export default function InventoryBrowser({ items }: { items: IndexItem[] }) {
             type="button"
             aria-pressed={active === f.value}
             onClick={() => applyFilter(f.value)}
-            className="filter-label"
+            className="control control-sm tone-acid"
           >
             {f.label}
           </button>

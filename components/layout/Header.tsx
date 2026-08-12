@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LOGO_URL } from "@/lib/brand";
+import { SHOP_PHONE_HREF } from "@/lib/brand";
 
 const nav = [
   { href: "/inventory", label: "Inventory" },
@@ -127,7 +128,7 @@ export default function Header() {
           </nav>
           <div className="px-page pb-10 pt-6">
             <p className="label text-muted">Mon–Fri 11–19 · Sat 11–18 · Sun 11–17</p>
-            <a href="tel:+19150000000" className="cta-primary mt-6 w-full">
+            <a href={SHOP_PHONE_HREF} className="cta-primary mt-6 w-full">
               Call the shop
             </a>
           </div>

@@ -533,7 +533,7 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
                   YOU CLEARED IT.
                 </h2>
               )}
-              <button type="button" onClick={close} className="cta-primary mt-10">
+              <button type="button" onClick={close} className="cta-primary control-go mt-10">
                 Continue
               </button>
             </>
@@ -546,10 +546,10 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
                 {(tuning.roundMs / 1000).toFixed(0)} seconds
               </p>
               <div className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
-                <button type="button" onClick={retry} className="cta-primary">
+                <button type="button" onClick={retry} className="cta-primary control-go">
                   Retry
                 </button>
-                <button type="button" onClick={close} className="cta-secondary">
+                <button type="button" onClick={close} className="cta-primary">
                   Continue
                 </button>
               </div>
@@ -563,7 +563,7 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
           ref={skipRef}
           type="button"
           onClick={skip}
-          className="label absolute top-4 right-4 min-w-11 min-h-11 px-4 py-3 border hairline bg-ink/60 text-muted hover:text-bone hover:border-bone focus-visible:outline focus-visible:outline-2 focus-visible:outline-acid transition-colors"
+          className="control control-sm absolute top-4 right-4"
         >
           SKIP ✕
         </button>

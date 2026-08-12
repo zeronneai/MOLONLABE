@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LOGO_URL } from "@/lib/brand";
+import { LOGO_URL, SHOP_PHONE_DISPLAY, SHOP_PHONE_HREF } from "@/lib/brand";
 
 const navLinks = [
   { href: "/inventory", label: "Inventory" },
@@ -52,6 +52,13 @@ export default function Footer() {
             10024 Montana Ave
             <br />
             El Paso, TX
+            <br />
+            <a
+              href={SHOP_PHONE_HREF}
+              className="mt-2 inline-flex h-11 items-center text-bone underline underline-offset-4 hover:text-acid"
+            >
+              {SHOP_PHONE_DISPLAY}
+            </a>
           </address>
         </div>
 

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Reveal from "@/components/motion/Reveal";
+import { SHOP_PHONE_HREF } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: "Services — Molon Labe Firearms x SunCity Outdoors",
@@ -54,10 +55,10 @@ export default function ServicesPage() {
       </Reveal>
 
       <div className="mt-12 flex flex-wrap items-center gap-x-10 gap-y-4">
-        <Link href="/transfers" className="cta-primary">
+        <Link href="/transfers" className="cta-primary control-go">
           Start a transfer
         </Link>
-        <a href="tel:+19150000000" className="cta-secondary">
+        <a href={SHOP_PHONE_HREF} className="cta-primary">
           Call the shop
         </a>
       </div>

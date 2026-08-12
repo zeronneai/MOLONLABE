@@ -125,7 +125,7 @@ export default function InquiryForm({
         </p>
       )}
 
-      <button type="submit" disabled={pending} className="cta-primary mt-10 disabled:opacity-50">
+      <button type="submit" disabled={pending} className="cta-primary control-go mt-10">
         {pending ? "Sending…" : submitLabel}
       </button>
     </form>

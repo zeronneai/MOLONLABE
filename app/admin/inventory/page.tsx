@@ -55,7 +55,7 @@ export default async function AdminInventory({
         {status && <input type="hidden" name="status" value={status} />}
       </form>
 
-      <div className="mt-4 flex flex-wrap gap-x-6">
+      <div className="mt-4 flex flex-wrap gap-2">
         {FILTERS.map((f) => (
           <Link
             key={f.key || "all"}
@@ -64,10 +64,10 @@ export default async function AdminInventory({
                 ? `/admin/inventory?${new URLSearchParams({ ...(q ? { q } : {}), status: f.key })}`
                 : `/admin/inventory${q ? `?q=${encodeURIComponent(q)}` : ""}`
             }
-            className="filter-tap"
+            className="control control-sm tone-acid"
             aria-pressed={status === f.key}
           >
-            <span className="filter-label">{f.label}</span>
+            {f.label}
           </Link>
         ))}
       </div>
