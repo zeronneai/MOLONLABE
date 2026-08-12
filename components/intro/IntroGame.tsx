@@ -30,6 +30,7 @@ import { GAME_ASSETS, PARALLAX, SCOPE_END } from "@/lib/game/assets";
 import { renderFrame, type Pointer, type ViewFx } from "@/lib/game/render";
 import { LOGO_URL } from "@/lib/brand";
 import { track } from "@/lib/analytics";
+import { seqLog, whenHeroPainted } from "@/lib/hero/paintSignal";
 
 const SEEN_KEY = "mlf_intro_seen";
 
@@ -128,12 +129,18 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
       elapsed_ms: Math.round(performance.now() - startedAtRef.current),
     });
     window.scrollTo(0, 0); // hero scrub must start at frame 0
-    setPhase("done");
+    seqLog("skip: scrolled to top, waiting for hero paint");
+    // never reveal an unpainted hero — the overlay holds until frame 0 is up
+    whenHeroPainted(() => {
+      seqLog("skip: overlay unmounting");
+      setPhase("done");
+    });
   }, []);
 
   const finishToSite = useCallback(() => {
     markSeen();
-    window.scrollTo(0, 0); // before the wipe finishes: scrub starts at frame 0
+    window.scrollTo(0, 0); // before the wipe even starts: scrub begins at frame 0
+    seqLog("continue: scrolled to top, entering handoff");
     setPhase("handoff");
   }, []);
 
@@ -403,10 +410,22 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
     return () => window.clearTimeout(id);
   }, [phase]);
 
+  // The wipe is gated on the hero having painted frame 0 — the scope view
+  // simply holds a beat longer on a slow connection, which reads as
+  // deliberate, instead of the wipe revealing a loading treatment.
   useEffect(() => {
     if (phase !== "scope") return;
-    const id = window.setTimeout(() => setPhase("wiping"), SCOPE_END.holdMs);
-    return () => window.clearTimeout(id);
+    let cancelPaintWait: (() => void) | null = null;
+    const id = window.setTimeout(() => {
+      cancelPaintWait = whenHeroPainted(() => {
+        seqLog("wipe starting (hero confirmed painted)");
+        setPhase("wiping");
+      });
+    }, SCOPE_END.holdMs);
+    return () => {
+      window.clearTimeout(id);
+      cancelPaintWait?.();
+    };
   }, [phase]);
 
   useEffect(() => {
@@ -440,7 +459,16 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
         phase === "wiping" ? " intro-wiping" : ""
       }`}
       onAnimationEnd={(e) => {
-        if (e.animationName === "intro-wipe") setPhase("done");
+        if (e.animationName !== "intro-wipe") return;
+        seqLog("wipe finished");
+        // hold the final composite one extra frame before unmounting so the
+        // swap never lands on the same tick as the wipe's last paint
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            seqLog("overlay unmounting");
+            setPhase("done");
+          }),
+        );
       }}
     >
       <canvas ref={canvasRef} className="intro-canvas" aria-hidden="true" />

@@ -17,6 +17,7 @@ import {
   heroFrameUrl,
   heroLoopUrl,
 } from "@/lib/hero/assets";
+import { markHeroPainted, markHeroPresent, seqLog } from "@/lib/hero/paintSignal";
 import { heroCopy } from "@/content/en";
 
 type Status =
@@ -26,11 +27,16 @@ type Status =
   | "static"; // reduced motion or frame failure: final frame + headline
 
 const EASE = 0.18; // per-frame interpolation toward the target frame
+// frames decoded up-front (while the intro game plays) so the reveal is
+// instant; the rest of the sequence streams in behind them
+const PRIORITY_FRAMES = 8;
 
 export default function HeroScrub() {
   const [status, setStatus] = useState<Status>("boot");
   const [portrait, setPortrait] = useState(false);
   const [loopReady, setLoopReady] = useState(false);
+  // frame 0 is on the canvas — the intro overlay gates its wipe on this
+  const [painted, setPainted] = useState(false);
 
   const sectionRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -48,6 +54,15 @@ export default function HeroScrub() {
   const drawnRef = useRef(-1);
   const statusRef = useRef<Status>("boot");
   statusRef.current = status;
+
+  // ---- handoff coordination with the intro overlay ------------------------
+  useEffect(() => {
+    markHeroPresent();
+  }, []);
+  useEffect(() => {
+    // static fallback: the LCP <Image> is the visible hero — good enough
+    if (status === "static") markHeroPainted();
+  }, [status]);
 
   // ---- decide: reduced motion, and orientation (re-resolved on change) ----
   useEffect(() => {
@@ -67,7 +82,10 @@ export default function HeroScrub() {
     return () => mq.removeEventListener("change", onFlip);
   }, []);
 
-  // ---- preload the sequence, verifying real extractions first -------------
+  // ---- preload the sequence: frame 0 first, painted immediately -----------
+  // The intro game usually covers this whole phase — frame 0 is decoded and
+  // painted under the overlay long before the wipe can start, and the
+  // overlay gates on that paint via the signal.
   useEffect(() => {
     if (status !== "loading") return;
     let cancelled = false;
@@ -80,18 +98,58 @@ export default function HeroScrub() {
         img.onerror = () => reject(new Error(`hero frame failed: ${src}`));
         img.src = src;
       });
+    // decode() so the first drawImage is a blit, not a decode stall —
+    // that stall is exactly the seam a slow phone would show
+    const loadDecoded = (src: string) =>
+      load(src).then(async (img) => {
+        try {
+          await img.decode();
+        } catch {
+          // decode() can reject spuriously; the image is still loaded
+        }
+        return img;
+      });
 
     const urls = Array.from({ length: FRAME_COUNT }, (_, i) =>
       heroFrameUrl(portrait, i),
     );
 
-    // a wrong clip duration or broken transform fails loudly right here,
-    // before the full sequence is requested
-    Promise.all([
-      load(urls[0]),
-      load(urls[Math.floor(FRAME_COUNT / 2)]),
-      load(urls[FRAME_COUNT - 1]),
-    ])
+    const paintFirst = (img: HTMLImageElement) => {
+      framesRef.current[0] = img;
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext("2d");
+      if (canvas && ctx) {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.round(canvas.clientWidth * dpr);
+        canvas.height = Math.round(canvas.clientHeight * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const w = canvas.clientWidth;
+        const h = canvas.clientHeight;
+        const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+        const dw = img.naturalWidth * scale;
+        const dh = img.naturalHeight * scale;
+        ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+        drawnRef.current = 0;
+      }
+      setPainted(true);
+      seqLog("hero frame 0 painted to canvas");
+      markHeroPainted();
+    };
+
+    // frame 0 lands, decodes and paints before anything else is requested;
+    // then the verification pair + priority head; then the full sequence.
+    // A wrong clip duration or broken transform still fails loudly (the
+    // mid/last verification) before the remaining 90+ frames are fetched.
+    loadDecoded(urls[0])
+      .then((first) => {
+        if (cancelled) return Promise.reject(new Error("cancelled"));
+        paintFirst(first);
+        return Promise.all([
+          loadDecoded(urls[Math.floor(FRAME_COUNT / 2)]),
+          loadDecoded(urls[FRAME_COUNT - 1]),
+          ...urls.slice(1, PRIORITY_FRAMES).map(loadDecoded),
+        ]);
+      })
       .then(() => Promise.allSettled(urls.map(load)))
       .then((settled) => {
         if (cancelled) return;
@@ -106,10 +164,11 @@ export default function HeroScrub() {
         });
         framesRef.current = frames;
         drawnRef.current = -1;
+        seqLog("hero sequence fully loaded — scrub ready");
         setStatus("ready");
       })
-      .catch((err) => {
-        if (cancelled) return;
+      .catch((err: Error) => {
+        if (cancelled || err.message === "cancelled") return;
         console.error("[hero] scrub disabled, using static fallback:", err);
         setStatus("static");
       });
@@ -305,7 +364,7 @@ export default function HeroScrub() {
           <canvas
             ref={canvasRef}
             className="absolute inset-0 h-full w-full"
-            style={{ opacity: status === "ready" ? 1 : 0 }}
+            style={{ opacity: painted || status === "ready" ? 1 : 0 }}
             aria-hidden="true"
           />
         )}
@@ -397,8 +456,9 @@ export default function HeroScrub() {
           </div>
         </div>
 
-        {/* minimal preload state — no spinner */}
-        {status === "loading" && (
+        {/* minimal preload state — no spinner; gone once frame 0 is up,
+            so the reveal can never show a loading treatment */}
+        {status === "loading" && !painted && (
           <div className="px-page absolute bottom-14 left-0" aria-live="polite">
             <p className="label text-muted">Loading</p>
             <div className="intro-loadbar mt-4">
