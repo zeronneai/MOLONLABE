@@ -10,12 +10,15 @@ import { getSessionSupabase } from "@/lib/supabase/session";
 import { slugify } from "@/lib/slug";
 import type { Database, Json } from "@/lib/database.types";
 import {
+  ARCHIVED_STATUS,
   CATEGORIES,
   CAMPAIGN_STATUSES,
   DEFAULT_EXCLUSION_NOTE,
   ITEM_STATUSES,
+  PRODUCT_BUCKET,
   type ActionState,
 } from "@/lib/admin/constants";
+import { countItemReferences } from "@/lib/db/itemRefs";
 import { DIFFICULTY_RANGES } from "@/lib/game/settings";
 
 export type { ActionState };
@@ -43,6 +46,104 @@ export async function setItemStatus(id: string, status: string): Promise<void> {
   if (error) console.error("setItemStatus:", error.message);
   revalidatePublic();
   revalidatePath("/admin/inventory");
+}
+
+/**
+ * Archive: the item leaves the public site but keeps its row, its history
+ * and anything linked to it. Applied immediately with no confirmation —
+ * the caller shows an "Archived. Undo" toast, and the previous status is
+ * returned so Undo can put it back exactly as it was.
+ */
+export async function archiveItem(id: string): Promise<string | null> {
+  const sb = await requireClient();
+  if (!sb) return null;
+  const { data: before } = await sb
+    .from("items")
+    .select("status")
+    .eq("id", id)
+    .maybeSingle();
+  const { error } = await sb
+    .from("items")
+    .update({ status: ARCHIVED_STATUS })
+    .eq("id", id);
+  if (error) {
+    console.error("archiveItem:", error.message);
+    return null;
+  }
+  revalidatePublic();
+  revalidatePath("/admin/inventory");
+  return before?.status ?? "available";
+}
+
+/** Undo for archive, and the Restore action on the Archived filter. */
+export async function restoreItem(id: string, status: string): Promise<void> {
+  const sb = await requireClient();
+  if (!sb) return;
+  const next = ITEM_STATUSES.includes(status as (typeof ITEM_STATUSES)[number])
+    ? status
+    : "available";
+  const { error } = await sb.from("items").update({ status: next }).eq("id", id);
+  if (error) console.error("restoreItem:", error.message);
+  revalidatePublic();
+  revalidatePath("/admin/inventory");
+}
+
+/**
+ * Permanent delete, for records created in error. Refuses while anything
+ * references the item — the database would refuse too (both item_id
+ * foreign keys are ON DELETE RESTRICT), but failing here lets us say why
+ * and point at Archive instead. Storage objects go first, otherwise the
+ * row is gone and the files are orphaned with no way left to find them.
+ */
+export async function deleteItem(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const sb = await requireClient();
+  if (!sb) return { status: "error", message: "Not signed in." };
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { status: "error", message: "Missing item." };
+
+  const { data: item } = await sb
+    .from("items")
+    .select("id, name, images")
+    .eq("id", id)
+    .maybeSingle();
+  if (!item) return { status: "error", message: "That item no longer exists." };
+
+  const refs = await countItemReferences(sb, id);
+  if (refs.total > 0) {
+    return {
+      status: "error",
+      message: `${refs.label} still reference this item. Archive it instead.`,
+    };
+  }
+
+  // Uploaded images live in the bucket; legacy Cloudinary URLs are not ours
+  // to remove and are skipped.
+  const marker = `/storage/v1/object/public/${PRODUCT_BUCKET}/`;
+  const paths = (Array.isArray(item.images) ? item.images : [])
+    .filter((u): u is string => typeof u === "string")
+    .map((url) => {
+      const at = url.indexOf(marker);
+      return at === -1 ? null : url.slice(at + marker.length);
+    })
+    .filter((p): p is string => p !== null);
+  if (paths.length > 0) {
+    const { error } = await sb.storage.from(PRODUCT_BUCKET).remove(paths);
+    // An unremovable file is a cleanup problem, not a reason to keep a
+    // record the owner has decided is a mistake.
+    if (error) console.error("deleteItem storage:", error.message);
+  }
+
+  const { error } = await sb.from("items").delete().eq("id", id);
+  if (error) {
+    console.error("deleteItem:", error.message);
+    return { status: "error", message: "Could not delete that item." };
+  }
+  revalidatePublic();
+  revalidatePath("/admin/inventory");
+  redirect("/admin/inventory?deleted=1");
 }
 
 export async function toggleItemFeatured(id: string, next: boolean): Promise<void> {
@@ -84,23 +185,34 @@ export async function duplicateItem(id: string): Promise<void> {
   const { data: item } = await sb.from("items").select("*").eq("id", id).maybeSingle();
   if (!item) return;
   const suffix = Date.now().toString(36).slice(-4);
-  const { error } = await sb.from("items").insert({
-    slug: `${item.slug}-copy-${suffix}`,
-    name: `${item.name} COPY`,
-    category: item.category,
-    brand: item.brand,
-    short_desc: item.short_desc,
-    long_desc: item.long_desc,
-    specs: item.specs,
-    price_display: item.price_display,
-    status: "hidden", // duplicates start invisible
-    is_featured: false,
-    sort_order: (item.sort_order ?? 0) + 1,
-    images: item.images,
-    video_url: item.video_url,
-  });
-  if (error) console.error("duplicateItem:", error.message);
+  const { data: copy, error } = await sb
+    .from("items")
+    .insert({
+      slug: `${item.slug}-copy-${suffix}`,
+      name: `${item.name} COPY`,
+      category: item.category,
+      brand: item.brand,
+      short_desc: item.short_desc,
+      long_desc: item.long_desc,
+      specs: item.specs,
+      price_display: item.price_display,
+      // Duplicates start archived so a half-finished copy is never public.
+      // That keeps them out of the working list, so we open the copy
+      // directly — duplicating is only ever a prelude to editing.
+      status: ARCHIVED_STATUS,
+      is_featured: false,
+      sort_order: (item.sort_order ?? 0) + 1,
+      images: item.images,
+      video_url: item.video_url,
+    })
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("duplicateItem:", error.message);
+    return;
+  }
   revalidatePath("/admin/inventory");
+  if (copy?.id) redirect(`/admin/inventory/${copy.id}`);
 }
 
 export async function saveItem(

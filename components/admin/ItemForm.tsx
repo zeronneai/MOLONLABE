@@ -145,7 +145,7 @@ export default function ItemForm({ item }: { item?: ItemRow }) {
         <button
           type="button"
           onClick={() => setSpecs((s) => [...s, ["", ""]])}
-          className="label mt-4 text-muted hover:text-bone"
+          className="label mt-2 flex h-11 items-center text-muted hover:text-bone"
         >
           + Add spec
         </button>

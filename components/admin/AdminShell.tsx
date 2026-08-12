@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { LOGO_URL } from "@/lib/brand";
+import Toast from "@/components/admin/Toast";
 
 const tabs = [
   { href: "/admin/inventory", label: "Inventory" },
@@ -69,6 +70,7 @@ export default function AdminShell({
         </nav>
       </header>
       <main className="px-page pb-24 pt-8">{children}</main>
+      <Toast />
     </div>
   );
 }

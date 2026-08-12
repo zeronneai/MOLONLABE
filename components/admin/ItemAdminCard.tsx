@@ -6,19 +6,34 @@
 import { useTransition } from "react";
 import Link from "next/link";
 import {
+  archiveItem,
   duplicateItem,
   moveItem,
+  restoreItem,
   setItemStatus,
   toggleItemFeatured,
 } from "@/app/admin/actions";
-import { ITEM_STATUSES } from "@/lib/admin/constants";
+import { showToast } from "@/components/admin/Toast";
+import { ARCHIVED_STATUS, ITEM_LIVE_STATUSES } from "@/lib/admin/constants";
 import type { ItemRow } from "@/lib/database.types";
 
 export default function ItemAdminCard({ item }: { item: ItemRow }) {
   const [pending, start] = useTransition();
+  const archived = item.status === ARCHIVED_STATUS;
   const image = Array.isArray(item.images)
     ? (item.images.find((u) => typeof u === "string") as string | undefined)
     : undefined;
+
+  // Applied immediately, no confirm — the toast carries the way back.
+  const archive = () =>
+    start(async () => {
+      const previous = await archiveItem(item.id);
+      showToast({
+        message: "Archived.",
+        actionLabel: "Undo",
+        onAction: () => restoreItem(item.id, previous ?? "available"),
+      });
+    });
 
   return (
     <div
@@ -47,33 +62,42 @@ export default function ItemAdminCard({ item }: { item: ItemRow }) {
             </button>
           </div>
           <p className="label mt-1 text-muted">
+            {archived && <span className="text-bone">Archived · </span>}
             {item.category} · {item.price_display ?? "—"}
           </p>
         </div>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-3">
-        <div className="flex" role="group" aria-label="Status">
-          {ITEM_STATUSES.map((s) => (
-            <button
-              key={s}
-              type="button"
-              aria-pressed={item.status === s}
-              onClick={() => start(() => setItemStatus(item.id, s))}
-              className={`label h-11 border px-3 transition-colors ${
-                item.status === s
-                  ? s === "sold"
-                    ? "border-danger text-danger"
-                    : s === "hidden"
-                      ? "border-muted text-bone"
+        {archived ? (
+          <button
+            type="button"
+            onClick={() => start(() => restoreItem(item.id, "available"))}
+            className="label h-11 border border-acid px-4 text-acid transition-colors"
+          >
+            Restore
+          </button>
+        ) : (
+          <div className="flex" role="group" aria-label="Status">
+            {ITEM_LIVE_STATUSES.map((s) => (
+              <button
+                key={s}
+                type="button"
+                aria-pressed={item.status === s}
+                onClick={() => start(() => setItemStatus(item.id, s))}
+                className={`label h-11 border px-3 transition-colors ${
+                  item.status === s
+                    ? s === "sold"
+                      ? "border-danger text-danger"
                       : "border-acid text-acid"
-                  : "hairline text-muted hover:text-bone"
-              }`}
-            >
-              {s === "available" ? "Avail" : s}
-            </button>
-          ))}
-        </div>
+                    : "hairline text-muted hover:text-bone"
+                }`}
+              >
+                {s === "available" ? "Avail" : s}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="ml-auto flex items-center">
           <button
             type="button"
@@ -98,6 +122,15 @@ export default function ItemAdminCard({ item }: { item: ItemRow }) {
           >
             Dup
           </button>
+          {!archived && (
+            <button
+              type="button"
+              onClick={archive}
+              className="label h-11 px-3 text-muted hover:text-bone"
+            >
+              Archive
+            </button>
+          )}
           <Link
             href={`/admin/inventory/${item.id}`}
             className="label flex h-11 items-center border hairline px-4 text-bone hover:border-acid hover:text-acid"

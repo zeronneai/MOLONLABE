@@ -1,18 +1,26 @@
 import Link from "next/link";
 import { getSessionSupabase } from "@/lib/supabase/session";
-import { ITEM_STATUSES } from "@/lib/admin/constants";
+import { ARCHIVED_STATUS, ITEM_LIVE_STATUSES } from "@/lib/admin/constants";
 import ItemAdminCard from "@/components/admin/ItemAdminCard";
 
 export const dynamic = "force-dynamic";
 
-type Search = Promise<{ q?: string; status?: string }>;
+type Search = Promise<{ q?: string; status?: string; deleted?: string }>;
+
+// Archived items are kept out of the working list — that is what archiving
+// is for — and are reached through their own filter.
+const FILTERS = [
+  { key: "", label: "All" },
+  ...ITEM_LIVE_STATUSES.map((s) => ({ key: s, label: s })),
+  { key: ARCHIVED_STATUS, label: "Archived" },
+];
 
 export default async function AdminInventory({
   searchParams,
 }: {
   searchParams: Search;
 }) {
-  const { q = "", status = "" } = await searchParams;
+  const { q = "", status = "", deleted = "" } = await searchParams;
   const sb = await getSessionSupabase();
   if (!sb) return null;
 
@@ -23,6 +31,7 @@ export default async function AdminInventory({
     .order("created_at", { ascending: false });
   if (q) query = query.ilike("name", `%${q}%`);
   if (status) query = query.eq("status", status);
+  else query = query.neq("status", ARCHIVED_STATUS);
   const { data: items, error } = await query;
 
   return (
@@ -47,24 +56,27 @@ export default async function AdminInventory({
       </form>
 
       <div className="mt-4 flex flex-wrap gap-x-6">
-        <Link
-          href={`/admin/inventory${q ? `?q=${encodeURIComponent(q)}` : ""}`}
-          className="filter-tap"
-          aria-pressed={!status}
-        >
-          <span className="filter-label">All</span>
-        </Link>
-        {ITEM_STATUSES.map((s) => (
+        {FILTERS.map((f) => (
           <Link
-            key={s}
-            href={`/admin/inventory?${new URLSearchParams({ ...(q ? { q } : {}), status: s })}`}
+            key={f.key || "all"}
+            href={
+              f.key
+                ? `/admin/inventory?${new URLSearchParams({ ...(q ? { q } : {}), status: f.key })}`
+                : `/admin/inventory${q ? `?q=${encodeURIComponent(q)}` : ""}`
+            }
             className="filter-tap"
-            aria-pressed={status === s}
+            aria-pressed={status === f.key}
           >
-            <span className="filter-label">{s}</span>
+            <span className="filter-label">{f.label}</span>
           </Link>
         ))}
       </div>
+
+      {deleted && (
+        <p role="status" className="label mt-6 text-acid">
+          Item deleted.
+        </p>
+      )}
 
       <div className="mt-6 border-t hairline">
         {error && (
