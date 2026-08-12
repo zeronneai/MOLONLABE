@@ -22,13 +22,22 @@ export const HERO_CLIPS = {
   },
 };
 
-// Looping hero-background clips — not delivered yet. When they land, set
-// the public ids here and the scrub hands off to them automatically; while
-// null the final scrub frame holds, which is the designed fallback anyway.
+// Looping hero-background clips that take over once the scrub completes.
+// Picked by orientation like the frame sequence. If either is set to null
+// the final scrub frame holds instead, which is the designed fallback.
 export const HERO_LOOPS: { desktop: string | null; mobile: string | null } = {
-  desktop: null,
-  mobile: null,
+  desktop: "hf_20260811_224431_b7ed0dcd-3b86-4d8f-be95-d55b9ca769cc_z1icog",
+  mobile: "hf_20260811_224417_c4b6870b-855a-4cc2-8e55-f73dd93821f0_bkkq06",
 };
+
+// Seam handling: the loops were generated without a matching end frame, so
+// HeroScrub plays them through two stacked <video> elements offset in time,
+// cross-fading over the last CROSSFADE_S of each cycle instead of relying
+// on the native loop attribute (which would visibly jump).
+export const LOOP_CROSSFADE_S = 1;
+// The loop must never compete with the frame sequence for bandwidth: it
+// only starts fetching once the scrub is past this progress.
+export const LOOP_PRELOAD_AT = 0.7;
 
 // ~100 frames ≈ 15–25KB each as f_webp,q_auto → target under 2.5MB total.
 export const FRAME_COUNT = 100;
@@ -46,7 +55,11 @@ export function heroFrameUrl(portrait: boolean, index: number): string {
   return `${CLOUD}/so_${t},f_webp,q_auto,w_${clip.width}/${clip.id}.webp`;
 }
 
+// f_auto,q_auto,vc_auto: WebM for browsers that take it, right-sized H.264
+// for the rest — never the raw upload.
 export function heroLoopUrl(portrait: boolean): string | null {
   const id = portrait ? HERO_LOOPS.mobile : HERO_LOOPS.desktop;
-  return id ? `${CLOUD}/f_auto,q_auto,w_${heroClip(portrait).width}/${id}.mp4` : null;
+  return id
+    ? `${CLOUD}/f_auto,q_auto,vc_auto,w_${heroClip(portrait).width}/${id}.mp4`
+    : null;
 }

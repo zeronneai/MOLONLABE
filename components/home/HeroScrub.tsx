@@ -11,6 +11,8 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   FRAME_COUNT,
+  LOOP_CROSSFADE_S,
+  LOOP_PRELOAD_AT,
   SCRUB_SCROLL_VH,
   heroFrameUrl,
   heroLoopUrl,
@@ -32,7 +34,12 @@ export default function HeroScrub() {
 
   const sectionRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  // Two stacked copies of the loop, offset in time: the standby fades in
+  // over the last second of the active one's cycle so the restart jump
+  // (the clips have no matching end frame) is never visible.
+  const videoARef = useRef<HTMLVideoElement>(null);
+  const videoBRef = useRef<HTMLVideoElement>(null);
+  const loopCtl = useRef({ primed: false, standbyPrimed: false, starting: false, active: 0, fading: false });
   const lineRefs = useRef<(HTMLParagraphElement | null)[]>([]);
   const headlineRef = useRef<HTMLDivElement>(null);
   const framesRef = useRef<HTMLImageElement[]>([]);
@@ -127,6 +134,7 @@ export default function HeroScrub() {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
+    loopCtl.current = { primed: false, standbyPrimed: false, starting: false, active: 0, fading: false };
 
     const size = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -185,13 +193,79 @@ export default function HeroScrub() {
       }
 
       // loop video takes over only when the scrub is complete
-      const video = videoRef.current;
-      if (video) {
-        if (p >= 0.999 && video.paused) {
-          video.play().then(() => setLoopReady(true)).catch(() => setLoopReady(false));
-        } else if (p < 0.999 && !video.paused) {
-          video.pause();
-          setLoopReady(false);
+      const a = videoARef.current;
+      const b = videoBRef.current;
+      if (a && b) {
+        const ctl = loopCtl.current;
+        // start fetching only once the scrub is mostly done, so the loop
+        // never competes with the frame sequence for bandwidth
+        if (!ctl.primed && p >= LOOP_PRELOAD_AT) {
+          ctl.primed = true;
+          a.preload = "auto";
+          a.load();
+        }
+        if (p >= 0.999) {
+          if (!ctl.starting && a.paused && b.paused) {
+            ctl.starting = true;
+            a.play()
+              .then(() => {
+                // cross-fade over the held final scrub frame (~250ms, CSS)
+                setLoopReady(true);
+                if (!ctl.standbyPrimed) {
+                  ctl.standbyPrimed = true;
+                  b.preload = "auto";
+                  b.load();
+                }
+              })
+              .catch(() => {
+                // autoplay refused (e.g. iOS Low Power): the final scrub
+                // frame holds. starting stays true so this doesn't retry
+                // every rAF — it resets if the user scrolls away and back.
+                setLoopReady(false);
+              });
+          }
+          // seam: fade the standby in over the active one's last second
+          const act = ctl.active === 0 ? a : b;
+          const nxt = ctl.active === 0 ? b : a;
+          const dur = act.duration;
+          if (!act.paused && Number.isFinite(dur) && dur > LOOP_CROSSFADE_S * 2) {
+            const remain = dur - act.currentTime;
+            if (remain <= LOOP_CROSSFADE_S) {
+              if (nxt.paused) {
+                nxt.currentTime = 0;
+                nxt.play().catch(() => {});
+              }
+              nxt.style.zIndex = "2";
+              act.style.zIndex = "1";
+              nxt.style.opacity = String(
+                Math.min(1, Math.max(0, 1 - remain / LOOP_CROSSFADE_S)),
+              );
+              ctl.fading = true;
+            } else if (ctl.fading) {
+              // the active element wrapped past its end — the standby has
+              // fully taken over; make the swap official
+              act.pause();
+              act.currentTime = 0;
+              act.style.opacity = "0";
+              nxt.style.opacity = "1";
+              ctl.active = ctl.active === 0 ? 1 : 0;
+              ctl.fading = false;
+            }
+          }
+        } else {
+          // scrolled back up: hold the scrub, reset the pair to the top
+          if (!a.paused || !b.paused) {
+            a.pause();
+            b.pause();
+            a.currentTime = 0;
+            b.currentTime = 0;
+            a.style.opacity = "1";
+            b.style.opacity = "0";
+            ctl.active = 0;
+            ctl.fading = false;
+            setLoopReady(false);
+          }
+          ctl.starting = false;
         }
       }
 
@@ -236,19 +310,40 @@ export default function HeroScrub() {
           />
         )}
 
-        {/* optional loop background once the scrub completes */}
+        {/* loop background once the scrub completes: the wrapper cross-fades
+            over the held final scrub frame; inside it, two copies of the
+            clip hand off to each other so the restart seam never shows.
+            (native loop stays on each element purely as a fail-safe — the
+            crossfade swap normally retires an element before its end) */}
         {loopSrc && !isStatic && (
-          <video
-            ref={videoRef}
-            src={loopSrc}
-            muted
-            loop
-            playsInline
-            preload="none"
-            className="absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
+          <div
+            className="absolute inset-0 transition-opacity duration-[250ms]"
             style={{ opacity: loopReady ? 1 : 0 }}
             aria-hidden="true"
-          />
+          >
+            <video
+              key={loopSrc + "-a"}
+              ref={videoARef}
+              src={loopSrc}
+              muted
+              loop
+              playsInline
+              preload="none"
+              className="absolute inset-0 h-full w-full object-cover"
+              style={{ opacity: 1 }}
+            />
+            <video
+              key={loopSrc + "-b"}
+              ref={videoBRef}
+              src={loopSrc}
+              muted
+              loop
+              playsInline
+              preload="none"
+              className="absolute inset-0 h-full w-full object-cover"
+              style={{ opacity: 0 }}
+            />
+          </div>
         )}
 
         <div
