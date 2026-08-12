@@ -3,7 +3,8 @@ import Link from "next/link";
 import { SHOP_PHONE_DISPLAY, SHOP_PHONE_HREF } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Sweepstakes Rules — Molon Labe Firearms x SunCity Outdoors",
+  alternates: { canonical: "/sweepstakes-rules" },
+  title: "Sweepstakes Rules",
   description:
     "Official rules for the Molon Labe Firearms x SunCity Outdoors sweepstakes. No purchase necessary.",
   // Placeholder copy must never be indexed as if it were the real terms.

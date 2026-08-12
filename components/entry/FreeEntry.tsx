@@ -6,13 +6,28 @@
 // as a paid entry and produces exactly the same kind of record, and it is
 // the only method that works today.
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { submitFreeEntry, type EntryState } from "@/app/actions/entry";
+import { track } from "@/lib/analytics";
 
 const initial: EntryState = { status: "idle" };
 
 export default function FreeEntry({ campaignId }: { campaignId: string }) {
   const [state, action, pending] = useActionState(submitFreeEntry, initial);
+  const started = useRef(false);
+
+  // entry_start fires once, on the first sign of intent.
+  const onFirstInput = () => {
+    if (started.current) return;
+    started.current = true;
+    track("entry_start", { campaign_id: campaignId });
+  };
+
+  useEffect(() => {
+    if (state.status === "success") {
+      track("entry_submit", { campaign_id: campaignId, method: "free" });
+    }
+  }, [state.status, campaignId]);
 
   if (state.status === "success") {
     return (
@@ -37,7 +52,7 @@ export default function FreeEntry({ campaignId }: { campaignId: string }) {
         no step behind this one.
       </p>
 
-      <form action={action} className="mt-8">
+      <form action={action} className="mt-8" onFocusCapture={onFirstInput}>
         <input type="hidden" name="campaign_id" value={campaignId} />
         {/* honeypot */}
         <input

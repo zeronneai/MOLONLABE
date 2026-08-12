@@ -13,6 +13,8 @@ import Gallery from "@/components/inventory/Gallery";
 import VideoBlock from "@/components/inventory/VideoBlock";
 import EditorialIndex from "@/components/inventory/EditorialIndex";
 import ItemCtas from "@/components/inventory/ItemCtas";
+import { ProductJsonLd } from "@/components/seo/StructuredData";
+import TrackView from "@/components/analytics/TrackView";
 
 export const dynamic = "force-dynamic";
 
@@ -29,8 +31,15 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const item = await getItemBySlug(slug);
   if (!item) return { title: "Not found" };
   return {
-    title: `${item.name} — Molon Labe Firearms x SunCity Outdoors`,
+    title: item.name,
     description: item.short_desc ?? undefined,
+    alternates: { canonical: `/inventory/${item.slug}` },
+    openGraph: {
+      type: "website",
+      title: item.name,
+      description: item.short_desc ?? undefined,
+      url: `/inventory/${item.slug}`,
+    },
   };
 }
 
@@ -46,6 +55,8 @@ export default async function ItemPage({ params }: Params) {
 
   return (
     <div className="lg:flex">
+      <ProductJsonLd item={item} image={images[0]} />
+      <TrackView slug={item.slug} name={item.name} category={item.category} />
       {/* Left half: sticky gallery, full viewport height, true 50vw */}
       <div className="lg:sticky lg:top-0 lg:h-svh lg:w-1/2 lg:self-start">
         <Gallery images={images} alt={item.name} />

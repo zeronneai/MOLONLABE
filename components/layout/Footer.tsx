@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { LOGO_URL, SHOP_PHONE_DISPLAY, SHOP_PHONE_HREF } from "@/lib/brand";
+import {
+  LOGO_URL,
+  SHOP_ADDRESS,
+  SHOP_HOURS,
+  SHOP_PHONE_DISPLAY,
+  SHOP_PHONE_HREF,
+} from "@/lib/brand";
 
 const navLinks = [
   { href: "/inventory", label: "Inventory" },
@@ -35,23 +41,22 @@ export default function Footer() {
         <div>
           <h2 className="label text-acid">Hours</h2>
           <dl className="mt-5 space-y-2 text-sm">
-            <div className="flex justify-between gap-6 border-b hairline pb-2">
-              <dt className="text-muted">Mon – Fri</dt>
-              <dd>11:00 – 19:00</dd>
-            </div>
-            <div className="flex justify-between gap-6 border-b hairline pb-2">
-              <dt className="text-muted">Saturday</dt>
-              <dd>11:00 – 18:00</dd>
-            </div>
-            <div className="flex justify-between gap-6 border-b hairline pb-2">
-              <dt className="text-muted">Sunday</dt>
-              <dd>11:00 – 17:00</dd>
-            </div>
+            {SHOP_HOURS.map((h) => (
+              <div
+                key={h.label}
+                className="flex justify-between gap-6 border-b hairline pb-2"
+              >
+                <dt className="text-muted">{h.label}</dt>
+                <dd>
+                  {h.opens} – {h.closes}
+                </dd>
+              </div>
+            ))}
           </dl>
           <address className="mt-6 text-sm not-italic leading-relaxed text-muted">
-            10024 Montana Ave
+            {SHOP_ADDRESS.street}
             <br />
-            El Paso, TX
+            {SHOP_ADDRESS.city}, {SHOP_ADDRESS.region}
             <br />
             <a
               href={SHOP_PHONE_HREF}

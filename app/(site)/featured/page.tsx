@@ -12,7 +12,8 @@ import { itemImages } from "@/lib/db/items";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Current Feature — Molon Labe Firearms x SunCity Outdoors",
+  alternates: { canonical: "/featured" },
+  title: "Current Feature",
   description:
     "The current sweepstakes feature at Molon Labe Firearms x SunCity Outdoors, El Paso, TX. No purchase necessary to enter.",
 };

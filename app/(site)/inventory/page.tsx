@@ -6,7 +6,8 @@ import { IN_THE_CASE } from "@/content/en";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Inventory — Molon Labe Firearms x SunCity Outdoors",
+  alternates: { canonical: "/inventory" },
+  title: "Inventory",
   description:
     "What is on hand right now at Molon Labe Firearms x SunCity Outdoors, El Paso, TX.",
 };

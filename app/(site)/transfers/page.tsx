@@ -3,7 +3,8 @@ import InquiryForm from "@/components/forms/InquiryForm";
 import Reveal from "@/components/motion/Reveal";
 
 export const metadata: Metadata = {
-  title: "FFL Transfers — Molon Labe Firearms x SunCity Outdoors",
+  alternates: { canonical: "/transfers" },
+  title: "FFL Transfers",
   description:
     "Buy anywhere, ship it to us, pick it up at the counter in El Paso. FFL transfer intake for Molon Labe Firearms x SunCity Outdoors.",
 };

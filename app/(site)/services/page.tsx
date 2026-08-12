@@ -4,7 +4,8 @@ import Reveal from "@/components/motion/Reveal";
 import { SHOP_PHONE_HREF } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Services — Molon Labe Firearms x SunCity Outdoors",
+  alternates: { canonical: "/services" },
+  title: "Services",
   description:
     "FFL transfers, special orders, and in-store services at Molon Labe Firearms x SunCity Outdoors, El Paso, TX.",
 };

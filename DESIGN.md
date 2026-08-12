@@ -75,10 +75,17 @@ Depth through material, not skeuomorphism. These are machined metal controls on 
 - **Steel** is everything else: secondary actions, neutral controls. Archive is steel; save is acid; delete is danger.
 
 **Where it applies.** Everywhere an interactive element exists: CTAs, form
-submits, filters, admin row actions, status switches, the intro game's
-buttons, and the entry program. Filters are controls, not text labels —
-the selected one depresses and reads acid, which is the active-nav use of
-the colour. Drop zones and readouts use `.field-well`, the sunken panel.
+submits, admin row actions and filters, status switches, the intro game's
+buttons, and the entry program. Drop zones and readouts use
+`.field-well`, the sunken panel.
+
+**Filters are split, deliberately.** In the admin they are steel controls:
+that panel is a working tool used one-handed, and a control that depresses
+is easier to hit and read than a line of text. On the public inventory
+index they stay plain text labels with an underline on the active one, per
+section 3 — that page's strength is its restraint, and a row of metal
+buttons above the editorial rows competes with them. Do not "fix" the
+inconsistency by unifying them; the two contexts want different things.
 
 **Secondary CTA** stays text with a 6px underline offset — it is a link, not a control. If it reads as an action rather than a link, it is a steel control instead.
 
