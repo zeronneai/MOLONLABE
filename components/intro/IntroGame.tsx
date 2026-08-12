@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { DESKTOP_TUNING, MOBILE_TUNING } from "@/lib/game/config";
+import { CROSSFADE_MS, DESKTOP_TUNING, MOBILE_TUNING } from "@/lib/game/config";
 import type { GameSettings } from "@/lib/game/settings";
 import { recordGameEvent } from "@/app/actions/game";
 import {
@@ -26,23 +26,25 @@ import {
   type GameArt,
   type Scene,
 } from "@/lib/game/scene";
-import { GAME_ASSETS, PARALLAX, SCOPE_END } from "@/lib/game/assets";
+import { PARALLAX } from "@/lib/game/assets";
 import { renderFrame, type Pointer, type ViewFx } from "@/lib/game/render";
-import { LOGO_URL } from "@/lib/brand";
 import { track } from "@/lib/analytics";
 import { seqLog, whenHeroPainted } from "@/lib/hero/paintSignal";
 
 const SEEN_KEY = "mlf_intro_seen";
 
+// The ending is one continuous shot. The round resolves by cross-fading the
+// shop interior into the hero scrub's already-painted frame 0 — the scope
+// view — and everything after that sits on top of that same image: result
+// card, code, buttons. Closing fades the card off it. Nothing underneath
+// ever changes, so scrolling simply pulls the camera back out of the scope.
 type Phase =
   | "idle"
   | "loading"
   | "arcade"
-  | "won"
-  | "lost"
-  | "handoff" // skull beat
-  | "scope" // resolves into the scope view that matches the hero's first frame
-  | "wiping"
+  | "resolving" // the one cross-fade: shop interior → scrub frame 0
+  | "result" // win/lose card, sitting on frame 0
+  | "closing" // card (and, on a mid-round skip, the game) fades off
   | "done";
 
 export default function IntroGame({ settings }: { settings?: GameSettings }) {
@@ -51,6 +53,7 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
   // When the offer is off, the server never serializes the code at all.
   const offer = settings?.offer ?? { enabled: false as const };
   const [phase, setPhase] = useState<Phase>("idle");
+  const [outcome, setOutcome] = useState<"won" | "lost" | null>(null);
   const [fine, setFine] = useState(false);
   const [copied, setCopied] = useState(false);
   const [lastHits, setLastHits] = useState(0);
@@ -90,7 +93,9 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
     }
     coarseRef.current = window.matchMedia("(pointer: coarse)").matches;
     setFine(!coarseRef.current);
-    new window.Image().src = LOGO_URL; // warm the skull for the handoff
+    // The ending resolves onto the hero's frame 0, so the overlay has to be
+    // sitting exactly on top of it for its whole life.
+    window.scrollTo(0, 0);
     startedAtRef.current = performance.now();
     setPhase("loading");
   }, [pathname]);
@@ -123,26 +128,25 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
     }
   };
 
-  const skip = useCallback(() => {
+  // Both exits are the same move: fade what's on screen off the hero's
+  // frame 0 and unmount. Mid-round that fades the shop interior; from the
+  // result card it fades only the card, because the interior is already
+  // gone. Either way the image underneath is untouched.
+  const close = useCallback(() => {
     markSeen();
-    track("intro_skipped", {
-      elapsed_ms: Math.round(performance.now() - startedAtRef.current),
-    });
-    window.scrollTo(0, 0); // hero scrub must start at frame 0
-    seqLog("skip: scrolled to top, waiting for hero paint");
-    // never reveal an unpainted hero — the overlay holds until frame 0 is up
+    window.scrollTo(0, 0);
     whenHeroPainted(() => {
-      seqLog("skip: overlay unmounting");
-      setPhase("done");
+      seqLog("closing: fading off frame 0");
+      setPhase("closing");
     });
   }, []);
 
-  const finishToSite = useCallback(() => {
-    markSeen();
-    window.scrollTo(0, 0); // before the wipe even starts: scrub begins at frame 0
-    seqLog("continue: scrolled to top, entering handoff");
-    setPhase("handoff");
-  }, []);
+  const skip = useCallback(() => {
+    track("intro_skipped", {
+      elapsed_ms: Math.round(performance.now() - startedAtRef.current),
+    });
+    close();
+  }, [close]);
 
   const retry = useCallback(() => {
     const state = stateRef.current;
@@ -156,6 +160,7 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
       );
     }
     setCopied(false);
+    setOutcome(null);
     setPhase("arcade");
   }, []);
 
@@ -281,8 +286,15 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
           sound("win");
           void recordGameEvent("won", mode);
         }
-        setPhase(state.phase);
-        return; // stop the loop; last frame stays behind the result card
+        setOutcome(state.phase);
+        // The cross-fade needs frame 0 already under us. It normally has
+        // been since the first seconds of the round; if not, the last game
+        // frame simply holds a beat rather than resolving onto nothing.
+        whenHeroPainted(() => {
+          seqLog("round over: cross-fading the interior into frame 0");
+          setPhase("resolving");
+        });
+        return; // stop the loop; the last frame is what fades out
       }
       rafRef.current = requestAnimationFrame(frame);
     };
@@ -376,9 +388,9 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
     };
   }, [phase]);
 
-  // Result screens and loading: Esc still skips, focus stays inside.
+  // Result screen and loading: Esc still skips, focus stays inside.
   useEffect(() => {
-    if (phase !== "won" && phase !== "lost" && phase !== "loading") return;
+    if (phase !== "result" && phase !== "loading") return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -402,30 +414,23 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
     };
   }, [phase, skip]);
 
-  // Skull beat, then the scope view, then the hard wipe. The scope frame
-  // matches the hero scrub's first frame so the wipe reads as one shot.
+  // Once the interior has finished dissolving into frame 0, the result card
+  // comes up on top of it.
   useEffect(() => {
-    if (phase !== "handoff") return;
-    const id = window.setTimeout(() => setPhase("scope"), 320);
+    if (phase !== "resolving") return;
+    const id = window.setTimeout(() => setPhase("result"), CROSSFADE_MS);
     return () => window.clearTimeout(id);
   }, [phase]);
 
-  // The wipe is gated on the hero having painted frame 0 — the scope view
-  // simply holds a beat longer on a slow connection, which reads as
-  // deliberate, instead of the wipe revealing a loading treatment.
+  // Closing: whatever is still on screen fades off frame 0, then the
+  // overlay unmounts. No wipe — the image underneath is already the site.
   useEffect(() => {
-    if (phase !== "scope") return;
-    let cancelPaintWait: (() => void) | null = null;
+    if (phase !== "closing") return;
     const id = window.setTimeout(() => {
-      cancelPaintWait = whenHeroPainted(() => {
-        seqLog("wipe starting (hero confirmed painted)");
-        setPhase("wiping");
-      });
-    }, SCOPE_END.holdMs);
-    return () => {
-      window.clearTimeout(id);
-      cancelPaintWait?.();
-    };
+      seqLog("overlay unmounting (image underneath unchanged)");
+      setPhase("done");
+    }, CROSSFADE_MS);
+    return () => window.clearTimeout(id);
   }, [phase]);
 
   useEffect(() => {
@@ -449,30 +454,33 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
 
   const tuning = coarseRef.current ? difficulty.mobile : difficulty.desktop;
 
+  const playing = phase === "loading" || phase === "arcade";
+  const fade = { transition: `opacity ${CROSSFADE_MS}ms linear` };
+
   return (
     <div
       ref={overlayRef}
       role="dialog"
       aria-modal="true"
       aria-label="Intro game: clear the round, or skip"
-      className={`intro-overlay${fine ? " intro-fine" : ""}${
-        phase === "wiping" ? " intro-wiping" : ""
-      }`}
-      onAnimationEnd={(e) => {
-        if (e.animationName !== "intro-wipe") return;
-        seqLog("wipe finished");
-        // hold the final composite one extra frame before unmounting so the
-        // swap never lands on the same tick as the wipe's last paint
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => {
-            seqLog("overlay unmounting");
-            setPhase("done");
-          }),
-        );
-      }}
+      className={`intro-overlay${fine ? " intro-fine" : ""}`}
+      // once the round has resolved onto frame 0 there is nothing left to
+      // block: closing hands the page over before the card has finished
+      // fading, so the site is live under the player's finger
+      style={phase === "closing" ? { pointerEvents: "none" } : undefined}
     >
-      <canvas ref={canvasRef} className="intro-canvas" aria-hidden="true" />
-      <div className="intro-scanlines" aria-hidden="true" />
+      {/* The shop interior. The only transition in the ending: this layer
+          dissolves into the hero scrub's frame 0, already painted behind
+          the overlay. Everything below sits on that image and never
+          replaces it. */}
+      <div
+        className="intro-game-layer"
+        style={{ ...fade, opacity: playing ? 1 : 0 }}
+        aria-hidden={!playing}
+      >
+        <canvas ref={canvasRef} className="intro-canvas" aria-hidden="true" />
+        <div className="intro-scanlines" aria-hidden="true" />
+      </div>
 
       {phase === "loading" && (
         <div className="intro-result" aria-label="Loading">
@@ -483,98 +491,74 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
         </div>
       )}
 
-      {phase === "won" && (
-        <div className="intro-result">
-          <p className="label text-acid">Cleared</p>
-          {offer.enabled ? (
+      {outcome && (phase === "result" || phase === "closing") && (
+        <div
+          className="intro-result intro-card"
+          style={{ ...fade, opacity: phase === "closing" ? 0 : 1 }}
+        >
+          {outcome === "won" ? (
             <>
-              <h2 className="display mt-4 text-center text-3xl sm:text-4xl">
-                {offer.value.toUpperCase()}
-              </h2>
-              <button
-                type="button"
-                onClick={copyCode}
-                className="intro-code mt-8"
-                aria-live="polite"
-              >
-                <span className="font-extrabold tracking-[0.2em]">{offer.code}</span>
-                <span className="label mt-2 block text-muted">
-                  {copied ? "Copied" : "Tap to copy"}
-                </span>
-              </button>
-              <p className="mt-6 max-w-xs text-center text-xs text-muted">{offer.note}</p>
-              {offer.expires && (
-                <p className="label mt-3 text-muted">
-                  Through{" "}
-                  {new Date(offer.expires + "T12:00:00").toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </p>
+              <p className="label text-acid">Cleared</p>
+              {offer.enabled ? (
+                <>
+                  <h2 className="display mt-4 text-center text-3xl sm:text-4xl">
+                    {offer.value.toUpperCase()}
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={copyCode}
+                    className="intro-code mt-8"
+                    aria-live="polite"
+                  >
+                    <span className="font-extrabold tracking-[0.2em]">{offer.code}</span>
+                    <span className="label mt-2 block text-muted">
+                      {copied ? "Copied" : "Tap to copy"}
+                    </span>
+                  </button>
+                  <p className="mt-6 max-w-xs text-center text-xs text-muted">
+                    {offer.note}
+                  </p>
+                  {offer.expires && (
+                    <p className="label mt-3 text-muted">
+                      Through{" "}
+                      {new Date(offer.expires + "T12:00:00").toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <h2 className="display mt-4 text-center text-3xl sm:text-4xl">
+                  YOU CLEARED IT.
+                </h2>
               )}
+              <button type="button" onClick={close} className="cta-primary mt-10">
+                Continue
+              </button>
             </>
           ) : (
-            <h2 className="display mt-4 text-center text-3xl sm:text-4xl">
-              YOU CLEARED IT.
-            </h2>
+            <>
+              <p className="label text-danger">Time</p>
+              <h2 className="display mt-4 text-center text-3xl sm:text-4xl">NICE TRY.</h2>
+              <p className="label mt-4 text-muted">
+                {lastHits} of {tuning.targetCount} in{" "}
+                {(tuning.roundMs / 1000).toFixed(0)} seconds
+              </p>
+              <div className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
+                <button type="button" onClick={retry} className="cta-primary">
+                  Retry
+                </button>
+                <button type="button" onClick={close} className="cta-secondary">
+                  Continue
+                </button>
+              </div>
+            </>
           )}
-          <button type="button" onClick={finishToSite} className="cta-primary mt-10">
-            Continue
-          </button>
         </div>
       )}
 
-      {phase === "lost" && (
-        <div className="intro-result">
-          <p className="label text-danger">Time</p>
-          <h2 className="display mt-4 text-center text-3xl sm:text-4xl">NICE TRY.</h2>
-          <p className="label mt-4 text-muted">
-            {lastHits} of {tuning.targetCount} in {(tuning.roundMs / 1000).toFixed(0)} seconds
-          </p>
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
-            <button type="button" onClick={retry} className="cta-primary">
-              Retry
-            </button>
-            <button type="button" onClick={finishToSite} className="cta-secondary">
-              Continue
-            </button>
-          </div>
-        </div>
-      )}
-
-      {phase === "handoff" && (
-        <div className="absolute inset-0 bg-ink">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={LOGO_URL} alt="" className="intro-skull" aria-hidden="true" />
-        </div>
-      )}
-
-      {(phase === "scope" || phase === "wiping") && (
-        <div className="intro-scope" aria-hidden="true">
-          <div
-            className="intro-scope-circle"
-            style={{
-              width: `min(${SCOPE_END.circleFrac * 100}vw, ${SCOPE_END.circleFrac * 100}vh)`,
-              height: `min(${SCOPE_END.circleFrac * 100}vw, ${SCOPE_END.circleFrac * 100}vh)`,
-            }}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={GAME_ASSETS.alien2}
-              alt=""
-              className="intro-scope-alien"
-              style={{
-                width: `${SCOPE_END.alienFrac * 100}%`,
-                transform: `translate(-50%, calc(-50% + ${SCOPE_END.alienYShift * 100}%))`,
-              }}
-            />
-            <span className="intro-scope-line-h" />
-            <span className="intro-scope-line-v" />
-          </div>
-        </div>
-      )}
-
-      {phase !== "handoff" && phase !== "scope" && phase !== "wiping" && (
+      {playing && (
         <button
           ref={skipRef}
           type="button"

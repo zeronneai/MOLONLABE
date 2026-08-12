@@ -11,6 +11,12 @@ export const GO_MS = 500; // "GO" card
 export const RELOAD_MS = 700; // reload downtime
 export const RISE_MS = 130; // alien pop-up / duck animation
 
+// The one transition in the ending: the shop interior cross-fades into the
+// hero scrub's frame 0 (the scope view) when the round resolves. Everything
+// after that — result card, continue, scrolling — happens over that same
+// unchanging image, so the whole ending reads as one continuous shot.
+export const CROSSFADE_MS = 300;
+
 export const DESKTOP_TUNING = {
   roundMs: 10_000, // round length
   targetCount: 8, // hits needed to win
