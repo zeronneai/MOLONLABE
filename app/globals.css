@@ -655,3 +655,427 @@ textarea.field-input {
 
 /* No end-screen chrome lives here any more: the round resolves onto the
    hero scrub's frame 0 and the card fades off it. See IntroGame.tsx. */
+
+/* Draw presentation ------------------------------------------------- */
+
+/* Built to be filmed. Every dimension in this block is expressed in --u,
+   a single scale unit derived from the frame, so the whole composition is
+   resolution-independent: it looks the same in a 9:16 window on a phone,
+   fullscreen on a monitor, and in whatever a stream re-encodes it to.
+   The two orientations are separate layouts sharing one type scale, not
+   one layout being cropped. */
+
+.draw-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: #000;
+  overflow: hidden;
+}
+
+.draw-frame {
+  position: relative;
+  container-type: size;
+  overflow: hidden;
+  background-color: var(--color-ink);
+  background-image: var(--noise);
+}
+
+/* Vertical is the primary composition: this is the one he films. */
+.draw-frame[data-orientation="vertical"] {
+  aspect-ratio: 9 / 16;
+  height: 100%;
+  max-width: 100%;
+  --u: 1cqw;
+}
+
+/* 16:9 is wider for the same diagonal, so the same type scale would read
+   as shouting. 0.62 lands it at the same optical size on a monitor. */
+.draw-frame[data-orientation="horizontal"] {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  max-height: 100%;
+  --u: 0.62cqw;
+}
+
+.draw-mark {
+  position: absolute;
+  top: calc(4 * var(--u));
+  left: calc(4 * var(--u));
+  z-index: 4;
+  width: calc(9 * var(--u));
+  opacity: 0.72;
+}
+.draw-mark img {
+  width: 100%;
+  height: auto;
+}
+
+.draw-badge {
+  position: absolute;
+  top: calc(4 * var(--u));
+  right: calc(4 * var(--u));
+  z-index: 4;
+  padding: calc(1 * var(--u)) calc(2 * var(--u));
+  border: 1px solid var(--color-amber);
+  border-radius: 2px;
+  color: var(--color-amber);
+  font-size: calc(1.15 * var(--u));
+}
+
+/* 1. Setup ---------------------------------------------------------- */
+
+.draw-setup {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(4 * var(--u));
+  padding: calc(8 * var(--u)) calc(7 * var(--u));
+  text-align: center;
+}
+
+/* Everything that is not the prize image. Keeping it in one wrapper is
+   what lets 16:9 become two columns without restating the layout. */
+.draw-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(2 * var(--u));
+}
+
+.draw-prize {
+  position: relative;
+  width: calc(58 * var(--u));
+  aspect-ratio: 4 / 3;
+  border: 1px solid color-mix(in srgb, var(--color-muted) 22%, transparent);
+  background-color: var(--color-surface);
+  overflow: hidden;
+}
+.draw-prize-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--color-muted);
+  font-size: calc(1.2 * var(--u));
+}
+
+.draw-eyebrow {
+  margin-top: calc(2 * var(--u));
+  color: var(--color-muted);
+  font-size: calc(1.3 * var(--u));
+}
+
+.draw-title {
+  font-size: calc(7 * var(--u));
+  line-height: 0.92;
+  max-width: 20ch;
+}
+
+.draw-stats {
+  display: flex;
+  justify-content: center;
+  gap: calc(6 * var(--u));
+  margin-top: calc(2 * var(--u));
+}
+.draw-stats dt {
+  color: var(--color-muted);
+  font-size: calc(1.15 * var(--u));
+}
+.draw-stats dd {
+  margin-top: calc(1 * var(--u));
+  font-size: calc(3.4 * var(--u));
+  font-weight: 800;
+  letter-spacing: var(--tracking-display);
+}
+
+.draw-note,
+.draw-error {
+  max-width: 44ch;
+  font-size: calc(1.4 * var(--u));
+  line-height: 1.5;
+}
+.draw-note {
+  color: var(--color-muted);
+}
+.draw-error {
+  color: var(--color-danger);
+}
+
+.draw-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(2.5 * var(--u));
+  margin-top: calc(3 * var(--u));
+}
+/* The controls keep real pixel sizes rather than scaling with --u: they
+   are touched, not filmed, and a thumb does not get smaller because the
+   window did. */
+.draw-seg,
+.draw-minor {
+  display: flex;
+  gap: calc(1.5 * var(--u));
+}
+.draw-minor {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* 2. The pool ------------------------------------------------------- */
+
+.draw-pool {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  /* Gaps track the tile size, so density stays constant as --tile moves. */
+  gap: calc(var(--tile) * 0.62 * var(--u)) calc(var(--tile) * 1.05 * var(--u));
+  padding: calc(13 * var(--u)) calc(4 * var(--u));
+  overflow: hidden;
+  transition: opacity 600ms ease;
+}
+
+.draw-tile {
+  /* Set per run from the tile count — see tileScale in DrawStage. */
+  font-size: calc(var(--tile, 2) * var(--u));
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: color-mix(in srgb, var(--color-bone) 62%, transparent);
+  white-space: nowrap;
+  animation: draw-tile-in 420ms ease-out both;
+}
+@keyframes draw-tile-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(0.8 * var(--u)));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Sits over the tiles, so it carries its own ground. Stating the real
+   number matters: a sampled pool that quietly showed 280 of 4,000 would
+   be misrepresenting the pot on a broadcast. */
+.draw-pool-note {
+  position: absolute;
+  bottom: calc(4 * var(--u));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: calc(1 * var(--u)) calc(2.4 * var(--u));
+  background-color: var(--color-ink);
+  border: 1px solid color-mix(in srgb, var(--color-muted) 22%, transparent);
+  border-radius: 2px;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--color-muted);
+  font-size: calc(1.1 * var(--u));
+  transition: opacity 600ms ease;
+}
+
+/* The pool recedes as the spin takes over and goes to near black at the
+   lock, which is what leaves the winner alone on screen. */
+.draw-frame[data-phase="spin"] .draw-pool {
+  opacity: 0.28;
+}
+.draw-frame[data-phase="lock"] .draw-pool {
+  opacity: 0.05;
+}
+.draw-frame[data-phase="spin"] .draw-pool-note,
+.draw-frame[data-phase="lock"] .draw-pool-note {
+  opacity: 0;
+}
+
+/* 3 & 4. Spin and lock ---------------------------------------------- */
+
+.draw-reveal {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(3.5 * var(--u));
+  padding-inline: calc(5 * var(--u));
+  text-align: center;
+  /* A scrim under the name so it stays legible over the pool without
+     hiding it. Radial, so the tiles fade rather than hitting an edge. */
+  background: radial-gradient(
+    ellipse at center,
+    rgba(11, 10, 12, 0.94) 0%,
+    rgba(11, 10, 12, 0.86) 38%,
+    rgba(11, 10, 12, 0) 72%
+  );
+}
+.draw-reveal-label {
+  color: var(--color-muted);
+  font-size: calc(1.3 * var(--u));
+}
+
+.draw-name {
+  font-size: calc(10.5 * var(--u));
+  line-height: 1;
+  max-width: 14ch;
+  min-height: 1em;
+  word-break: break-word;
+}
+/* Motion blur in three steps. A per-frame filter value on type this large
+   is the single most expensive thing this animation could do on a phone,
+   and two switch points are visually indistinguishable from a ramp. */
+.draw-name[data-blur="hi"] {
+  filter: blur(calc(0.5 * var(--u)));
+  opacity: 0.78;
+}
+.draw-name[data-blur="mid"] {
+  filter: blur(calc(0.2 * var(--u)));
+  opacity: 0.92;
+}
+.draw-name[data-blur="none"] {
+  filter: none;
+  opacity: 1;
+}
+/* The last stretch, where the gap between names stretches past a second.
+   The breath keeps a held frame from reading as a freeze. */
+.draw-name[data-tense="true"] {
+  animation: draw-tense 1100ms ease-in-out infinite;
+}
+@keyframes draw-tense {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.025);
+  }
+}
+
+/* Acid appears exactly once in this whole screen: here. */
+.draw-frame[data-phase="lock"] .draw-name {
+  color: var(--color-acid);
+  animation: draw-lock-in 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.draw-frame[data-phase="lock"] .draw-reveal-label {
+  color: var(--color-acid);
+}
+@keyframes draw-lock-in {
+  from {
+    opacity: 0;
+    transform: scale(0.84);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 5. The record ----------------------------------------------------- */
+
+.draw-record {
+  position: absolute;
+  bottom: calc(5 * var(--u));
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(0.8 * var(--u));
+  padding-inline: calc(5 * var(--u));
+  text-align: center;
+  color: var(--color-muted);
+  font-size: calc(1.35 * var(--u));
+  font-variant-numeric: tabular-nums;
+  animation: draw-record-in 500ms 700ms ease-out both;
+}
+/* The proof line is the one thing on screen that has to be readable frame
+   by frame on a re-encoded stream, so it gets its own ground rather than
+   sitting on top of the ghosted pool. */
+.draw-record::before {
+  content: "";
+  position: absolute;
+  inset: calc(-7 * var(--u)) calc(-5 * var(--u)) calc(-8 * var(--u));
+  z-index: -1;
+  background: linear-gradient(
+    to top,
+    var(--color-ink) 55%,
+    color-mix(in srgb, var(--color-ink) 70%, transparent) 80%,
+    transparent
+  );
+}
+.draw-record strong {
+  color: var(--color-bone);
+  font-weight: 800;
+}
+.draw-after {
+  display: flex;
+  gap: calc(1.5 * var(--u));
+  margin-top: calc(1.6 * var(--u));
+}
+@keyframes draw-record-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Horizontal: the setup card runs as two columns because a 16:9 frame has
+   width to spend and stacking wastes it. The reveal stays centred. */
+.draw-frame[data-orientation="horizontal"] .draw-setup {
+  flex-direction: row;
+  gap: calc(6 * var(--u));
+  text-align: left;
+  padding: calc(7 * var(--u)) calc(9 * var(--u));
+}
+.draw-frame[data-orientation="horizontal"] .draw-setup > .draw-prize {
+  flex: 0 0 auto;
+  width: calc(40 * var(--u));
+}
+.draw-frame[data-orientation="horizontal"] .draw-copy {
+  align-items: flex-start;
+}
+.draw-frame[data-orientation="horizontal"] .draw-title {
+  font-size: calc(6 * var(--u));
+}
+.draw-frame[data-orientation="horizontal"] .draw-stats {
+  justify-content: flex-start;
+}
+.draw-frame[data-orientation="horizontal"] .draw-controls {
+  align-items: flex-start;
+}
+.draw-frame[data-orientation="horizontal"] .draw-minor {
+  justify-content: flex-start;
+}
+.draw-frame[data-orientation="horizontal"] .draw-name {
+  font-size: calc(9 * var(--u));
+  max-width: 18ch;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .draw-tile,
+  .draw-record {
+    animation: none;
+  }
+  .draw-name[data-tense="true"],
+  .draw-frame[data-phase="lock"] .draw-name {
+    animation: none;
+  }
+  .draw-pool,
+  .draw-pool-note {
+    transition: none;
+  }
+}

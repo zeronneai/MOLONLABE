@@ -34,6 +34,9 @@ export default function DrawPanel({
           {entrants} {entrants === 1 ? "entrant" : "entrants"}. They appear
           under past winners on the featured page.
         </p>
+        <a href={`/draw/${campaignId}`} className="control mt-6">
+          Open presentation
+        </a>
       </section>
     );
   }
@@ -49,14 +52,26 @@ export default function DrawPanel({
         campaign and can only be done once.
       </p>
 
-      <button
-        type="button"
-        disabled={entries === 0 || pending}
-        onClick={() => setConfirming(true)}
-        className="control control-caution mt-6"
-      >
-        {entries === 0 ? "No entries yet" : "Draw a winner"}
-      </button>
+      {/* Presentation mode is the intended route: it runs the same
+          commit, then reveals it. This plain button stays as the fallback
+          for a draw nobody is filming. */}
+      <div className="mt-6 flex flex-wrap gap-3">
+        <a
+          href={`/draw/${campaignId}`}
+          className="control control-caution"
+          aria-disabled={entries === 0}
+        >
+          Presentation mode
+        </a>
+        <button
+          type="button"
+          disabled={entries === 0 || pending}
+          onClick={() => setConfirming(true)}
+          className="control"
+        >
+          {entries === 0 ? "No entries yet" : "Draw without ceremony"}
+        </button>
+      </div>
 
       {confirming && (
         <div

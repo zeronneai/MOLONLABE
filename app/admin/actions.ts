@@ -20,6 +20,8 @@ import {
 } from "@/lib/admin/constants";
 import { countItemReferences } from "@/lib/db/itemRefs";
 import { DIFFICULTY_RANGES } from "@/lib/game/settings";
+import { newSeed, redactName, selectWinner } from "@/lib/draw/select";
+import type { DrawRecord } from "@/lib/draw/presentation";
 
 export type { ActionState };
 
@@ -460,48 +462,102 @@ export async function saveCampaign(
  * campaign — a second winner would have to be a deliberate act, not a
  * double-tap.
  */
-export async function drawWinner(campaignId: string): Promise<void> {
+/**
+ * Commits the draw and returns the record of it.
+ *
+ * This is the only place a winner is decided. It runs to completion —
+ * seed generated, winner selected, row written — before anything is
+ * animated, so the presentation screen is showing a result that already
+ * exists in the database rather than producing one. Nothing downstream
+ * can change the outcome; the worst a broken animation can do is fail to
+ * display a winner who is already recorded.
+ *
+ * Idempotent by design: a campaign that already has a winner returns that
+ * winner instead of drawing a second one. That is what lets the owner
+ * re-run the presentation, or recover from a phone that locked mid-take,
+ * without touching the result.
+ */
+export async function commitDraw(campaignId: string): Promise<DrawRecord> {
   const sb = await requireClient();
-  if (!sb) return;
+  if (!sb) return { ok: false, error: "Not signed in." };
 
   const { data: already } = await sb
     .from("winners")
-    .select("id")
+    .select("display_name, ticket, entry_total, seed, drawn_at")
     .eq("campaign_id", campaignId)
     .maybeSingle();
   if (already) {
-    console.error("drawWinner: campaign already has a winner");
-    return;
+    return {
+      ok: true,
+      replay: true,
+      name: already.display_name,
+      ticket: already.ticket ?? 0,
+      total: already.entry_total ?? 0,
+      seed: already.seed ?? "",
+      drawnAt: already.drawn_at,
+    };
   }
 
   const { data: entrants, error } = await sb
     .from("entrants")
     .select("id, first_name, last_name, entry_count")
     .eq("campaign_id", campaignId);
-  if (error || !entrants || entrants.length === 0) {
-    if (error) console.error("drawWinner:", error.message);
-    return;
+  if (error) {
+    console.error("commitDraw:", error.message);
+    return { ok: false, error: "Could not read the entrants." };
+  }
+  if (!entrants || entrants.length === 0) {
+    return { ok: false, error: "There are no entries to draw from." };
   }
 
-  const total = entrants.reduce((sum, e) => sum + Math.max(1, e.entry_count ?? 1), 0);
-  let ticket = Math.floor(Math.random() * total);
-  const winner =
-    entrants.find((e) => {
-      ticket -= Math.max(1, e.entry_count ?? 1);
-      return ticket < 0;
-    }) ?? entrants[0];
+  const seed = newSeed();
+  const result = selectWinner(
+    entrants.map((e) => ({ id: e.id, weight: e.entry_count })),
+    seed,
+  );
+  if (!result) return { ok: false, error: "There are no entries to draw from." };
 
-  const { error: insertError } = await sb.from("winners").insert({
-    campaign_id: campaignId,
-    entrant_id: winner.id,
-    display_name: `${winner.first_name} ${winner.last_name}`.trim(),
-  });
+  const winner = entrants.find((e) => e.id === result.entrantId);
+  if (!winner) return { ok: false, error: "Could not resolve the winner." };
+
+  // Redacted at write time: the surname never reaches the winners table,
+  // so no future component can leak it by rendering the wrong column.
+  const displayName = redactName(winner.first_name, winner.last_name);
+
+  const { data: written, error: insertError } = await sb
+    .from("winners")
+    .insert({
+      campaign_id: campaignId,
+      entrant_id: winner.id,
+      display_name: displayName,
+      seed: result.seed,
+      ticket: result.ticket,
+      entry_total: result.total,
+    })
+    .select("drawn_at")
+    .maybeSingle();
   if (insertError) {
-    console.error("drawWinner insert:", insertError.message);
-    return;
+    console.error("commitDraw insert:", insertError.message);
+    return { ok: false, error: "Could not record the winner." };
   }
 
   await sb.from("campaigns").update({ status: "awarded" }).eq("id", campaignId);
   revalidatePublic();
   revalidatePath("/admin/featured");
+
+  return {
+    ok: true,
+    replay: false,
+    name: displayName,
+    ticket: result.ticket,
+    total: result.total,
+    seed: result.seed,
+    drawnAt: written?.drawn_at ?? new Date().toISOString(),
+  };
+}
+
+/** The plain admin-panel draw. Same algorithm, no theater. */
+export async function drawWinner(campaignId: string): Promise<void> {
+  const record = await commitDraw(campaignId);
+  if (!record.ok) console.error("drawWinner:", record.error);
 }

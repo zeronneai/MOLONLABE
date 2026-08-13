@@ -170,6 +170,9 @@ export interface Database {
           photo_url: string | null;
           note: string | null;
           drawn_at: string;
+          seed: string | null;
+          ticket: number | null;
+          entry_total: number | null;
         };
         Insert: {
           id?: string;
@@ -179,6 +182,9 @@ export interface Database {
           photo_url?: string | null;
           note?: string | null;
           drawn_at?: string;
+          seed?: string | null;
+          ticket?: number | null;
+          entry_total?: number | null;
         };
         Update: {
           id?: string;
@@ -188,6 +194,9 @@ export interface Database {
           photo_url?: string | null;
           note?: string | null;
           drawn_at?: string;
+          seed?: string | null;
+          ticket?: number | null;
+          entry_total?: number | null;
         };
         Relationships: [];
       };

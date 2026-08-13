@@ -2,8 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { SESSION_MAX_AGE } from "@/lib/supabase/config";
 
-// Guards /admin/*: refreshes the session cookie and bounces
-// unauthenticated requests to the login screen at /admin.
+// Guards /admin/* and /draw/*: refreshes the session cookie and bounces
+// unauthenticated requests to the login screen at /admin. The draw
+// presentation lives outside /admin so nothing on screen or in the URL
+// identifies it as an admin tool, but it reads the entrant pool and
+// commits the winner, so it is gated identically.
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -41,5 +44,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/draw/:path*"],
 };
