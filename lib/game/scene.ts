@@ -5,6 +5,7 @@
 
 import {
   ASSET_LOAD_TIMEOUT_MS,
+  BACKDROP,
   GAME_ASSETS,
   PARALLAX,
   SPAWN_ANCHORS_DESKTOP,
@@ -19,6 +20,13 @@ export interface SpawnPoint {
   h: number;
   sprite: CanvasImageSource;
   anchor: SpawnAnchor;
+  /**
+   * How much dark halo this point needs, 0..1, measured from the actual
+   * background rather than guessed. A pale alien over a lit display case
+   * would otherwise disappear, and which points land on a lit case is a
+   * property of the photograph, not of the code.
+   */
+  drop: number;
 }
 
 export interface Occluder {
@@ -110,24 +118,47 @@ function coverFit(img: HTMLImageElement, w: number, h: number) {
   return { dx: (w - dw) / 2, dy: (h - dh) / 2, dw, dh };
 }
 
+/**
+ * Mean perceived luminance (0..1) of a region of the background, sampled
+ * from the decoded image. Cloudinary serves CORS headers and the image is
+ * loaded crossOrigin=anonymous, so the canvas is not tainted; if a future
+ * host stops sending them, getImageData throws and we fall back to the
+ * anchor's own darkDrop flag.
+ */
+function sampleLuminance(
+  img: HTMLImageElement,
+  sx: number,
+  sy: number,
+  sw: number,
+  sh: number,
+): number | null {
+  try {
+    const canvas = document.createElement("canvas");
+    const size = 16; // enough to average a region, cheap to read back
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return null;
+    // Clamp to the image so an anchor near the edge still samples something.
+    const cx = Math.max(0, Math.min(img.naturalWidth - 1, sx));
+    const cy = Math.max(0, Math.min(img.naturalHeight - 1, sy));
+    const cw = Math.max(1, Math.min(img.naturalWidth - cx, sw));
+    const ch = Math.max(1, Math.min(img.naturalHeight - cy, sh));
+    ctx.drawImage(img, cx, cy, cw, ch, 0, 0, size, size);
+    const { data } = ctx.getImageData(0, 0, size, size);
+    let total = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      total += (0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]) / 255;
+    }
+    return total / (data.length / 4);
+  } catch {
+    return null; // tainted canvas or a decode that never completed
+  }
+}
+
 export function buildScene(art: GameArt, w: number, h: number): Scene {
   const anchors = art.portrait ? SPAWN_ANCHORS_MOBILE : SPAWN_ANCHORS_DESKTOP;
   const bgDraw = coverFit(art.bg, w, h);
-
-  const sources = { "1": art.alien1, "2": art.alien2, "3": art.alien3 } as const;
-  const spawnPoints: SpawnPoint[] = anchors.map((anchor) => {
-    const source = sources[anchor.sprite];
-    const aspect = source.naturalHeight / Math.max(1, source.naturalWidth);
-    const width = Math.min(w, h) * 0.24 * anchor.scale;
-    return {
-      x: anchor.x * w,
-      coverY: anchor.y * h,
-      w: width,
-      h: width * aspect,
-      sprite: tintSprite(source, anchor.tint),
-      anchor,
-    };
-  });
 
   // viewport rect → background-image source rect (inverse of cover-fit)
   const toSource = (vx: number, vy: number, vw: number, vh: number) => {
@@ -141,6 +172,41 @@ export function buildScene(art: GameArt, w: number, h: number): Scene {
     };
   };
 
+  const sources = { "1": art.alien1, "2": art.alien2, "3": art.alien3 } as const;
+  const spawnPoints: SpawnPoint[] = anchors.map((anchor) => {
+    const source = sources[anchor.sprite];
+    const aspect = source.naturalHeight / Math.max(1, source.naturalWidth);
+    const width = Math.min(w, h) * 0.24 * anchor.scale;
+    // Sample what is actually behind this point, over the box the alien
+    // occupies when fully up.
+    const height = width * aspect;
+    const region = toSource(anchor.x * w - width / 2, anchor.y * h - height, width, height);
+    const luma = sampleLuminance(art.bg, region.sx, region.sy, region.sw, region.sh);
+
+    // Pale sprites need help sooner than dark ones. Below the threshold the
+    // background is doing the work already and a halo would just look like
+    // a smudge.
+    const threshold = anchor.sprite === "3" ? BACKDROP.paleThreshold : BACKDROP.darkThreshold;
+    const measured =
+      luma === null
+        ? anchor.darkDrop
+          ? BACKDROP.maxDrop
+          : 0
+        : Math.max(0, Math.min(1, (luma - threshold) / (1 - threshold))) * BACKDROP.maxDrop;
+
+    return {
+      x: anchor.x * w,
+      coverY: anchor.y * h,
+      w: width,
+      h: height,
+      sprite: tintSprite(source, anchor.tint),
+      anchor,
+      // The hand-set flag is a floor, not the whole answer: measurement can
+      // ask for more, never for less.
+      drop: Math.max(measured, anchor.darkDrop ? BACKDROP.minFlagged : 0),
+    };
+  });
+
   // open (pop) anchors have no occluder — clean-edged sprites don't need one
   const occluders: Occluder[] = anchors.flatMap((anchor) => {
     if (!anchor.occluder) return [];
@@ -150,6 +216,13 @@ export function buildScene(art: GameArt, w: number, h: number): Scene {
     const dh = anchor.occluder.h * h;
     return [{ ...toSource(dx, dy, dw, dh), dx, dy, dw, dh, layer: anchor.occluder.layer }];
   });
+
+  // Dev probe: lets a test assert what was measured without reading pixels
+  // back out of a live canvas. Costs one array assignment per scene build.
+  if (typeof window !== "undefined") {
+    (window as unknown as { __mlfSpawnDrops?: unknown }).__mlfSpawnDrops =
+      spawnPoints.map((sp) => ({ x: sp.anchor.x, sprite: sp.anchor.sprite, drop: sp.drop }));
+  }
 
   return { art, bgDraw, spawnPoints, occluders };
 }

@@ -1,4 +1,5 @@
 import { getSessionSupabase } from "@/lib/supabase/session";
+import EmptyState from "@/components/ui/EmptyState";
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +64,15 @@ export default async function AdminEntrants({
           </div>
         ))}
         {(entrants ?? []).length === 0 && (
-          <p className="label py-10 text-muted">No entrants{q ? " match" : " yet"}.</p>
+          <EmptyState
+            label={q ? "No match" : "No entrants"}
+            headline={q ? "NOBODY BY THAT NAME." : "NOBODY'S ENTERED YET."}
+            body={
+              q
+                ? "Try a partial name, or an email."
+                : "Entrants appear the moment the first person enters the live campaign."
+            }
+          />
         )}
       </div>
     </div>

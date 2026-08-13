@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getSessionSupabase } from "@/lib/supabase/session";
 import { ARCHIVED_STATUS, ITEM_LIVE_STATUSES } from "@/lib/admin/constants";
 import ItemAdminCard from "@/components/admin/ItemAdminCard";
+import EmptyState from "@/components/ui/EmptyState";
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +87,16 @@ export default async function AdminInventory({
         )}
         {items?.map((item) => <ItemAdminCard key={item.id} item={item} />)}
         {items?.length === 0 && (
-          <p className="label py-10 text-muted">Nothing matches.</p>
+          <EmptyState
+            label={q || status ? "No match" : "Empty case"}
+            headline={q || status ? "NOTHING FITS THAT." : "NOTHING IN THE CASE YET."}
+            body={
+              q || status
+                ? "Clear the search or pick another filter. Archived items live behind their own filter."
+                : "Add the first piece and it goes live the moment you save it."
+            }
+            action={q || status ? undefined : { href: "/admin/inventory/new", text: "Add an item" }}
+          />
         )}
       </div>
     </div>

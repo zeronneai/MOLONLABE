@@ -114,11 +114,12 @@ export function renderFrame(
     const box = targetCenter(state, target);
     const px = box.x + bgOff.x;
     const py = box.y + bgOff.y;
-    // soft dark halo behind pale sprites so they never vanish into a lit case
-    if (sp.anchor.darkDrop) {
+    // Soft dark halo so a pale sprite never dissolves into a lit case. Its
+    // strength was measured from the background at scene build time.
+    if (sp.drop > 0.01) {
       const r = box.w * 0.85;
       const halo = ctx.createRadialGradient(px, py, 0, px, py, r);
-      halo.addColorStop(0, "rgba(11, 10, 12, 0.5)");
+      halo.addColorStop(0, `rgba(11, 10, 12, ${sp.drop.toFixed(3)})`);
       halo.addColorStop(1, "rgba(11, 10, 12, 0)");
       ctx.fillStyle = halo;
       ctx.fillRect(px - r, py - r, r * 2, r * 2);

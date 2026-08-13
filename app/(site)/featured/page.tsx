@@ -5,6 +5,7 @@ import Reveal from "@/components/motion/Reveal";
 import Countdown from "@/components/home/Countdown";
 import EntryPacks from "@/components/entry/EntryPacks";
 import FreeEntry from "@/components/entry/FreeEntry";
+import { INSTAGRAM_HANDLE, INSTAGRAM_URL } from "@/lib/brand";
 import { getLiveCampaign } from "@/lib/db/campaigns";
 import { getEntrantTotal, getEntryTotal, getWinners } from "@/lib/db/entries";
 import { itemImages } from "@/lib/db/items";
@@ -56,9 +57,18 @@ export default async function FeaturedPage() {
           <br />
           THE BLOCK.
         </h1>
-        <p className="mt-6 max-w-md text-muted">
-          The next feature is announced on Instagram first — @molonlabe.fa.
+        <p className="mt-6 max-w-[46ch] text-muted">
+          Between features right now. The next one is announced on Instagram
+          first — {INSTAGRAM_HANDLE} — and it opens here the same day.
         </p>
+        <div className="mt-10 flex flex-wrap items-center gap-4">
+          <Link href="/inventory" className="cta-primary control-go">
+            See what&apos;s in the case
+          </Link>
+          <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" className="cta-primary">
+            Follow for the drop
+          </a>
+        </div>
         {winners.length > 0 && <PastWinners winners={winners} />}
         <RulesLink />
       </div>

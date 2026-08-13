@@ -6,6 +6,7 @@
 
 import { useRef, useState } from "react";
 import EditorialIndex, { type IndexItem } from "./EditorialIndex";
+import EmptyState from "@/components/ui/EmptyState";
 
 const FILTERS: { label: string; value: string | null }[] = [
   { label: "All", value: null },
@@ -61,12 +62,14 @@ export default function InventoryBrowser({ items }: { items: IndexItem[] }) {
         {filtered.length > 0 ? (
           <EditorialIndex items={filtered} enterKey={gen} exiting={exiting} />
         ) : (
-          <div className="border-t hairline py-16">
-            <p className="label text-muted">
-              Nothing in this category right now — it moves fast. Call the shop
-              or check back.
-            </p>
-          </div>
+          <EmptyState
+            label={active === "all" ? "Empty case" : "Nothing in this category"}
+            headline={
+              active === "all" ? "THE CASE IS EMPTY." : "NOTHING HERE RIGHT NOW."
+            }
+            body="Stock moves fast and the site only shows what's actually on hand. Call the shop — what's coming in isn't listed yet."
+            action={{ href: "/visit", text: "Find us" }}
+          />
         )}
       </div>
     </div>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getVisibleItems, toIndexItem } from "@/lib/db/items";
 import InventoryBrowser from "@/components/inventory/InventoryBrowser";
+import EmptyState from "@/components/ui/EmptyState";
 import { IN_THE_CASE } from "@/content/en";
 
 export const dynamic = "force-dynamic";
@@ -31,12 +32,12 @@ export default async function InventoryPage() {
         {items.length > 0 ? (
           <InventoryBrowser items={items.map(toIndexItem)} />
         ) : (
-          <div className="border-t hairline py-20">
-            <p className="label text-muted">
-              The case is being stocked — check back shortly, or come see us
-              at 10024 Montana Ave.
-            </p>
-          </div>
+          <EmptyState
+            label="Empty case"
+            headline="THE CASE IS EMPTY."
+            body="Nothing is listed right now. Stock moves fast and this page only shows what's genuinely on hand — the counter is the fastest way to see what's just landed."
+            action={{ href: "/visit", text: "Find us" }}
+          />
         )}
       </div>
     </div>

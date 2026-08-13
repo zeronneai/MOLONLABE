@@ -16,7 +16,16 @@ import ItemCtas from "@/components/inventory/ItemCtas";
 import { ProductJsonLd } from "@/components/seo/StructuredData";
 import TrackView from "@/components/analytics/TrackView";
 
-export const dynamic = "force-dynamic";
+// Rendered per request; inventory changes too often to cache.
+//
+// KNOWN LIMITATION: a slug that does not exist renders the 404 screen but
+// returns HTTP 200 — a soft 404. The segment is dynamically rendered, so
+// Next commits the status with the first streamed chunk, before
+// notFound() resolves. The page is served noindex either way, so it is
+// not indexable; a hard 404 would need generateStaticParams with
+// dynamicParams:false (which would hide items added since the last build)
+// or an existence check in middleware. Neither trade is worth it yet.
+export const revalidate = 0;
 
 const STATUS_COLOR = {
   available: "text-acid",
@@ -29,7 +38,9 @@ type Params = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
   const item = await getItemBySlug(slug);
-  if (!item) return { title: "Not found" };
+  // Renders the 404 screen with its noindex. See the note on `revalidate`
+  // above for why the HTTP status stays 200 here.
+  if (!item) notFound();
   return {
     title: item.name,
     description: item.short_desc ?? undefined,

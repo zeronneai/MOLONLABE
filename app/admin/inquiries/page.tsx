@@ -1,4 +1,5 @@
 import { getSessionSupabase } from "@/lib/supabase/session";
+import EmptyState from "@/components/ui/EmptyState";
 import InquiryCard from "@/components/admin/InquiryCard";
 
 export const dynamic = "force-dynamic";
@@ -46,7 +47,15 @@ export default async function AdminInquiries({
           />
         ))}
         {(inquiries ?? []).length === 0 && (
-          <p className="label py-10 text-muted">Nothing here.</p>
+          <EmptyState
+            label={status ? "None here" : "Queue clear"}
+            headline={status ? "NOTHING WITH THAT STATUS." : "QUEUE'S CLEAR."}
+            body={
+              status
+                ? "Switch filters to see the rest."
+                : "Nobody's waiting on you. New inquiries land here and get flagged until you've answered them."
+            }
+          />
         )}
       </div>
     </div>

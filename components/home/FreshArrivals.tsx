@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Reveal from "@/components/motion/Reveal";
 import EditorialIndex from "@/components/inventory/EditorialIndex";
+import EmptyState from "@/components/ui/EmptyState";
 import { getFreshArrivals, toIndexItem } from "@/lib/db/items";
 
 export default async function FreshArrivals() {
@@ -26,10 +27,13 @@ export default async function FreshArrivals() {
           </div>
         </>
       ) : (
-        <div className="mt-12 border-t hairline py-16">
-          <p className="label text-muted">
-            The case is being stocked — come see us at 10024 Montana Ave.
-          </p>
+        <div className="mt-12">
+          <EmptyState
+            label="Being stocked"
+            headline="THE CASE IS BEING FILLED."
+            body="Nothing is listed yet. What's on hand goes up here as it lands — until then, the counter is the fastest way to see it."
+            action={{ href: "/visit", text: "Find us" }}
+          />
         </div>
       )}
     </section>

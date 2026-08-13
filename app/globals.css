@@ -349,6 +349,34 @@ textarea.field-input {
   letter-spacing: 0.18em;
 }
 
+/* Loading skeletons: the sunken material, with a slow sheen that stops
+   for reduced motion. Never a spinner. */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--color-surface-sunken);
+  border-radius: 2px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(242, 239, 231, 0.05) 50%,
+    transparent 100%
+  );
+  animation: skeleton-sheen 1.6s ease-in-out infinite;
+}
+@keyframes skeleton-sheen {
+  to {
+    transform: translateX(100%);
+  }
+}
+
 /* Section reveal — DESIGN.md section 6 */
 .reveal {
   opacity: 0;
@@ -495,6 +523,9 @@ textarea.field-input {
   }
   .edx-in,
   .edx-out {
+    animation: none;
+  }
+  .skeleton::after {
     animation: none;
   }
 }

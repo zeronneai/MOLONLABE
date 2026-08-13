@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getSessionSupabase } from "@/lib/supabase/session";
 import CampaignCard from "@/components/admin/CampaignCard";
+import EmptyState from "@/components/ui/EmptyState";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,12 @@ export default async function AdminFeatured() {
           />
         ))}
         {(campaigns ?? []).length === 0 && (
-          <p className="label py-10 text-muted">No campaigns yet.</p>
+          <EmptyState
+            label="No campaign"
+            headline="NOTHING ON THE BLOCK."
+            body="Set up a campaign, point it at an item, give it a close date. Entries start the moment you set it live."
+            action={{ href: "/admin/featured/new", text: "New campaign" }}
+          />
         )}
       </div>
     </div>

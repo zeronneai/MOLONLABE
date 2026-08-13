@@ -130,6 +130,19 @@ export const PARALLAX = {
   overscan: 1.07, // background drawn this much larger so edges never show
 };
 
+/**
+ * Backdrop contrast. Which spawn points sit over a brightly lit display
+ * case is a property of the photograph, so the scene measures the actual
+ * background behind each point instead of trusting a flag set by eye. A
+ * pale sprite gets help sooner than a dark one.
+ */
+export const BACKDROP = {
+  paleThreshold: 0.3, // above this mean luminance, ALIEN_3 needs a drop
+  darkThreshold: 0.5, // sprites 1 and 2 hold their own for longer
+  maxDrop: 0.62, // opacity of the halo at its strongest
+  minFlagged: 0.35, // an anchor with darkDrop set never gets less than this
+};
+
 export const ASSET_LOAD_TIMEOUT_MS = 10_000;
 
 // Hit-burst palette (pixel particles read well over the photo)
