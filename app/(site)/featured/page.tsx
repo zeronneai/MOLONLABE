@@ -4,6 +4,7 @@ import Link from "next/link";
 import Reveal from "@/components/motion/Reveal";
 import Countdown from "@/components/home/Countdown";
 import EntryPacks from "@/components/entry/EntryPacks";
+import { getPaymentProvider } from "@/lib/payments";
 import FreeEntry from "@/components/entry/FreeEntry";
 import { INSTAGRAM_HANDLE, INSTAGRAM_URL } from "@/lib/brand";
 import { getLiveCampaign } from "@/lib/db/campaigns";
@@ -19,11 +20,15 @@ export const metadata: Metadata = {
     "The current sweepstakes feature at Molon Labe Firearms x SunCity Outdoors, El Paso, TX. No purchase necessary to enter.",
 };
 
-const STEPS = [
+// Step one depends on whether the paid tier exists. Describing packs
+// that are not on the page would be a lie the visitor can see.
+const steps = (paid: boolean) => [
   {
     n: "01",
-    title: "Pick your entries",
-    body: "Buy a pack, or take the free entry. A free entry is worth exactly what a purchased one is worth.",
+    title: paid ? "Pick your entries" : "Enter free",
+    body: paid
+      ? "Buy a pack, or take the free entry. A free entry is worth exactly what a purchased one is worth."
+      : "One entry, no purchase, no catch. Fill in the form below and you are in the draw.",
   },
   {
     n: "02",
@@ -75,6 +80,7 @@ export default async function FeaturedPage() {
     );
   }
 
+  const paidEntriesAvailable = getPaymentProvider().configured;
   const [entries, entrants] = await Promise.all([
     getEntryTotal(campaign.id),
     getEntrantTotal(campaign.id),
@@ -152,7 +158,7 @@ export default async function FeaturedPage() {
         <Reveal>
           <h2 className="label text-acid">How it works</h2>
           <div className="mt-8 border-t hairline">
-            {STEPS.map((step) => (
+            {steps(paidEntriesAvailable).map((step) => (
               <div
                 key={step.n}
                 className="flex flex-col gap-2 border-b hairline py-8 sm:flex-row sm:items-baseline sm:gap-10"
@@ -170,17 +176,23 @@ export default async function FeaturedPage() {
         </Reveal>
       </section>
 
-      {/* Entry packs — the paid route, pending checkout */}
-      <section className="px-page mt-20">
-        <Reveal>
-          <h2 className="label text-acid">Entry packs</h2>
-          <div className="mt-8">
-            <EntryPacks />
-          </div>
-        </Reveal>
-      </section>
+      {/* Entry packs exist only when a provider can actually take money.
+          While checkout is unresolved the whole tier is absent — invented
+          prices next to a dead button are worse than no tier at all. It
+          returns on its own the moment a configured provider ships. */}
+      {paidEntriesAvailable && (
+        <section className="px-page mt-20">
+          <Reveal>
+            <h2 className="label text-acid">Entry packs</h2>
+            <div className="mt-8">
+              <EntryPacks />
+            </div>
+          </Reveal>
+        </section>
+      )}
 
-      {/* The free method — same page, same weight, its own box */}
+      {/* The free method. The only way in while the paid tier is off, and
+          an equal one when it comes back. */}
       <section className="px-page mt-16">
         <Reveal>
           <FreeEntry campaignId={campaign.id} />

@@ -17,14 +17,14 @@ sections 1 and 2 below.
 | What | Where | Status |
 | --- | --- | --- |
 | Sweepstakes rules, full text | `app/(site)/sweepstakes-rules/page.tsx` | **Attorney.** A 13-section checklist stands in for the terms. The page is `noindex` and says plainly that it is not legal copy. The entry program must not open to the public until this is replaced. |
-| Privacy policy | Footer says "Privacy policy — coming soon" | No page exists. Needs a decision: write one, or drop the line. Visible on every page as-is. |
+| Privacy policy | `app/(site)/privacy/page.tsx` | **Drafted and live at `/privacy`, linked from the footer, marked for attorney review and `noindex`.** Written as real operative copy, because it describes what the site actually does. One explicit gap left for the lawyer: the retention period. |
 
-## 2. Money — blocks the paid entry route
+## 2. Money — no longer visible, still undecided
 
 | What | Where | Status |
 | --- | --- | --- |
-| Entry pack prices | `lib/payments/index.ts` → `ENTRY_PACKS` | **I invented these**: 5 entries $25, 15 for $50, 40 for $100. They are on screen right now, next to a disabled "Opens soon" button. Wrong numbers in front of customers is worse than no numbers — if the client has not decided, say so and I will hide the prices until they have. |
-| Whether entry packs exist at all | Same file | The whole paid tier is my reading of the brief. If the sweepstakes is free-entry only, that section should come out. |
+| Entry pack prices | `lib/payments/index.ts` → `ENTRY_PACKS` | **No longer on the page.** The whole paid tier is hidden behind `getPaymentProvider().configured`, which is false until Fortis lands. The invented $25/$50/$100 are not rendered and are not in the payload. They must be replaced with real numbers before a configured provider ever ships, or they will appear the moment one does. |
+| Whether entry packs exist at all | Same file | Still my reading of the brief. If the sweepstakes is free-entry only, delete `ENTRY_PACKS`, `EntryPacks.tsx` and the guard rather than leaving them dormant. |
 
 ## 3. Copy I wrote in the brand's voice — needs a read-through
 
@@ -32,7 +32,7 @@ None of this is wrong, but none of it came from the client.
 
 | What | Where |
 | --- | --- |
-| The four services and their descriptions — FFL Transfers, Special Orders, Consignment, "Advice, free" | `app/(site)/services/page.tsx`. The brief said only "range, classes, gunsmithing, whatever they offer" — **note I did not include range or classes, because I do not know whether they have them.** This list is a guess at the real lineup. |
+| ~~Special Orders, Consignment, "Advice, free"~~ — **removed.** Only FFL Transfers remains, which the brief evidences with its own route and intake form. The page now says plainly that more happens at the counter. | `app/(site)/services/page.tsx`. Still needs the real lineup, which likely includes range, classes and gunsmithing — the brief mentioned them and I had no basis to claim them either way. |
 | The shop story | `components/home/ShopStory.tsx` |
 | Hero scroll copy: "GOOD AIM IS HALF OF IT" / "THE OTHER HALF IS IN THE CASE" / "COME GET YOURS" | `content/en.ts` |
 | Every empty state | `components/ui/EmptyState.tsx` call sites |
@@ -45,9 +45,9 @@ None of this is wrong, but none of it came from the client.
 
 | What | Where |
 | --- | --- |
-| The shop story photo | `components/home/ShopStory.tsx` — currently a product shot. The brief asks for **the storefront and the ceiling install**. Needs a real photograph. |
+| The shop story photo | `components/home/ShopStory.tsx` — **no longer borrows a product shot.** It holds a neutral framed panel with the address until the storefront and ceiling install are photographed. Set `SHOP_IMAGE` to the real photo and it fills in with no other change. |
 | Seeded catalog | `supabase/seed.sql` — the four items from brief §8 with their real Cloudinary photos. Fine as a starting catalog; the owner replaces them as real stock lands. |
-| Seeded campaign | `supabase/seed.sql` — "SIG MPX Carbon — Current Feature", 30-day window, my description. Delete or rewrite before launch. |
+| ~~Seeded campaign~~ — **removed from `supabase/seed.sql`.** The featured page shows its empty state until the owner creates a real campaign. If an earlier run already inserted the demo, the file carries the `delete` statement to remove it. |
 
 ## 5. Settings the owner controls, currently at my defaults
 

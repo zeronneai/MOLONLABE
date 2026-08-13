@@ -92,7 +92,14 @@ export default function Footer() {
                 Sweepstakes rules
               </Link>
             </li>
-            <li>Privacy policy — coming soon</li>
+            <li>
+              <Link
+                href="/privacy"
+                className="label text-muted transition-colors hover:text-bone"
+              >
+                Privacy policy
+              </Link>
+            </li>
             <li>Built by Purple Roots Agency</li>
           </ul>
         </div>

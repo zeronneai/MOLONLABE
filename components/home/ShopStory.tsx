@@ -2,22 +2,33 @@ import Image from "next/image";
 import Reveal from "@/components/motion/Reveal";
 import { SHOP_ADDRESS } from "@/lib/brand";
 
-// Placeholder until a real storefront / ceiling-install photo is shot.
-const SHOP_IMAGE =
-  "https://res.cloudinary.com/dsprn0ew4/image/upload/v1786043151/Pistol_on_black_granite_2K_202608061302_zzzmjb.jpg";
+// The brief asks for the storefront and the ceiling install. Until that
+// is shot, this frame stays empty rather than borrowing a product photo:
+// a picture of a pistol under a heading about the counter says the wrong
+// thing, and a neutral frame reads as deliberate. Set SHOP_IMAGE to the
+// real photograph and it fills in with no other change.
+const SHOP_IMAGE: string | null = null;
 
 export default function ShopStory() {
   return (
     <section className="grid min-h-[70vh] lg:grid-cols-[2fr_3fr]">
       {/* Image bleeds off the LEFT edge — deliberate reversal of section B */}
-      <div className="relative min-h-[45vh] lg:min-h-0">
-        <Image
-          src={SHOP_IMAGE}
-          alt="Inside the shop"
-          fill
-          sizes="(min-width: 1024px) 40vw, 100vw"
-          className="object-cover"
-        />
+      <div className="relative min-h-[45vh] bg-surface lg:min-h-0">
+        {SHOP_IMAGE ? (
+          <Image
+            src={SHOP_IMAGE}
+            alt="Inside the shop"
+            fill
+            sizes="(min-width: 1024px) 40vw, 100vw"
+            className="object-cover"
+          />
+        ) : (
+          // A held frame, not a broken one: the hairline and the label read
+          // as composition rather than as a missing asset.
+          <div className="absolute inset-0 flex items-end border-r hairline p-8">
+            <p className="label text-muted">{SHOP_ADDRESS.street}</p>
+          </div>
+        )}
       </div>
 
       <div className="pr-page flex flex-col justify-center py-16 pl-8 lg:py-24">

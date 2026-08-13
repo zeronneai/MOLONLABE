@@ -14,7 +14,12 @@ resolving so the two never stack. Confirmation persists under
 `mlf_age_ok`; a decline is deliberately not persisted so a mistap is
 recoverable.
 
-### 1.2 Sweepstakes rules copy — PLACEHOLDER
+### 1.2 Legal copy — BOTH PAGES DRAFTED, NEITHER REVIEWED
+`/privacy` is now drafted, linked and `noindex` pending attorney review;
+it needs a retention period filled in. `/sweepstakes-rules` remains a
+section checklist rather than terms.
+
+#### Sweepstakes rules copy — PLACEHOLDER
 `/sweepstakes-rules` is scaffolding: a section checklist, not operative
 terms, marked for the client's attorney and `noindex`. The entry program
 must not open to the public until real rules replace it. **Owner action:

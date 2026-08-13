@@ -64,15 +64,15 @@ values
   )
 on conflict (slug) do nothing;
 
--- One live campaign so the featured slot has something to show.
-insert into public.campaigns (title, item_id, description, opens_at, closes_at, status)
-select
-  'SIG MPX Carbon — Current Feature',
-  id,
-  'Folding brace, carbon fiber handguard, enclosed red dot. One will go home with somebody.',
-  now(),
-  now() + interval '30 days',
-  'live'
-from public.items
-where slug = 'sig-mpx-carbon'
-  and not exists (select 1 from public.campaigns where status = 'live');
+-- No campaign is seeded on purpose.
+--
+-- A demo campaign here would be the live sweepstakes a real customer
+-- sees, with a prize and a countdown that nobody at the shop chose. The
+-- featured page shows its empty state until the owner creates a real one
+-- in the admin, which is the honest thing for it to say.
+--
+-- If a previous run of this file already inserted the demo campaign,
+-- remove it with:
+--
+--   delete from public.campaigns
+--   where title = 'SIG MPX Carbon — Current Feature';
