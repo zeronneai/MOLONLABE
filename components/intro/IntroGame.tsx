@@ -30,6 +30,7 @@ import { PARALLAX } from "@/lib/game/assets";
 import { renderFrame, type Pointer, type ViewFx } from "@/lib/game/render";
 import { track } from "@/lib/analytics";
 import { seqLog, whenHeroPainted } from "@/lib/hero/paintSignal";
+import { markIntroResolved } from "@/lib/intro/introSignal";
 
 const SEEN_KEY = "mlf_intro_seen";
 
@@ -438,6 +439,13 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
       void audioRef.current?.close().catch(() => {});
     };
   }, []);
+
+  // Whatever put us in "done" — played, skipped, seen before, reduced
+  // motion, admin, or art that failed to load — the intro is out of the
+  // way and anything queued behind it can run.
+  useEffect(() => {
+    if (phase === "done") markIntroResolved();
+  }, [phase]);
 
   const copyCode = async () => {
     if (!offer.enabled) return;

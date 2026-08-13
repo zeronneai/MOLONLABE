@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Reveal from "@/components/motion/Reveal";
+import { SHOP_ADDRESS } from "@/lib/brand";
 
 // Placeholder until a real storefront / ceiling-install photo is shot.
 const SHOP_IMAGE =
@@ -40,7 +41,7 @@ export default function ShopStory() {
             <div>
               <h3 className="label text-muted">Address</h3>
               <address className="mt-4 text-sm not-italic leading-relaxed">
-                10024 Montana Ave
+                {SHOP_ADDRESS.street}
                 <br />
                 El Paso, TX
               </address>

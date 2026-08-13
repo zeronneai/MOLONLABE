@@ -2,6 +2,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import IntroGame from "@/components/intro/IntroGame";
 import Analytics from "@/components/analytics/Analytics";
+import AgeGate from "@/components/compliance/AgeGate";
 import { LocalBusinessJsonLd } from "@/components/seo/StructuredData";
 import { getGameSettings } from "@/lib/game/settings";
 
@@ -21,6 +22,8 @@ export default async function SiteLayout({
       <main className="flex-1">{children}</main>
       <Footer />
       <IntroGame settings={gameSettings} />
+      {/* Waits on the intro game; never stacks with it. */}
+      <AgeGate />
       <Analytics />
     </div>
   );

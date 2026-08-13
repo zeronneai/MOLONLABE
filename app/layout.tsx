@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Archivo } from "next/font/google";
 import "./globals.css";
-import { LOGO_URL, SHOP_NAME, SITE_URL } from "@/lib/brand";
+import { LOGO_URL, SHOP_ADDRESS, SHOP_NAME, SITE_URL } from "@/lib/brand";
 
 const archivo = Archivo({
   subsets: ["latin"],
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     template: "%s — Molon Labe Firearms x SunCity Outdoors",
   },
   description:
-    "Digital showroom for Molon Labe Firearms x SunCity Outdoors. See what is on hand, what is currently featured, and visit us at 10024 Montana Ave, El Paso, TX.",
+    `Digital showroom for Molon Labe Firearms x SunCity Outdoors. See what is on hand, what is currently featured, and visit us at ${SHOP_ADDRESS.street}, ${SHOP_ADDRESS.city}, ${SHOP_ADDRESS.region}.`,
   applicationName: SHOP_NAME,
   icons: { icon: LOGO_URL },
   alternates: { canonical: "/" },

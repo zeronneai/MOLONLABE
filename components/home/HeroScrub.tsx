@@ -31,9 +31,21 @@ const EASE = 0.18; // per-frame interpolation toward the target frame
 // instant; the rest of the sequence streams in behind them
 const PRIORITY_FRAMES = 8;
 
-export default function HeroScrub() {
+export default function HeroScrub({
+  durations,
+}: {
+  /** Measured clip durations; falls back to the configured constants. */
+  durations?: { desktop: number; mobile: number };
+} = {}) {
   const [status, setStatus] = useState<Status>("boot");
   const [portrait, setPortrait] = useState(false);
+  // Measured duration for whichever clip this orientation uses; undefined
+  // falls back to the constant inside heroFrameUrl.
+  const seconds = durations
+    ? portrait
+      ? durations.mobile
+      : durations.desktop
+    : undefined;
   const [loopReady, setLoopReady] = useState(false);
   // frame 0 is on the canvas — the intro overlay gates its wipe on this
   const [painted, setPainted] = useState(false);
@@ -111,7 +123,7 @@ export default function HeroScrub() {
       });
 
     const urls = Array.from({ length: FRAME_COUNT }, (_, i) =>
-      heroFrameUrl(portrait, i),
+      heroFrameUrl(portrait, i, seconds),
     );
 
     const paintFirst = (img: HTMLImageElement) => {
@@ -341,8 +353,8 @@ export default function HeroScrub() {
   // ---- render -------------------------------------------------------------
   const isStatic = status === "static";
   const scrollVh = portrait ? SCRUB_SCROLL_VH.mobile : SCRUB_SCROLL_VH.desktop;
-  const firstFrame = heroFrameUrl(portrait, 0);
-  const lastFrame = heroFrameUrl(portrait, FRAME_COUNT - 1);
+  const firstFrame = heroFrameUrl(portrait, 0, seconds);
+  const lastFrame = heroFrameUrl(portrait, FRAME_COUNT - 1, seconds);
   const loopSrc = heroLoopUrl(portrait);
 
   return (

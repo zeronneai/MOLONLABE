@@ -40,9 +40,7 @@ export default function VisitSection({ primary = false }: { primary?: boolean } 
                 className="flex justify-between gap-6 border-b hairline pb-2"
               >
                 <dt className="text-muted">{h.label}</dt>
-                <dd>
-                  {h.opens} – {h.closes}
-                </dd>
+                <dd>{h.display}</dd>
               </div>
             ))}
           </dl>

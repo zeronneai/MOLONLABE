@@ -8,11 +8,11 @@ follows is what is genuinely incomplete, stubbed, or waiting on someone.
 
 ## 1. Blocking — the site should not go live without these
 
-### 1.1 Age gate (brief §13) — NOT BUILT
-A "Are you 21 or older?" modal on first visit, after the intro game,
-persisted in `localStorage`. Nothing for this exists in the codebase. It
-is the one brief requirement in the compliance section with no code
-behind it. Half a day.
+### 1.1 ~~Age gate~~ — DONE
+Built in `components/compliance/AgeGate.tsx`, gated on the intro game
+resolving so the two never stack. Confirmation persists under
+`mlf_age_ok`; a decline is deliberately not persisted so a mistap is
+recoverable.
 
 ### 1.2 Sweepstakes rules copy — PLACEHOLDER
 `/sweepstakes-rules` is scaffolding: a section checklist, not operative
@@ -28,12 +28,11 @@ Everything the client owns is still ours-by-default:
 - Whether the sweepstakes even opens with entry packs at all
 **Owner action: client.**
 
-### 1.4 Lighthouse verification (brief §16) — UNVERIFIED
-Targets are performance 90+, accessibility 95+, SEO 100 on home. This has
-never been measured: the sandbox cannot reach Cloudinary, so LCP and
-total transfer here are meaningless. Must be run against the deployed
-preview before sign-off, and the hero frame sequence is the most likely
-thing to fail it.
+### 1.4 Lighthouse verification (brief §16) — UNVERIFIED, INSTRUCTIONS WRITTEN
+Targets are performance 90+, accessibility 95+, SEO 100 on home. Still
+never measured — the sandbox cannot reach Cloudinary. See
+`docs/lighthouse.md` for how to run it, which visit to measure, and which
+failures are expected costs of the hero and the game rather than defects.
 
 ---
 
@@ -54,11 +53,18 @@ Note: the brief asks for `lib/payments/provider.ts`; ours is
 whether (915) 497-0541 actually has WhatsApp; if it does, flip the flag
 and the CTAs return.
 
-### 2.3 Hero loop clip durations — PLACEHOLDER VALUES
-`HERO_CLIPS.seconds` is `5` for both clips in `lib/hero/assets.ts`. If
-the real clips are not five seconds, the tail frames 404 and the scrub
-falls back to a static frame (loudly, in console). Needs the real
-durations.
+### 2.3 ~~Hero clip durations~~ — MEASURED, NOT ASSUMED
+`lib/hero/duration.ts` reads the real duration from Cloudinary's
+`fl_getinfo` at request time (cached hourly) and passes it to the scrub.
+`HERO_CLIPS.seconds` is now only a fallback; a mismatch logs a warning
+naming the constant to fix, and an unreachable endpoint logs loudly and
+falls back rather than silently truncating the scrub.
+
+Still worth confirming once on the preview: that `fl_getinfo` is enabled
+for this Cloudinary account. It is a standard delivery flag, but I could
+not reach Cloudinary from the sandbox to prove it. If it 404s you will
+see `[hero] could not measure` in the Vercel logs — send me the real
+durations and I will set the constants.
 
 ---
 
@@ -85,11 +91,11 @@ the first streamed chunk, before `notFound()` resolves. It is served
 added since the last build) or an existence check in middleware.
 Documented at the top of `app/(site)/inventory/[slug]/page.tsx`.
 
-### 4.2 Spanish (brief §14) — NOT STARTED
-`content/en.ts` exists but holds only hero copy and the shared
-`IN_THE_CASE` headline; there is no `content/es.ts` and no `t()` helper.
-Most copy is inline in components. "Bilingual ready" is not true today —
-making it true is a real extraction pass, not a translation.
+### 4.2 Spanish (brief §14) — NOT STARTED, SCOPED
+370 user-visible strings across 66 files: 215 public, 145 admin, 10 in
+the game. `content/en.ts` holds only hero copy and the shared
+`IN_THE_CASE` headline. See `docs/i18n-estimate.md` for the count by
+area, the proposed approach and the effort.
 
 ### 4.3 Game spawn anchors are still positional guesses
 The dark-drop strength is now measured from the background at runtime, so
@@ -121,8 +127,8 @@ never been exercised against Postgres.
 4. Mark the four key events in GA4 — `inquiry_submit`, `click_to_call`,
    `entry_submit`, `transfer_submit`. Nothing we ship can set that flag;
    see `docs/analytics.md`.
-5. Confirm the shop's real hours and the 79925 postal code in
-   `lib/brand.ts` — the postcode was inferred from the address, not given.
+5. ~~Confirm the shop's address and hours~~ — done. Address, suite,
+   postcode and hours in `lib/brand.ts` are confirmed by the client.
 
 ---
 

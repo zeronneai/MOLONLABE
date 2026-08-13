@@ -6,9 +6,10 @@
 
 const CLOUD = "https://res.cloudinary.com/dsprn0ew4/video/upload";
 
-// ⚠ seconds = clip duration. Set from the real clips — a wrong duration
-// makes the tail frames 404, which the runtime verification catches and
-// falls back from (loudly).
+// `seconds` is a FALLBACK duration only. The real one is measured from
+// Cloudinary at request time (lib/hero/duration.ts) and a mismatch logs a
+// warning naming this constant, so a re-exported clip cannot silently
+// break the scrub.
 export const HERO_CLIPS = {
   desktop: {
     id: "hf_20260811_222157_239af25b-ddcd-4da6-971b-c93aeedbcd47_karb6y",
@@ -49,9 +50,19 @@ export function heroClip(portrait: boolean) {
   return portrait ? HERO_CLIPS.mobile : HERO_CLIPS.desktop;
 }
 
-export function heroFrameUrl(portrait: boolean, index: number): string {
+/**
+ * `seconds` overrides the configured duration with one measured from
+ * Cloudinary (see lib/hero/duration.ts). The constant in HERO_CLIPS is
+ * only a fallback for when that measurement is unavailable.
+ */
+export function heroFrameUrl(
+  portrait: boolean,
+  index: number,
+  seconds?: number,
+): string {
   const clip = heroClip(portrait);
-  const t = ((clip.seconds * index) / (FRAME_COUNT - 1)).toFixed(2);
+  const duration = seconds && seconds > 0 ? seconds : clip.seconds;
+  const t = ((duration * index) / (FRAME_COUNT - 1)).toFixed(2);
   return `${CLOUD}/so_${t},f_webp,q_auto,w_${clip.width}/${clip.id}.webp`;
 }
 
