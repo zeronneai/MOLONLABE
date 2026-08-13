@@ -22,6 +22,7 @@ import { LOGO_URL, SHOP_SHORT_NAME } from "@/lib/brand";
 import { newSeed, selectWinner } from "@/lib/draw/select";
 import { buildPool, buildReel } from "@/lib/draw/pool";
 import {
+  CONTROLS_HIDE_MS,
   MAX_REEL,
   POOL_FILL_MS,
   POOL_HOLD_MS,
@@ -75,10 +76,53 @@ export default function DrawStage({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [controlsOn, setControlsOn] = useState(false);
 
   const stageRef = useRef<HTMLDivElement>(null);
   const nameRef = useRef<HTMLDivElement>(null);
   const reelRef = useRef<string[]>([]);
+  const hideTimer = useRef<number | null>(null);
+
+  /**
+   * Copy and Done are summoned rather than shown. Anything standing on the
+   * frame after the lock ends up in the recording, and the hold on the
+   * winner is the shot. Hiding them outside the frame instead would only
+   * work where there is letterbox to hide them in — on the phone, which is
+   * the device that matters, the frame is the whole viewport.
+   *
+   * So: pointer movement or a key brings them back for a few seconds and
+   * they leave again. That is hover on a monitor and a tap on a phone,
+   * without two mechanisms to maintain.
+   */
+  const nudgeControls = useCallback(() => {
+    setControlsOn(true);
+    if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+    hideTimer.current = window.setTimeout(
+      () => setControlsOn(false),
+      CONTROLS_HIDE_MS,
+    );
+  }, []);
+
+  const holdControls = useCallback(() => {
+    // Focus is inside the group — a keyboard user is mid-interaction and
+    // must not have the thing they are aiming at fade out from under them.
+    if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+    setControlsOn(true);
+  }, []);
+
+  useEffect(() => {
+    if (phase !== "lock") return;
+    const onKey = () => nudgeControls();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [phase, nudgeControls]);
+
+  useEffect(
+    () => () => {
+      if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+    },
+    [],
+  );
 
   // Rehearsal swaps the entire pool for fabricated data and never calls
   // the server action, so a practice run cannot write a winner. The stats
@@ -120,7 +164,7 @@ export default function DrawStage({
   const tileScale = useMemo(() => {
     const n = poolView?.tiles.length ?? 0;
     if (n === 0) return 2.4;
-    const fill = orientation === "vertical" ? 1310 : 1070;
+    const fill = orientation === "vertical" ? 1280 : 1030;
     return Math.min(5.6, Math.max(1.9, Math.sqrt(fill / n)));
   }, [poolView, orientation]);
 
@@ -285,7 +329,14 @@ export default function DrawStage({
 
   return (
     <div className="draw-stage" ref={stageRef}>
-      <div className="draw-frame" data-orientation={orientation} data-phase={phase}>
+      <div
+        className="draw-frame"
+        data-orientation={orientation}
+        data-phase={phase}
+        data-controls={controlsOn ? "on" : "off"}
+        onPointerMove={phase === "lock" ? nudgeControls : undefined}
+        onPointerDown={phase === "lock" ? nudgeControls : undefined}
+      >
         {/* Corner mark. Present in every phase — it is the only branding
             on screen and it needs to survive a crop. */}
         <div className="draw-mark">
@@ -457,15 +508,25 @@ export default function DrawStage({
               {reveal.total.toLocaleString()} · {stamp(reveal.drawnAt)} MT
             </p>
             <p>seed {reveal.seed}</p>
-            <div className="draw-after">
-              <button type="button" onClick={copy} className="control control-sm">
-                {copied ? "Copied" : "Copy summary"}
-              </button>
-              <button type="button" onClick={reset} className="control control-sm">
-                Done
-              </button>
-            </div>
             {error && <p className="draw-error label">{error}</p>}
+          </div>
+        )}
+
+        {/* Summoned, not shown — see nudgeControls. Kept out of the record
+            block so the proof line can stay on screen permanently while
+            these come and go. */}
+        {phase === "lock" && reveal && (
+          <div
+            className="draw-after"
+            onFocusCapture={holdControls}
+            onBlurCapture={nudgeControls}
+          >
+            <button type="button" onClick={copy} className="control control-sm">
+              {copied ? "Copied" : "Copy summary"}
+            </button>
+            <button type="button" onClick={reset} className="control control-sm">
+              Done
+            </button>
           </div>
         )}
       </div>

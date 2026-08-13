@@ -46,6 +46,13 @@ export const POOL_HOLD_MS = 1000;
 export const SPIN_MS = 8000;
 
 /**
+ * How long the post-reveal controls stay up once summoned. Long enough to
+ * reach for a button, short enough that a stray tap does not leave them
+ * sitting in the shot.
+ */
+export const CONTROLS_HIDE_MS = 3800;
+
+/**
  * Name changes across the spin. With the cubic ease-out below this opens
  * at roughly 37 changes a second — fast enough to read as a blur — and
  * puts the last three changes at about 5.8s, 6.3s and 8.0s. That widening
@@ -61,13 +68,23 @@ export function spinEase(t: number): number {
 }
 
 /**
- * Ceiling on rendered pool tiles. A pot of 4,000 entries cannot be 4,000
- * DOM nodes on a phone and still hold 60fps, so past this the pool is
- * sampled proportionally — a ten-entry entrant is still ten times as
- * likely to appear in the sample as a one-entry entrant, so the thing the
- * moment is meant to communicate survives the truncation.
+ * Ceiling on rendered pool tiles, and the single biggest lever on frame
+ * rate during the spin. Past this the pool is sampled proportionally — a
+ * ten-entry entrant is still ten times as likely to appear in the sample
+ * as a one-entry entrant, so what the moment communicates survives the cap.
+ *
+ * Measured, not guessed. With the pool hidden entirely the spin holds 60fps
+ * on a 6x-throttled CPU with essentially no long frames; at 280 tiles about
+ * a third of frames in the first half of the spin run long. Tile count is
+ * what costs, and it is nearly free to lower because `tileScale` in
+ * DrawStage grows the type to compensate — 160 large names fill the frame
+ * exactly as well as 280 small ones. The only thing given up is sampling
+ * granularity on a very large pot, and the screen states the real total
+ * rather than implying the sample is the whole thing.
+ *
+ * Raise this only with a frame-timing measurement in hand.
  */
-export const MAX_TILES = 280;
+export const MAX_TILES = 160;
 
 /** Names cycled during the spin. More than this and the reel is padding. */
 export const MAX_REEL = 120;

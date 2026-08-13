@@ -840,7 +840,10 @@ textarea.field-input {
   justify-content: center;
   /* Gaps track the tile size, so density stays constant as --tile moves. */
   gap: calc(var(--tile) * 0.62 * var(--u)) calc(var(--tile) * 1.05 * var(--u));
-  padding: calc(13 * var(--u)) calc(4 * var(--u));
+  /* Top padding clears the corner mark, which sits at 4u and is 9u tall.
+     Without the margin the first row of names runs straight through the
+     skull. */
+  padding: calc(15 * var(--u)) calc(4 * var(--u)) calc(13 * var(--u));
   overflow: hidden;
   transition: opacity 600ms ease;
 }
@@ -1019,10 +1022,37 @@ textarea.field-input {
   color: var(--color-bone);
   font-weight: 800;
 }
+/* Summoned controls. Absent from the frame by default so they cannot end
+   up in the recording; pointer movement or a keypress brings them back for
+   CONTROLS_HIDE_MS. `visibility` rather than `display` so focus order and
+   the fade both survive, and pointer-events off while hidden so a tap
+   lands on the frame and summons them rather than pressing a button the
+   owner cannot see. */
+.draw-after > .control {
+  white-space: nowrap;
+}
 .draw-after {
+  position: absolute;
+  bottom: calc(15 * var(--u));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
   display: flex;
   gap: calc(1.5 * var(--u));
-  margin-top: calc(1.6 * var(--u));
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 220ms ease,
+    visibility 0s linear 220ms;
+}
+.draw-frame[data-controls="on"] .draw-after {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    opacity 160ms ease,
+    visibility 0s;
 }
 @keyframes draw-record-in {
   from {
@@ -1043,7 +1073,14 @@ textarea.field-input {
 }
 .draw-frame[data-orientation="horizontal"] .draw-setup > .draw-prize {
   flex: 0 0 auto;
-  width: calc(40 * var(--u));
+  width: calc(48 * var(--u));
+}
+/* --u is a fraction of width, and 16:9 is short — the same 15u that clears
+   the mark in a tall frame eats a fifth of this one. The mark is at a
+   fixed 4u + 9u either way, so this only needs to clear that. */
+.draw-frame[data-orientation="horizontal"] .draw-pool {
+  padding-top: calc(16 * var(--u));
+  padding-bottom: calc(11 * var(--u));
 }
 .draw-frame[data-orientation="horizontal"] .draw-copy {
   align-items: flex-start;
