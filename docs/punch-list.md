@@ -21,12 +21,11 @@ must not open to the public until real rules replace it. **Owner action:
 attorney.**
 
 ### 1.3 Real content passes
-Everything the client owns is still ours-by-default:
-- Entry pack prices (`lib/payments/index.ts`) — $25 / $50 / $100 invented
-- Services page copy — written from the brief's one-line description
-- The shop story on the home page
-- Whether the sweepstakes even opens with entry packs at all
-**Owner action: client.**
+Fully enumerated in `docs/content-needed.md` — every string and number on
+the site that I wrote and the client has not confirmed, grouped by what
+blocks launch. The short version: attorney rules copy, a privacy policy
+that does not exist, invented entry pack prices sitting on screen, and a
+services list I guessed at. **Owner action: client.**
 
 ### 1.4 Lighthouse verification (brief §16) — UNVERIFIED, INSTRUCTIONS WRITTEN
 Targets are performance 90+, accessibility 95+, SEO 100 on home. Still
@@ -106,9 +105,14 @@ on a real device.
 
 ### 4.4 Verification is against a mock
 Every suite in this build runs against a hand-written Supabase stand-in,
-because the real project is unreachable from the build sandbox. RLS
-policies are approximated, not executed. The policies themselves have
-never been exercised against Postgres.
+because the real project is unreachable from the build sandbox (no route
+to supabase.co, and no credentials here — they live in Vercel). RLS
+policies are approximated, not executed.
+
+`docs/pre-launch-test.md` is the manual script that closes this gap: a
+numbered walkthrough on the real preview against the real database,
+covering the policies, the storage bucket and the service-role path that
+the mock could only imitate.
 
 ---
 
