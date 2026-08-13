@@ -45,7 +45,7 @@ None of this is wrong, but none of it came from the client.
 
 | What | Where |
 | --- | --- |
-| The shop story photo | `components/home/ShopStory.tsx` — **no longer borrows a product shot.** It holds a neutral framed panel with the address until the storefront and ceiling install are photographed. Set `SHOP_IMAGE` to the real photo and it fills in with no other change. |
+| The shop story photo | `components/home/ShopStory.tsx` — now filled with the client-supplied Cloudinary image (`SHOP_IMAGE`), served through `f_auto,q_auto,w_1600`. Two things still open: it is an atmospheric shot, not the actual storefront or ceiling install the brief asks for, so swap it when those are photographed; and **the alt text is a guess** — Cloudinary is unreachable from the build sandbox, so nobody has verified the description against the picture. Confirm or correct it. |
 | Seeded catalog | `supabase/seed.sql` — the four items from brief §8 with their real Cloudinary photos. Fine as a starting catalog; the owner replaces them as real stock lands. |
 | ~~Seeded campaign~~ — **removed from `supabase/seed.sql`.** The featured page shows its empty state until the owner creates a real campaign. If an earlier run already inserted the demo, the file carries the `delete` statement to remove it. |
 
