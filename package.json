@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "walkthrough:capture": "node scripts/walkthrough/capture.mjs",
+    "walkthrough:build": "node scripts/walkthrough/build.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

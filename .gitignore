@@ -27,3 +27,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Walkthrough build artifacts. The captured frames are large PNGs and
+# are regenerated from the deployed site; the PDF they produce is the
+# artifact worth keeping.
+.walkthrough-build/
+docs/walkthrough-frames/
