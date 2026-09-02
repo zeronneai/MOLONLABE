@@ -15,6 +15,9 @@ import EditorialIndex from "@/components/inventory/EditorialIndex";
 import ItemCtas from "@/components/inventory/ItemCtas";
 import { ProductJsonLd } from "@/components/seo/StructuredData";
 import TrackView from "@/components/analytics/TrackView";
+import PurchasePanel from "@/components/inventory/PurchasePanel";
+import { getLiveCampaign } from "@/lib/db/campaigns";
+import { entriesFor } from "@/lib/cart/pricing";
 
 // Rendered per request; inventory changes too often to cache.
 //
@@ -64,6 +67,16 @@ export default async function ItemPage({ params }: Params) {
   const status = itemStatus(item);
   const related = (await getRelatedItems(item.category, item.slug)).map(toIndexItem);
 
+  // What this one item would earn, shown before the decision rather than
+  // discovered in the cart. Zero when no campaign is running or its rate
+  // is zero, in which case the panel says nothing about entries at all.
+  const campaign = await getLiveCampaign();
+  const open =
+    campaign &&
+    campaign.status === "live" &&
+    (!campaign.closes_at || new Date(campaign.closes_at) > new Date());
+  const rate = open ? (campaign?.entries_per_dollar ?? 0) : 0;
+
   return (
     <div className="lg:flex">
       <ProductJsonLd item={item} image={images[0]} />
@@ -94,9 +107,15 @@ export default async function ItemPage({ params }: Params) {
           {item.brand && <span className="label text-muted">{item.brand}</span>}
         </div>
 
-        <p className="mt-8 text-2xl font-extrabold tracking-[-0.02em]">
-          {(item.price_display ?? "Call for price").toUpperCase()}
-        </p>
+        <PurchasePanel
+          itemId={item.id}
+          priceCents={item.price_cents}
+          priceDisplay={item.price_display}
+          fulfillment={item.fulfillment_type === "ship" ? "ship" : "pickup"}
+          available={status === "available"}
+          entriesEarned={entriesFor(item.price_cents ?? 0, rate)}
+          campaignTitle={open ? (campaign?.title ?? null) : null}
+        />
 
         {item.short_desc && (
           <p className="mt-6 max-w-[60ch] text-muted">{item.short_desc}</p>

@@ -78,6 +78,24 @@ export default function CampaignForm({
             className="field-input"
           />
         </div>
+        <div>
+          <label className="field-label" htmlFor="c-rate">Entries per dollar</label>
+          <input
+            id="c-rate"
+            name="entries_per_dollar"
+            type="number"
+            min={0}
+            max={1000}
+            step={1}
+            defaultValue={campaign?.entries_per_dollar ?? 1}
+            className="field-input"
+          />
+          <p className="label mt-2 text-muted">
+            Entries a purchase earns per whole dollar of merchandise, before
+            tax and shipping. 0 turns purchase entries off for this campaign;
+            the free method is unaffected either way.
+          </p>
+        </div>
         <div className="sm:col-span-2">
           <label className="field-label" htmlFor="c-winner">Winner note</label>
           <input

@@ -25,6 +25,8 @@ export interface Database {
           long_desc: string | null;
           specs: Json;
           price_display: string | null;
+          price_cents: number | null;
+          fulfillment_type: string;
           status: string;
           is_featured: boolean | null;
           sort_order: number | null;
@@ -43,6 +45,8 @@ export interface Database {
           long_desc?: string | null;
           specs?: Json;
           price_display?: string | null;
+          price_cents?: number | null;
+          fulfillment_type?: string;
           status?: string;
           is_featured?: boolean | null;
           sort_order?: number | null;
@@ -61,6 +65,8 @@ export interface Database {
           long_desc?: string | null;
           specs?: Json;
           price_display?: string | null;
+          price_cents?: number | null;
+          fulfillment_type?: string;
           status?: string;
           is_featured?: boolean | null;
           sort_order?: number | null;
@@ -81,6 +87,7 @@ export interface Database {
           closes_at: string | null;
           status: string;
           winner_note: string | null;
+          entries_per_dollar: number;
           created_at: string | null;
         };
         Insert: {
@@ -92,6 +99,7 @@ export interface Database {
           closes_at?: string | null;
           status?: string;
           winner_note?: string | null;
+          entries_per_dollar?: number;
           created_at?: string | null;
         };
         Update: {
@@ -103,6 +111,7 @@ export interface Database {
           closes_at?: string | null;
           status?: string;
           winner_note?: string | null;
+          entries_per_dollar?: number;
           created_at?: string | null;
         };
         Relationships: [
@@ -244,6 +253,125 @@ export interface Database {
           },
         ];
       };
+      orders: {
+        Row: {
+          id: string;
+          order_number: string;
+          status: string;
+          email: string;
+          first_name: string;
+          last_name: string;
+          phone: string | null;
+          subtotal_cents: number;
+          tax_cents: number;
+          shipping_cents: number;
+          total_cents: number;
+          has_shipment: boolean;
+          has_pickup: boolean;
+          ship_name: string | null;
+          ship_line1: string | null;
+          ship_line2: string | null;
+          ship_city: string | null;
+          ship_region: string | null;
+          ship_postal_code: string | null;
+          disclaimer_accepted_at: string;
+          disclaimer_text: string;
+          disclaimer_version: string | null;
+          refund_policy_text: string;
+          campaign_id: string | null;
+          entries_per_dollar: number | null;
+          entries_awarded: number;
+          gateway: string;
+          gateway_transaction_id: string | null;
+          gateway_auth_code: string | null;
+          gateway_response_code: string | null;
+          card_brand: string | null;
+          card_last4: string | null;
+          confirmation_token: string;
+          confirmation_sent_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_number: string;
+          status?: string;
+          email: string;
+          first_name: string;
+          last_name: string;
+          phone?: string | null;
+          subtotal_cents: number;
+          tax_cents?: number;
+          shipping_cents?: number;
+          total_cents: number;
+          has_shipment?: boolean;
+          has_pickup?: boolean;
+          ship_name?: string | null;
+          ship_line1?: string | null;
+          ship_line2?: string | null;
+          ship_city?: string | null;
+          ship_region?: string | null;
+          ship_postal_code?: string | null;
+          disclaimer_accepted_at: string;
+          disclaimer_text: string;
+          disclaimer_version: string | null;
+          refund_policy_text: string;
+          campaign_id?: string | null;
+          entries_per_dollar?: number | null;
+          entries_awarded?: number;
+          gateway?: string;
+          gateway_transaction_id?: string | null;
+          gateway_auth_code?: string | null;
+          gateway_response_code?: string | null;
+          card_brand?: string | null;
+          card_last4?: string | null;
+          confirmation_token: string;
+          confirmation_sent_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          status?: string;
+          confirmation_sent_at?: string | null;
+        };
+        Relationships: [];
+      };
+      order_items: {
+        Row: {
+          id: string;
+          order_id: string;
+          line_type: string;
+          item_id: string | null;
+          pack_id: string | null;
+          name: string;
+          unit_price_cents: number;
+          quantity: number;
+          fulfillment_type: string;
+          line_total_cents: number;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          line_type: string;
+          item_id?: string | null;
+          pack_id?: string | null;
+          name: string;
+          unit_price_cents: number;
+          quantity: number;
+          fulfillment_type: string;
+          line_total_cents: number;
+        };
+        Update: {
+          line_type?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey";
+            columns: ["order_id"];
+            isOneToOne: false;
+            referencedRelation: "orders";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       settings: {
         Row: {
           key: string;
@@ -294,6 +422,17 @@ export interface Database {
         Args: { campaign: string };
         Returns: number;
       };
+      add_purchase_entries: {
+        Args: {
+          p_campaign: string;
+          p_email: string;
+          p_first_name: string;
+          p_last_name: string;
+          p_phone: string | null;
+          p_entries: number;
+        };
+        Returns: number;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
@@ -306,6 +445,8 @@ export type EntrantRow = Database["public"]["Tables"]["entrants"]["Row"];
 export type EntrantInsert = Database["public"]["Tables"]["entrants"]["Insert"];
 export type WinnerRow = Database["public"]["Tables"]["winners"]["Row"];
 export type InquiryInsert = Database["public"]["Tables"]["inquiries"]["Insert"];
+export type OrderRow = Database["public"]["Tables"]["orders"]["Row"];
+export type OrderItemRow = Database["public"]["Tables"]["order_items"]["Row"];
 
 export type ItemStatus = "available" | "reserved" | "sold";
 export type ItemCategory =

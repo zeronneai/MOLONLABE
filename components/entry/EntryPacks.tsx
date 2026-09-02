@@ -1,13 +1,15 @@
-// Paid entries. Only rendered when a payment provider is configured —
-// see the guard in app/(site)/featured/page.tsx. While checkout is
-// unresolved the whole tier is absent from the page rather than shown
-// disabled, because the prices here are placeholders and placeholder
-// money in front of a customer is worse than no tier at all.
+// Paid entries — buying entries outright rather than earning them by
+// spending. ENTRY_PACKS is empty and this renders nothing.
 //
-// The prices in ENTRY_PACKS must be confirmed by the client before this
-// ever renders. See docs/content-needed.md.
+// Under the model we ship, entries come from purchases, so packs may
+// never be needed at all. The type and the order model's second line
+// type stay defined so adding them later is an implementation rather than
+// a migration; the client decides whether they exist. The page gates on
+// the list being non-empty, not on a gateway being configured — a live
+// gateway says nothing about whether the shop sells packs.
 
 import { ENTRY_PACKS } from "@/lib/payments";
+import { formatUsd } from "@/lib/money";
 
 export default function EntryPacks() {
   return (
@@ -16,7 +18,7 @@ export default function EntryPacks() {
         <div key={pack.id} className="bg-ink p-8">
           <p className="display text-4xl">{pack.entries}</p>
           <p className="label mt-2 text-muted">Entries</p>
-          <p className="mt-6 text-lg">${pack.priceUsd}</p>
+          <p className="mt-6 text-lg">{formatUsd(pack.priceCents)}</p>
           <button type="button" className="control control-sm mt-6 w-full">
             Buy
           </button>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LOGO_URL } from "@/lib/brand";
 import { SHOP_PHONE_HREF } from "@/lib/brand";
+import CartLink from "@/components/cart/CartLink";
 
 const nav = [
   { href: "/inventory", label: "Inventory" },
@@ -70,6 +71,7 @@ export default function Header() {
               ))}
             </ul>
           </nav>
+          <CartLink />
           <Link
             href="/visit"
             className="control control-sm"
@@ -127,6 +129,9 @@ export default function Header() {
             </ul>
           </nav>
           <div className="px-page pb-10 pt-6">
+            <div className="mb-6">
+              <CartLink onNavigate={() => setOpen(false)} />
+            </div>
             <p className="label text-muted">Mon–Fri 11–19 · Sat 11–18 · Sun 11–17</p>
             <a href={SHOP_PHONE_HREF} className="cta-primary mt-6 w-full">
               Call the shop

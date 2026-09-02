@@ -5,6 +5,7 @@ import Analytics from "@/components/analytics/Analytics";
 import AgeGate from "@/components/compliance/AgeGate";
 import { LocalBusinessJsonLd } from "@/components/seo/StructuredData";
 import { getGameSettings } from "@/lib/game/settings";
+import { CartProvider } from "@/lib/cart/store";
 
 // Public site chrome. The admin route group renders without any of this —
 // including analytics, so the owner working the shop never shows up in the
@@ -16,6 +17,7 @@ export default async function SiteLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const gameSettings = await getGameSettings();
   return (
+    <CartProvider>
     <div className="flex min-h-dvh flex-col">
       <LocalBusinessJsonLd />
       <Header />
@@ -26,5 +28,6 @@ export default async function SiteLayout({
       <AgeGate />
       <Analytics />
     </div>
+    </CartProvider>
   );
 }

@@ -9,6 +9,7 @@ import Toast from "@/components/admin/Toast";
 const tabs = [
   { href: "/admin/inventory", label: "Inventory" },
   { href: "/admin/featured", label: "Featured" },
+  { href: "/admin/orders", label: "Orders" },
   { href: "/admin/inquiries", label: "Inquiries" },
   { href: "/admin/entrants", label: "Entrants" },
   { href: "/admin/game", label: "Game & Offer" },

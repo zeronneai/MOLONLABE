@@ -76,3 +76,20 @@ are live values the client should set deliberately.
 > still reads "10024 Montana Ave" without the suite. That is the client's
 > original brief and a historical record — correcting it would falsify
 > what we were given.
+
+
+## 7. Checkout — open items
+
+Added with the Authorize.net build. The first three block launch; the rest
+are known gaps with stated consequences.
+
+| What | Where | Why it matters |
+| --- | --- | --- |
+| **Sales tax rate** | `settings` row `commerce.tax_rate_bps`, basis points | Defaults to **0**, which is certainly wrong. The correct figure for the shop's jurisdiction is the client's accountant's to state — inventing one is a filing problem, not a rounding error. `docs/authorizenet-sandbox.md` step 4 has the SQL. |
+| **Shipping charge** | `settings` row `commerce.shipping_flat_cents` | Defaults to **0**, so shipped orders currently post free. Flat rate only; anything by weight or zone needs building. |
+| **No-refunds wording** | `REFUND_POLICY` in `lib/legal.ts` | **Placeholder.** The substance was specified and the line is live and stored on every order, but the exact phrasing is still owed by the client. Currently "All sales are final. No refunds or exchanges." |
+| **Pickup notice wording** | `PICKUP_NOTICE` in `lib/legal.ts` | Mine, not the attorney's. The client asked for a line making clear that paying is not completing the sale; this is my attempt at it and should go past the attorney with the rest. |
+| **The footer disclaimer now contradicts the site** | `components/layout/Footer.tsx` line 110 | It reads "All firearm sales are conducted in person through a licensed dealer…", which was true when nothing was sold online. Accessories and optics now ship. The firearm half is still accurate; the sentence as a whole is not. This is legal-adjacent copy, so it is flagged rather than quietly rewritten. |
+| **No stock counts** | `items` has no quantity column | A shipped line can be ordered in a quantity the shop does not have. Pickup lines are capped at one because the status column already models one unit per row, so firearms cannot oversell. Shipped goods can, up to 10. The owner sees the order and can call the buyer. |
+| **Entry packs** | `ENTRY_PACKS` in `lib/payments/index.ts` | Empty and unimplemented, by decision. The order model's second line type exists so adding them later is an implementation rather than a migration. The client decides whether they exist at all. |
+| **Transfers to a buyer's own FFL** | not built | Out of scope for launch by decision: it needs licence collection, verification and per-order tracking. The order model can carry it; the flow is not built. Separate from `/transfers`, which handles inbound transfers into the shop. |

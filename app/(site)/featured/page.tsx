@@ -4,7 +4,7 @@ import Link from "next/link";
 import Reveal from "@/components/motion/Reveal";
 import Countdown from "@/components/home/Countdown";
 import EntryPacks from "@/components/entry/EntryPacks";
-import { getPaymentProvider } from "@/lib/payments";
+import { ENTRY_PACKS } from "@/lib/payments";
 import FreeEntry from "@/components/entry/FreeEntry";
 import { INSTAGRAM_HANDLE, INSTAGRAM_URL } from "@/lib/brand";
 import { getLiveCampaign } from "@/lib/db/campaigns";
@@ -22,13 +22,20 @@ export const metadata: Metadata = {
 
 // Step one depends on whether the paid tier exists. Describing packs
 // that are not on the page would be a lie the visitor can see.
-const steps = (paid: boolean) => [
+// Step 01 depends on whether this campaign grants entries for spending.
+// It is keyed off the campaign's own rate rather than off a payment
+// gateway being live: those are different questions, and a shop can take
+// cards for a season with no sweepstakes running.
+const steps = (entriesPerDollar: number) => [
   {
     n: "01",
-    title: paid ? "Pick your entries" : "Enter free",
-    body: paid
-      ? "Buy a pack, or take the free entry. A free entry is worth exactly what a purchased one is worth."
-      : "One entry, no purchase, no catch. Fill in the form below and you are in the draw.",
+    title: entriesPerDollar > 0 ? "Enter free, or shop" : "Enter free",
+    body:
+      entriesPerDollar > 0
+        ? `One entry, no purchase, no catch — the form below is all it takes. Every dollar you spend in the shop earns ${
+            entriesPerDollar === 1 ? "another entry" : `${entriesPerDollar} more`
+          } on top. A free entry is worth exactly what an earned one is worth.`
+        : "One entry, no purchase, no catch. Fill in the form below and you are in the draw.",
   },
   {
     n: "02",
@@ -80,7 +87,6 @@ export default async function FeaturedPage() {
     );
   }
 
-  const paidEntriesAvailable = getPaymentProvider().configured;
   const [entries, entrants] = await Promise.all([
     getEntryTotal(campaign.id),
     getEntrantTotal(campaign.id),
@@ -158,7 +164,7 @@ export default async function FeaturedPage() {
         <Reveal>
           <h2 className="label text-acid">How it works</h2>
           <div className="mt-8 border-t hairline">
-            {steps(paidEntriesAvailable).map((step) => (
+            {steps(campaign.entries_per_dollar ?? 0).map((step) => (
               <div
                 key={step.n}
                 className="flex flex-col gap-2 border-b hairline py-8 sm:flex-row sm:items-baseline sm:gap-10"
@@ -176,11 +182,11 @@ export default async function FeaturedPage() {
         </Reveal>
       </section>
 
-      {/* Entry packs exist only when a provider can actually take money.
-          While checkout is unresolved the whole tier is absent — invented
-          prices next to a dead button are worse than no tier at all. It
-          returns on its own the moment a configured provider ships. */}
-      {paidEntriesAvailable && (
+      {/* Entry packs appear only if the shop actually sells any. Gating
+          this on the gateway would light it up the moment card payments
+          went live, which is a different question — entries now come from
+          purchases, and packs may never exist. */}
+      {ENTRY_PACKS.length > 0 && (
         <section className="px-page mt-20">
           <Reveal>
             <h2 className="label text-acid">Entry packs</h2>

@@ -72,6 +72,60 @@ export default function ItemForm({ item }: { item?: ItemRow }) {
             className="field-input"
           />
         </div>
+        <div>
+          <label className="field-label" htmlFor="f-price-cents">
+            Online price{" "}
+            <span className="normal-case tracking-normal">(blank = not sold online)</span>
+          </label>
+          <input
+            id="f-price-cents"
+            name="price_online"
+            inputMode="decimal"
+            placeholder="1299.00"
+            defaultValue={
+              item?.price_cents != null ? (item.price_cents / 100).toFixed(2) : ""
+            }
+            className="field-input"
+          />
+          <p className="label mt-2 text-muted">
+            Leave blank and the item shows its display price and cannot be
+            added to a cart.
+          </p>
+        </div>
+
+        {/* Legal, not cosmetic: this decides whether the item can be put
+            in the post. It defaults to collect-in-store so a forgotten
+            field can never make a firearm shippable. */}
+        <div className="sm:col-span-2">
+          <p className="field-label">How it reaches the buyer</p>
+          <div className="seg mt-2">
+            <label className="control control-sm has-[:checked]:!bg-surface-sunken has-[:checked]:!border-amber has-[:checked]:!text-amber">
+              <input
+                type="radio"
+                name="fulfillment_type"
+                value="pickup"
+                defaultChecked={(item?.fulfillment_type ?? "pickup") !== "ship"}
+                className="sr-only"
+              />
+              Collect in store
+            </label>
+            <label className="control control-sm has-[:checked]:!bg-surface-sunken has-[:checked]:!border-muted has-[:checked]:!text-bone">
+              <input
+                type="radio"
+                name="fulfillment_type"
+                value="ship"
+                defaultChecked={item?.fulfillment_type === "ship"}
+                className="sr-only"
+              />
+              Ships
+            </label>
+          </div>
+          <p className="label mt-2 text-muted">
+            Firearms are collected in store. Ammunition, optics, holsters and
+            apparel ship.
+          </p>
+        </div>
+
         <div className="sm:col-span-2">
           <label className="field-label" htmlFor="f-slug">
             Slug <span className="normal-case tracking-normal">(blank = from name)</span>

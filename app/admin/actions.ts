@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSessionSupabase } from "@/lib/supabase/session";
 import { slugify } from "@/lib/slug";
+import { parseUsdToCents } from "@/lib/money";
 import type { Database, Json } from "@/lib/database.types";
 import {
   ARCHIVED_STATUS,
@@ -198,6 +199,8 @@ export async function duplicateItem(id: string): Promise<void> {
       long_desc: item.long_desc,
       specs: item.specs,
       price_display: item.price_display,
+      price_cents: item.price_cents,
+      fulfillment_type: item.fulfillment_type,
       // Duplicates start archived so a half-finished copy is never public.
       // That keeps them out of the working list, so we open the copy
       // directly — duplicating is only ever a prelude to editing.
@@ -260,6 +263,12 @@ export async function saveItem(
     short_desc: String(formData.get("short_desc") ?? "").trim() || null,
     long_desc: String(formData.get("long_desc") ?? "").trim() || null,
     price_display: String(formData.get("price_display") ?? "").trim() || null,
+    // Blank, or anything that is not a clean amount, becomes "not sold
+    // online" rather than a guessed number. A typo here would charge a
+    // real card the wrong figure.
+    price_cents: parseUsdToCents(String(formData.get("price_online") ?? "")),
+    fulfillment_type:
+      String(formData.get("fulfillment_type") ?? "") === "ship" ? "ship" : "pickup",
     video_url: String(formData.get("video_url") ?? "").trim() || null,
     status,
     is_featured: formData.get("is_featured") === "on",
@@ -438,6 +447,12 @@ export async function saveCampaign(
     opens_at: toIso(formData.get("opens_at")),
     closes_at: toIso(formData.get("closes_at")),
     winner_note: String(formData.get("winner_note") ?? "").trim() || null,
+    // Clamped to the same range the database enforces, so a pasted value
+    // fails here with a usable form rather than as a constraint violation.
+    entries_per_dollar: Math.min(
+      1000,
+      Math.max(0, Math.round(Number(formData.get("entries_per_dollar") ?? 1) || 0)),
+    ),
   };
 
   const { error } = id
