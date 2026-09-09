@@ -17,6 +17,7 @@ import { ProductJsonLd } from "@/components/seo/StructuredData";
 import TrackView from "@/components/analytics/TrackView";
 import PurchasePanel from "@/components/inventory/PurchasePanel";
 import { getLiveCampaign } from "@/lib/db/campaigns";
+import { getItemVariants } from "@/lib/db/items";
 import { entriesFor } from "@/lib/cart/pricing";
 
 // Rendered per request; inventory changes too often to cache.
@@ -70,6 +71,7 @@ export default async function ItemPage({ params }: Params) {
   // What this one item would earn, shown before the decision rather than
   // discovered in the cart. Zero when no campaign is running or its rate
   // is zero, in which case the panel says nothing about entries at all.
+  const variants = item.has_variants ? await getItemVariants(item.id) : [];
   const campaign = await getLiveCampaign();
   const open =
     campaign &&
@@ -115,6 +117,7 @@ export default async function ItemPage({ params }: Params) {
           available={status === "available"}
           entriesEarned={entriesFor(item.price_cents ?? 0, rate)}
           campaignTitle={open ? (campaign?.title ?? null) : null}
+          variants={variants}
         />
 
         {item.short_desc && (

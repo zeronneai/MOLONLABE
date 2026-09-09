@@ -27,6 +27,7 @@ export interface Database {
           price_display: string | null;
           price_cents: number | null;
           fulfillment_type: string;
+          has_variants: boolean;
           status: string;
           is_featured: boolean | null;
           sort_order: number | null;
@@ -47,6 +48,7 @@ export interface Database {
           price_display?: string | null;
           price_cents?: number | null;
           fulfillment_type?: string;
+          has_variants?: boolean;
           status?: string;
           is_featured?: boolean | null;
           sort_order?: number | null;
@@ -67,6 +69,7 @@ export interface Database {
           price_display?: string | null;
           price_cents?: number | null;
           fulfillment_type?: string;
+          has_variants?: boolean;
           status?: string;
           is_featured?: boolean | null;
           sort_order?: number | null;
@@ -166,6 +169,38 @@ export interface Database {
             columns: ["campaign_id"];
             isOneToOne: false;
             referencedRelation: "campaigns";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      item_variants: {
+        Row: {
+          id: string;
+          item_id: string;
+          size: string;
+          stock: number;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          item_id: string;
+          size: string;
+          stock?: number;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          size?: string;
+          stock?: number;
+          sort_order?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "item_variants_item_id_fkey";
+            columns: ["item_id"];
+            isOneToOne: false;
+            referencedRelation: "items";
             referencedColumns: ["id"];
           },
         ];
@@ -346,6 +381,8 @@ export interface Database {
           quantity: number;
           fulfillment_type: string;
           line_total_cents: number;
+          variant_id: string | null;
+          size: string | null;
         };
         Insert: {
           id?: string;
@@ -358,6 +395,8 @@ export interface Database {
           quantity: number;
           fulfillment_type: string;
           line_total_cents: number;
+          variant_id?: string | null;
+          size?: string | null;
         };
         Update: {
           line_type?: string;
@@ -422,6 +461,14 @@ export interface Database {
         Args: { campaign: string };
         Returns: number;
       };
+      claim_variant_stock: {
+        Args: { p_variant: string; p_qty: number };
+        Returns: boolean;
+      };
+      release_variant_stock: {
+        Args: { p_variant: string; p_qty: number };
+        Returns: undefined;
+      };
       add_purchase_entries: {
         Args: {
           p_campaign: string;
@@ -447,6 +494,7 @@ export type WinnerRow = Database["public"]["Tables"]["winners"]["Row"];
 export type InquiryInsert = Database["public"]["Tables"]["inquiries"]["Insert"];
 export type OrderRow = Database["public"]["Tables"]["orders"]["Row"];
 export type OrderItemRow = Database["public"]["Tables"]["order_items"]["Row"];
+export type ItemVariantRow = Database["public"]["Tables"]["item_variants"]["Row"];
 
 export type ItemStatus = "available" | "reserved" | "sold";
 export type ItemCategory =

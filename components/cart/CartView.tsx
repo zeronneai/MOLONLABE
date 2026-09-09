@@ -15,7 +15,7 @@ import { useCart } from "@/lib/cart/store";
 import { quoteCart } from "@/app/actions/cart";
 import { formatUsd } from "@/lib/money";
 import { PICKUP_NOTICE, SHIPPING_NOTICE } from "@/lib/legal";
-import type { PricedCart, PricedLine } from "@/lib/cart/types";
+import { lineKey, type PricedCart, type PricedLine } from "@/lib/cart/types";
 import EmptyState from "@/components/ui/EmptyState";
 
 export default function CartView() {
@@ -58,7 +58,7 @@ export default function CartView() {
             <p className="label text-danger">Removed from your cart</p>
             <ul className="mt-3 space-y-1 text-sm text-muted">
               {cart.rejected.map((r) => (
-                <li key={r.itemId}>
+                <li key={r.key}>
                   <span className="text-bone">{r.name ?? "An item"}</span> —{" "}
                   {r.reason}
                 </li>
@@ -66,7 +66,7 @@ export default function CartView() {
             </ul>
             <button
               type="button"
-              onClick={() => cart.rejected.forEach((r) => remove(r.itemId))}
+              onClick={() => cart.rejected.forEach((r) => remove(r.key))}
               className="control control-sm mt-4"
             >
               Clear these
@@ -167,8 +167,8 @@ function Group({
   note: string;
   tone: "muted" | "amber";
   lines: PricedLine[];
-  onQuantity: (id: string, q: number) => void;
-  onRemove: (id: string) => void;
+  onQuantity: (key: string, q: number) => void;
+  onRemove: (key: string) => void;
 }) {
   return (
     <section className="mb-12">
@@ -185,7 +185,7 @@ function Group({
       <ul className="mt-6 border-t hairline">
         {lines.map((line) => (
           <li
-            key={line.itemId}
+            key={lineKey(line)}
             className="flex items-start gap-5 border-b hairline py-5"
           >
             <div className="relative h-20 w-20 shrink-0 bg-surface">
@@ -206,6 +206,9 @@ function Group({
               >
                 {line.name}
               </Link>
+              {line.size && (
+                <p className="label mt-1 text-acid">Size {line.size}</p>
+              )}
               <p className="mt-1 text-sm text-muted">
                 {formatUsd(line.unitPriceCents)}
                 {line.quantity > 1 ? ` each` : ""}
@@ -223,7 +226,7 @@ function Group({
                       max={10}
                       value={line.quantity}
                       onChange={(e) =>
-                        onQuantity(line.itemId, Number(e.target.value))
+                        onQuantity(lineKey(line), Number(e.target.value))
                       }
                       className="field-input !h-11 w-20"
                     />
@@ -231,7 +234,7 @@ function Group({
                 ) : null}
                 <button
                   type="button"
-                  onClick={() => onRemove(line.itemId)}
+                  onClick={() => onRemove(lineKey(line))}
                   className="control control-sm control-danger"
                 >
                   Remove

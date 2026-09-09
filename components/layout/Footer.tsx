@@ -9,6 +9,7 @@ import {
 
 const navLinks = [
   { href: "/inventory", label: "Inventory" },
+  { href: "/shop", label: "Shop" },
   { href: "/featured", label: "Featured" },
   { href: "/transfers", label: "Transfers" },
   { href: "/services", label: "Services" },

@@ -47,7 +47,13 @@ const addressSchema = z.object({
 
 const checkoutSchema = z.object({
   lines: z
-    .array(z.object({ itemId: z.string().min(1), quantity: z.number().int().min(1) }))
+    .array(
+      z.object({
+        itemId: z.string().min(1),
+        quantity: z.number().int().min(1),
+        variantId: z.string().min(1).nullable().optional(),
+      }),
+    )
     .min(1, "Your cart is empty.")
     .max(50),
   customer: z.object({
@@ -160,24 +166,43 @@ export async function submitCheckout(
     return { ok: false, message: "That order totals nothing. Check your cart." };
   }
 
-  // 2. Claim the stock before charging. Conditional on still being
-  //    available, so a simultaneous checkout of the same unit loses here
-  //    rather than at the counter.
-  const claimed: string[] = [];
+  // 2. Claim the stock before charging, so a simultaneous checkout of the
+  //    last one loses here rather than at the counter.
+  //
+  //    Two kinds of claim, because there are two kinds of stock. A rifle
+  //    is one row that flips available -> reserved. A shirt in medium is a
+  //    count that goes down by one, and the item itself stays on sale
+  //    because the larges are still there.
+  const claims: Claim[] = [];
   for (const line of cart.lines) {
-    const { data: rows, error } = await sb
-      .from("items")
-      .update({ status: "reserved" })
-      .eq("id", line.itemId)
-      .eq("status", "available")
-      .select("id");
-    if (error) logDbError("checkout claim", error);
-    if (rows && rows.length > 0) claimed.push(line.itemId);
-    else {
-      await releaseClaims(sb, claimed);
+    let held = false;
+    if (line.variantId) {
+      const { data, error } = await sb.rpc("claim_variant_stock", {
+        p_variant: line.variantId,
+        p_qty: line.quantity,
+      });
+      if (error) logDbError("checkout claim variant", error);
+      held = data === true;
+      if (held) claims.push({ kind: "variant", variantId: line.variantId, quantity: line.quantity });
+    } else {
+      const { data: rows, error } = await sb
+        .from("items")
+        .update({ status: "reserved" })
+        .eq("id", line.itemId)
+        .eq("status", "available")
+        .select("id");
+      if (error) logDbError("checkout claim", error);
+      held = Boolean(rows && rows.length > 0);
+      if (held) claims.push({ kind: "unit", itemId: line.itemId });
+    }
+
+    if (!held) {
+      await releaseClaims(sb, claims);
       return {
         ok: false,
-        message: `${line.name} was taken while you were checking out. Nothing has been charged.`,
+        message: line.size
+          ? `${line.name} in ${line.size} sold out while you were checking out. Nothing has been charged.`
+          : `${line.name} was taken while you were checking out. Nothing has been charged.`,
       };
     }
   }
@@ -207,7 +232,7 @@ export async function submitCheckout(
   });
 
   if (!charge.ok) {
-    await releaseClaims(sb, claimed);
+    await releaseClaims(sb, claims);
     console.error("checkout charge failed:", charge.detail);
     return { ok: false, message: charge.message };
   }
@@ -291,6 +316,11 @@ export async function submitCheckout(
       order_id: order.id,
       line_type: "inventory",
       item_id: line.itemId,
+      variant_id: line.variantId,
+      // Snapshotted as text as well as by id: the shop may stop carrying
+      // that size and delete the row, and the receipt still has to say
+      // which one was bought.
+      size: line.size,
       name: line.name,
       unit_price_cents: line.unitPriceCents,
       quantity: line.quantity,
@@ -311,7 +341,9 @@ export async function submitCheckout(
   // Shipped goods are done; collected goods stay reserved until the
   // background check clears at the counter, because a check that fails
   // puts the firearm back on the shelf.
-  const shipIds = cart.shipLines.map((l) => l.itemId);
+  // Only single-unit lines. A shirt whose medium just sold is still on
+  // sale in large, so its stock went down and its status must not move.
+  const shipIds = cart.shipLines.filter((l) => !l.variantId).map((l) => l.itemId);
   if (shipIds.length > 0) {
     const { error } = await sb
       .from("items")
@@ -404,28 +436,45 @@ export async function submitCheckout(
 
 function toEmailLine(line: {
   name: string;
+  size: string | null;
   quantity: number;
   unitPriceCents: number;
   lineTotalCents: number;
 }) {
   return {
     name: line.name,
+    size: line.size,
     quantity: line.quantity,
     unitPriceCents: line.unitPriceCents,
     lineTotalCents: line.lineTotalCents,
   };
 }
 
+/** A held claim, and enough to undo it. */
+type Claim =
+  | { kind: "unit"; itemId: string }
+  | { kind: "variant"; variantId: string; quantity: number };
+
 /** Puts unsold claims back. Only ever called before a successful charge. */
 async function releaseClaims(
   sb: NonNullable<ReturnType<typeof getServiceSupabase>>,
-  ids: string[],
+  claims: Claim[],
 ): Promise<void> {
-  if (ids.length === 0) return;
-  const { error } = await sb
-    .from("items")
-    .update({ status: "available" })
-    .in("id", ids)
-    .eq("status", "reserved");
-  if (error) logDbError("checkout release", error);
+  const unitIds = claims.filter((c) => c.kind === "unit").map((c) => c.itemId);
+  if (unitIds.length > 0) {
+    const { error } = await sb
+      .from("items")
+      .update({ status: "available" })
+      .in("id", unitIds)
+      .eq("status", "reserved");
+    if (error) logDbError("checkout release", error);
+  }
+  for (const claim of claims) {
+    if (claim.kind !== "variant") continue;
+    const { error } = await sb.rpc("release_variant_stock", {
+      p_variant: claim.variantId,
+      p_qty: claim.quantity,
+    });
+    if (error) logDbError("checkout release variant", error);
+  }
 }

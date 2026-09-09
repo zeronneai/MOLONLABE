@@ -9,6 +9,7 @@ import CartLink from "@/components/cart/CartLink";
 
 const nav = [
   { href: "/inventory", label: "Inventory" },
+  { href: "/shop", label: "Shop" },
   { href: "/featured", label: "Featured" },
   { href: "/transfers", label: "Transfers" },
   { href: "/services", label: "Services" },

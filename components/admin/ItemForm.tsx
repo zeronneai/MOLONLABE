@@ -2,11 +2,22 @@
 
 import { useActionState, useState } from "react";
 import { saveItem } from "@/app/admin/actions";
-import { CATEGORIES, ITEM_STATUSES } from "@/lib/admin/constants";
+import {
+  CATEGORIES,
+  ITEM_STATUSES,
+  defaultFulfillment,
+} from "@/lib/admin/constants";
 import type { ItemRow } from "@/lib/database.types";
 import ImageUploader from "./ImageUploader";
+import VariantEditor, { type VariantDraft } from "./VariantEditor";
 
-export default function ItemForm({ item }: { item?: ItemRow }) {
+export default function ItemForm({
+  item,
+  variants = [],
+}: {
+  item?: ItemRow;
+  variants?: VariantDraft[];
+}) {
   const [state, action, pending] = useActionState(saveItem, { status: "idle" as const });
   const initialSpecs =
     item?.specs && typeof item.specs === "object" && !Array.isArray(item.specs)
@@ -15,6 +26,21 @@ export default function ItemForm({ item }: { item?: ItemRow }) {
   const [specs, setSpecs] = useState<[string, string][]>(
     initialSpecs.length ? initialSpecs : [["", ""]],
   );
+  // Category drives the fulfilment default, but only until the owner
+  // touches it. Apparel always ships; everything else stays on the
+  // cautious side, because the wrong guess in that direction is a firearm
+  // in the mail.
+  const [category, setCategory] = useState(item?.category ?? "pistol");
+  const [fulfillment, setFulfillment] = useState<"ship" | "pickup">(
+    item
+      ? item.fulfillment_type === "ship"
+        ? "ship"
+        : "pickup"
+      : // A new item starts on the category the select starts on.
+        defaultFulfillment("pistol"),
+  );
+  const [fulfillmentTouched, setFulfillmentTouched] = useState(Boolean(item));
+
   const images =
     item && Array.isArray(item.images)
       ? item.images.filter((u): u is string => typeof u === "string")
@@ -34,7 +60,11 @@ export default function ItemForm({ item }: { item?: ItemRow }) {
           <select
             id="f-category"
             name="category"
-            defaultValue={item?.category ?? "pistol"}
+            value={category}
+            onChange={(e) => {
+              setCategory(e.target.value);
+              if (!fulfillmentTouched) setFulfillment(defaultFulfillment(e.target.value));
+            }}
             className="field-input"
           >
             {CATEGORIES.map((c) => (
@@ -104,7 +134,11 @@ export default function ItemForm({ item }: { item?: ItemRow }) {
                 type="radio"
                 name="fulfillment_type"
                 value="pickup"
-                defaultChecked={(item?.fulfillment_type ?? "pickup") !== "ship"}
+                checked={fulfillment === "pickup"}
+                onChange={() => {
+                  setFulfillment("pickup");
+                  setFulfillmentTouched(true);
+                }}
                 className="sr-only"
               />
               Collect in store
@@ -114,17 +148,23 @@ export default function ItemForm({ item }: { item?: ItemRow }) {
                 type="radio"
                 name="fulfillment_type"
                 value="ship"
-                defaultChecked={item?.fulfillment_type === "ship"}
+                checked={fulfillment === "ship"}
+                onChange={() => {
+                  setFulfillment("ship");
+                  setFulfillmentTouched(true);
+                }}
                 className="sr-only"
               />
               Ships
             </label>
           </div>
           <p className="label mt-2 text-muted">
-            Firearms are collected in store. Ammunition, optics, holsters and
-            apparel ship.
+            Firearms are collected in store. Optics, holsters and apparel
+            ship. Ammunition depends on where it is going — set it per item.
           </p>
         </div>
+
+        <VariantEditor initial={variants} initialEnabled={Boolean(item?.has_variants)} />
 
         <div className="sm:col-span-2">
           <label className="field-label" htmlFor="f-slug">

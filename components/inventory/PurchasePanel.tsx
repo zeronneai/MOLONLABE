@@ -13,7 +13,7 @@ import Link from "next/link";
 import { useCart } from "@/lib/cart/store";
 import { formatUsd } from "@/lib/money";
 import { FIREARM_DISCLAIMER, PICKUP_NOTICE, REFUND_POLICY } from "@/lib/legal";
-import type { FulfillmentType } from "@/lib/cart/types";
+import type { FulfillmentType, VariantOption } from "@/lib/cart/types";
 
 export default function PurchasePanel({
   itemId,
@@ -23,6 +23,7 @@ export default function PurchasePanel({
   available,
   entriesEarned,
   campaignTitle,
+  variants,
 }: {
   itemId: string;
   /** Null when the item is not sold online. */
@@ -32,10 +33,19 @@ export default function PurchasePanel({
   available: boolean;
   entriesEarned: number;
   campaignTitle: string | null;
+  /** Empty for anything sold as a single unit. */
+  variants: VariantOption[];
 }) {
   const { add, lines } = useCart();
   const [added, setAdded] = useState(false);
-  const inCart = lines.some((l) => l.itemId === itemId);
+  const sized = variants.length > 0;
+  const anyInStock = variants.some((v) => v.inStock);
+  // No pre-selection. Auto-picking the first size in stock would let
+  // somebody add a medium while looking at a page they thought was large.
+  const [size, setSize] = useState<string | null>(null);
+  const inCart = lines.some(
+    (l) => l.itemId === itemId && (!sized || l.variantId === size),
+  );
 
   // Not sold online: the page keeps the old behaviour exactly — the
   // display price and the inquiry CTAs below it. Nothing about checkout
@@ -63,6 +73,38 @@ export default function PurchasePanel({
           </Link>
           .
         </p>
+      )}
+
+      {/* Sizes, when there are any. Sold-out ones stay on screen and
+          disabled: seeing that the large has gone is information, and
+          removing it just makes people wonder if it ever existed. */}
+      {sized && (
+        <fieldset className="mt-6">
+          <legend className="label text-muted">Size</legend>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {variants.map((variant) => (
+              <button
+                key={variant.id}
+                type="button"
+                disabled={!variant.inStock}
+                aria-pressed={size === variant.id}
+                onClick={() => setSize(variant.id)}
+                className="control control-sm tone-acid"
+              >
+                {variant.size}
+                {!variant.inStock && (
+                  <span className="ml-2 text-danger">Sold out</span>
+                )}
+              </button>
+            ))}
+          </div>
+          {!anyInStock && (
+            <p className="mt-3 text-sm text-danger">
+              Every size has gone. Call the shop and we&apos;ll tell you when
+              it&apos;s back.
+            </p>
+          )}
+        </fieldset>
       )}
 
       {/* Which route this item takes, stated before the button rather
@@ -94,14 +136,22 @@ export default function PurchasePanel({
       <div className="mt-6 flex flex-wrap items-center gap-4">
         <button
           type="button"
-          disabled={!available}
+          disabled={!available || (sized && (!anyInStock || !size))}
           onClick={() => {
-            add(itemId, fulfillment);
+            add(itemId, fulfillment, sized ? size : null);
             setAdded(true);
           }}
           className="cta-primary control-go"
         >
-          {!available ? "Not available" : inCart ? "In your cart" : "Add to cart"}
+          {!available
+            ? "Not available"
+            : sized && !anyInStock
+              ? "Sold out"
+              : sized && !size
+                ? "Pick a size"
+                : inCart
+                  ? "In your cart"
+                  : "Add to cart"}
         </button>
         {(added || inCart) && (
           <Link href="/cart" className="cta-secondary">

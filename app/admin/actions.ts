@@ -20,6 +20,7 @@ import {
   type ActionState,
 } from "@/lib/admin/constants";
 import { countItemReferences } from "@/lib/db/itemRefs";
+import { logDbError } from "@/lib/db/log";
 import { DIFFICULTY_RANGES } from "@/lib/game/settings";
 import { newSeed, redactName, selectWinner } from "@/lib/draw/select";
 import type { DrawRecord } from "@/lib/draw/presentation";
@@ -187,6 +188,16 @@ export async function duplicateItem(id: string): Promise<void> {
   if (!sb) return;
   const { data: item } = await sb.from("items").select("*").eq("id", id).maybeSingle();
   if (!item) return;
+  // Sizes come across, their stock does not. A duplicate is a new run of
+  // shirts; inheriting the original's counts would put stock on the shelf
+  // that nobody has actually received.
+  const { data: sourceVariants } = item.has_variants
+    ? await sb
+        .from("item_variants")
+        .select("size, sort_order")
+        .eq("item_id", id)
+        .order("sort_order", { ascending: true })
+    : { data: [] };
   const suffix = Date.now().toString(36).slice(-4);
   const { data: copy, error } = await sb
     .from("items")
@@ -201,6 +212,7 @@ export async function duplicateItem(id: string): Promise<void> {
       price_display: item.price_display,
       price_cents: item.price_cents,
       fulfillment_type: item.fulfillment_type,
+      has_variants: item.has_variants,
       // Duplicates start archived so a half-finished copy is never public.
       // That keeps them out of the working list, so we open the copy
       // directly — duplicating is only ever a prelude to editing.
@@ -215,6 +227,17 @@ export async function duplicateItem(id: string): Promise<void> {
   if (error) {
     console.error("duplicateItem:", error.message);
     return;
+  }
+  if (copy?.id && (sourceVariants ?? []).length > 0) {
+    const { error: variantError } = await sb.from("item_variants").insert(
+      (sourceVariants ?? []).map((v) => ({
+        item_id: copy.id,
+        size: v.size,
+        stock: 0,
+        sort_order: v.sort_order,
+      })),
+    );
+    if (variantError) logDbError("duplicateItem variants", variantError);
   }
   revalidatePath("/admin/inventory");
   if (copy?.id) redirect(`/admin/inventory/${copy.id}`);
@@ -236,6 +259,38 @@ export async function saveItem(
     return { status: "error", message: "Pick a category." };
   if (!ITEM_STATUSES.includes(status as (typeof ITEM_STATUSES)[number]))
     return { status: "error", message: "Bad status." };
+
+  // Sizes. Parsed before anything is written, so a corrupted payload
+  // fails the save rather than half-applying to a live item.
+  const hasVariants = formData.get("has_variants") === "on";
+  let variants: { id?: string; size: string; stock: number }[] = [];
+  try {
+    const parsed: unknown = JSON.parse(String(formData.get("variants") ?? "[]"));
+    if (Array.isArray(parsed)) {
+      variants = parsed.flatMap((v) => {
+        if (!v || typeof v !== "object") return [];
+        const { id, size, stock } = v as Record<string, unknown>;
+        const label = typeof size === "string" ? size.trim() : "";
+        if (!label) return [];
+        const count = Math.max(0, Math.floor(Number(stock) || 0));
+        return [{ id: typeof id === "string" ? id : undefined, size: label, stock: count }];
+      });
+    }
+  } catch {
+    return { status: "error", message: "Size list is corrupted — reload and retry." };
+  }
+  if (hasVariants) {
+    const seen = new Set<string>();
+    for (const v of variants) {
+      const key = v.size.toLowerCase();
+      // The database has a unique index on this; catching it here gives
+      // the owner the actual size that clashed instead of a constraint code.
+      if (seen.has(key)) {
+        return { status: "error", message: `"${v.size}" is listed twice.` };
+      }
+      seen.add(key);
+    }
+  }
 
   let images: Json = [];
   try {
@@ -269,6 +324,7 @@ export async function saveItem(
     price_cents: parseUsdToCents(String(formData.get("price_online") ?? "")),
     fulfillment_type:
       String(formData.get("fulfillment_type") ?? "") === "ship" ? "ship" : "pickup",
+    has_variants: hasVariants,
     video_url: String(formData.get("video_url") ?? "").trim() || null,
     status,
     is_featured: formData.get("is_featured") === "on",
@@ -276,16 +332,47 @@ export async function saveItem(
     images,
   };
 
-  const { error } = id
-    ? await sb.from("items").update(row).eq("id", id)
-    : await sb.from("items").insert(row);
+  const { data: saved, error } = id
+    ? await sb.from("items").update(row).eq("id", id).select("id").maybeSingle()
+    : await sb.from("items").insert(row).select("id").maybeSingle();
 
-  if (error) {
-    console.error("saveItem:", error.message);
+  if (error || !saved) {
+    console.error("saveItem:", error?.message);
     return {
       status: "error",
-      message: error.code === "23505" ? "That slug is taken." : "Save failed — try again.",
+      message: error?.code === "23505" ? "That slug is taken." : "Save failed — try again.",
     };
+  }
+
+  // Sizes are only synced while the toggle is on. Turning it off leaves
+  // the rows where they are rather than deleting them — the pricer
+  // ignores them entirely, and an owner who unticks the box by accident
+  // does not lose their stock counts.
+  if (hasVariants) {
+    const keep = variants.filter((v) => v.id).map((v) => v.id as string);
+    let removal = sb.from("item_variants").delete().eq("item_id", saved.id);
+    if (keep.length > 0) removal = removal.not("id", "in", `(${keep.join(",")})`);
+    const { error: deleteError } = await removal;
+    if (deleteError) logDbError("saveItem variants delete", deleteError);
+
+    for (const [index, variant] of variants.entries()) {
+      const payload = { size: variant.size, stock: variant.stock, sort_order: index };
+      const { error: variantError } = variant.id
+        ? await sb.from("item_variants").update(payload).eq("id", variant.id)
+        : await sb
+            .from("item_variants")
+            .insert({ ...payload, item_id: saved.id });
+      if (variantError) {
+        console.error("saveItem variant:", variantError.message);
+        return {
+          status: "error",
+          message:
+            variantError.code === "23505"
+              ? `"${variant.size}" is already listed.`
+              : "The item saved but its sizes did not. Open it again and check.",
+        };
+      }
+    }
   }
   revalidatePublic(row.slug);
   revalidatePath("/admin/inventory");

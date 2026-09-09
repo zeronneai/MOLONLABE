@@ -23,7 +23,7 @@ import {
   REFUND_POLICY,
   SHIPPING_NOTICE,
 } from "@/lib/legal";
-import type { PricedCart } from "@/lib/cart/types";
+import { lineKey, type PricedCart } from "@/lib/cart/types";
 
 type AcceptResponse = {
   messages: { resultCode: string; message: { code: string; text: string }[] };
@@ -355,9 +355,10 @@ export default function CheckoutForm({
           <h2 className="label text-muted">Order</h2>
           <ul className="mt-5 space-y-3 text-sm">
             {cart.lines.map((l) => (
-              <li key={l.itemId} className="flex justify-between gap-4">
+              <li key={lineKey(l)} className="flex justify-between gap-4">
                 <span className="min-w-0">
                   {l.name}
+                  {l.size ? ` — ${l.size}` : ""}
                   {l.quantity > 1 ? ` × ${l.quantity}` : ""}
                   <span
                     className={`label ml-2 ${

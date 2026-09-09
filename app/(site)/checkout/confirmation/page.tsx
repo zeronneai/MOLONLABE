@@ -205,7 +205,13 @@ function Row({ label, value }: { label: string; value: string }) {
 function LineList({
   lines,
 }: {
-  lines: { id: string; name: string; quantity: number; line_total_cents: number }[];
+  lines: {
+    id: string;
+    name: string;
+    size: string | null;
+    quantity: number;
+    line_total_cents: number;
+  }[];
 }) {
   return (
     <ul className="mt-5 border-t hairline">
@@ -213,6 +219,9 @@ function LineList({
         <li key={l.id} className="flex justify-between gap-4 border-b hairline py-4">
           <span className="font-extrabold tracking-[-0.02em]">
             {l.name}
+            {l.size && (
+              <span className="ml-2 font-normal text-muted">{l.size}</span>
+            )}
             {l.quantity > 1 && (
               <span className="ml-2 font-normal text-muted">× {l.quantity}</span>
             )}

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getVisibleItems, toIndexItem } from "@/lib/db/items";
+import { getInventoryItems, toIndexItem } from "@/lib/db/items";
 import InventoryBrowser from "@/components/inventory/InventoryBrowser";
 import EmptyState from "@/components/ui/EmptyState";
 import { IN_THE_CASE } from "@/content/en";
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 export default async function InventoryPage() {
-  const items = await getVisibleItems();
+  const items = await getInventoryItems();
 
   return (
     <div className="px-page pb-24 pt-[calc(72px+4rem)]">

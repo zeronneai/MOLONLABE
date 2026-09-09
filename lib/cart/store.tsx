@@ -14,7 +14,12 @@ import {
   useMemo,
   useState,
 } from "react";
-import { MAX_QUANTITY, type CartLine, type FulfillmentType } from "./types";
+import {
+  MAX_QUANTITY,
+  lineKey,
+  type CartLine,
+  type FulfillmentType,
+} from "./types";
 
 const KEY = "mlf_cart";
 
@@ -23,9 +28,14 @@ type CartContextValue = {
   /** False until localStorage has been read, so the UI can avoid flicker. */
   ready: boolean;
   count: number;
-  add: (itemId: string, fulfillment: FulfillmentType) => void;
-  setQuantity: (itemId: string, quantity: number) => void;
-  remove: (itemId: string) => void;
+  add: (
+    itemId: string,
+    fulfillment: FulfillmentType,
+    variantId?: string | null,
+  ) => void;
+  /** Keyed by lineKey(), because item alone does not identify a line. */
+  setQuantity: (key: string, quantity: number) => void;
+  remove: (key: string) => void;
   clear: () => void;
 };
 
@@ -41,11 +51,17 @@ function read(): CartLine[] {
     // devtools open. Only well-formed lines survive.
     return parsed.flatMap((entry) => {
       if (!entry || typeof entry !== "object") return [];
-      const { itemId, quantity } = entry as Record<string, unknown>;
+      const { itemId, quantity, variantId } = entry as Record<string, unknown>;
       if (typeof itemId !== "string" || !itemId) return [];
       const qty = Math.floor(Number(quantity));
       if (!Number.isFinite(qty) || qty < 1) return [];
-      return [{ itemId, quantity: Math.min(qty, MAX_QUANTITY.ship) }];
+      return [
+        {
+          itemId,
+          quantity: Math.min(qty, MAX_QUANTITY.ship),
+          variantId: typeof variantId === "string" && variantId ? variantId : null,
+        },
+      ];
     });
   } catch {
     return [];
@@ -85,32 +101,33 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const add = useCallback(
-    (itemId: string, fulfillment: FulfillmentType) => {
+    (itemId: string, fulfillment: FulfillmentType, variantId?: string | null) => {
       const max = MAX_QUANTITY[fulfillment];
+      const key = lineKey({ itemId, variantId });
       const current = read();
-      const existing = current.find((l) => l.itemId === itemId);
+      const existing = current.find((l) => lineKey(l) === key);
       const next = existing
         ? current.map((l) =>
-            l.itemId === itemId
+            lineKey(l) === key
               ? { ...l, quantity: Math.min(l.quantity + 1, max) }
               : l,
           )
-        : [...current, { itemId, quantity: 1 }];
+        : [...current, { itemId, quantity: 1, variantId: variantId ?? null }];
       persist(next);
     },
     [persist],
   );
 
   const setQuantity = useCallback(
-    (itemId: string, quantity: number) => {
+    (key: string, quantity: number) => {
       const qty = Math.floor(quantity);
       if (qty < 1) {
-        persist(read().filter((l) => l.itemId !== itemId));
+        persist(read().filter((l) => lineKey(l) !== key));
         return;
       }
       persist(
         read().map((l) =>
-          l.itemId === itemId
+          lineKey(l) === key
             ? { ...l, quantity: Math.min(qty, MAX_QUANTITY.ship) }
             : l,
         ),
@@ -120,7 +137,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   );
 
   const remove = useCallback(
-    (itemId: string) => persist(read().filter((l) => l.itemId !== itemId)),
+    (key: string) => persist(read().filter((l) => lineKey(l) !== key)),
     [persist],
   );
 

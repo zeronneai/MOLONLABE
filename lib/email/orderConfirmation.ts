@@ -20,6 +20,8 @@ import { SHOP_ADDRESS, SHOP_NAME, SHOP_PHONE_DISPLAY, SITE_URL } from "@/lib/bra
 
 export type EmailLine = {
   name: string;
+  /** Size, for the items that come in sizes. Null for everything else. */
+  size?: string | null;
   quantity: number;
   unitPriceCents: number;
   lineTotalCents: number;
@@ -65,7 +67,9 @@ function lineRows(lines: EmailLine[]): string {
       (l) => `
       <tr>
         <td style="padding:10px 0;border-bottom:1px solid #e5e2da;font-size:15px;color:#16151a">
-          ${escapeHtml(l.name)}${l.quantity > 1 ? ` <span style="color:#6b6c70">× ${l.quantity}</span>` : ""}
+          ${escapeHtml(l.name)}${
+            l.size ? ` <span style="color:#6b6c70">— ${escapeHtml(l.size)}</span>` : ""
+          }${l.quantity > 1 ? ` <span style="color:#6b6c70">× ${l.quantity}</span>` : ""}
         </td>
         <td style="padding:10px 0;border-bottom:1px solid #e5e2da;font-size:15px;color:#16151a;text-align:right;white-space:nowrap">
           ${formatUsd(l.lineTotalCents)}
@@ -179,7 +183,7 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
     lines
       .map(
         (l) =>
-          `  ${l.name}${l.quantity > 1 ? ` x${l.quantity}` : ""}  ${formatUsd(l.lineTotalCents)}`,
+          `  ${l.name}${l.size ? ` (${l.size})` : ""}${l.quantity > 1 ? ` x${l.quantity}` : ""}  ${formatUsd(l.lineTotalCents)}`,
       )
       .join("\n");
 

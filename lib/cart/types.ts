@@ -12,11 +12,28 @@ export type FulfillmentType = "ship" | "pickup";
 export type CartLine = {
   itemId: string;
   quantity: number;
+  /**
+   * Which size, for items that come in sizes. Null for everything else —
+   * a rifle has no variant and never grows one.
+   */
+  variantId?: string | null;
 };
+
+/**
+ * A cart holds one line per item *and size*: two of a shirt in medium and
+ * one in large are two lines, not one. Everything that adds, removes or
+ * re-counts keys off this rather than the item id alone.
+ */
+export function lineKey(line: { itemId: string; variantId?: string | null }): string {
+  return `${line.itemId}:${line.variantId ?? ""}`;
+}
 
 /** One line after the server has resolved and priced it. */
 export type PricedLine = {
   itemId: string;
+  variantId: string | null;
+  /** The size as text, snapshotted for display. Null when not sized. */
+  size: string | null;
   slug: string;
   name: string;
   image: string | null;
@@ -28,6 +45,8 @@ export type PricedLine = {
 
 /** A line the server refused, and why, so the cart can say so out loud. */
 export type RejectedLine = {
+  /** lineKey of the line that was refused, so it can be removed exactly. */
+  key: string;
   itemId: string;
   name: string | null;
   reason: string;
@@ -55,9 +74,17 @@ export type PricedCart = {
  * row from available to sold — so a pickup line is always exactly one.
  * Shipped goods can be bought in multiples.
  *
- * KNOWN GAP: there is no stock count on items, so a shipped line can be
- * ordered in a quantity the shop does not have. The owner sees the order
- * and can call the buyer. Fixing it properly needs a stock column and is
- * tracked in docs/content-needed.md.
+ * For an item with sizes this is only the outer bound: the real cap is
+ * that size's stock count, applied in the pricer. Items without sizes
+ * still have no stock figure at all, so a shipped one can be over-ordered
+ * up to this number — see docs/content-needed.md.
  */
 export const MAX_QUANTITY = { pickup: 1, ship: 10 } as const;
+
+/** One size of one item, as the public pages need it. */
+export type VariantOption = {
+  id: string;
+  size: string;
+  /** Sold out sizes stay on screen, disabled — absence is information. */
+  inStock: boolean;
+};

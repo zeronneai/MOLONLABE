@@ -84,6 +84,9 @@ export default async function AdminOrders() {
                       {pickup.map((l) => (
                         <li key={l.id}>
                           {l.name}
+                          {l.size ? (
+                            <span className="text-acid"> · {l.size}</span>
+                          ) : null}
                           {l.quantity > 1 ? ` × ${l.quantity}` : ""}
                         </li>
                       ))}
@@ -98,6 +101,9 @@ export default async function AdminOrders() {
                       {ship.map((l) => (
                         <li key={l.id}>
                           {l.name}
+                          {l.size ? (
+                            <span className="text-acid"> · {l.size}</span>
+                          ) : null}
                           {l.quantity > 1 ? ` × ${l.quantity}` : ""}
                         </li>
                       ))}

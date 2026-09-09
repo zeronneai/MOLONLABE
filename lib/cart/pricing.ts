@@ -7,6 +7,7 @@ import { logDbError } from "@/lib/db/log";
 import { itemImages } from "@/lib/db/items";
 import {
   MAX_QUANTITY,
+  lineKey,
   type CartLine,
   type FulfillmentType,
   type PricedCart,
@@ -71,6 +72,9 @@ const REJECTION = {
   missing: "No longer listed.",
   unavailable: "No longer available.",
   unpriced: "Not sold online — call the shop for this one.",
+  needsSize: "Pick a size for this one.",
+  sizeGone: "That size has sold out.",
+  noSizes: "No sizes are in stock.",
 } as const;
 
 /**
@@ -107,51 +111,106 @@ export async function priceCart(
   };
   if (!sb || lines.length === 0) return empty;
 
-  // Collapse duplicates before hitting the database — two "add to cart"
-  // taps on the same item is a quantity, not two lines.
-  const wanted = new Map<string, number>();
+  // Collapse duplicates before hitting the database. Keyed by item AND
+  // size, so adding a medium twice is a quantity while adding a medium
+  // and a large stays two lines.
+  const wanted = new Map<string, { itemId: string; variantId: string | null; quantity: number }>();
   for (const line of lines) {
     const qty = Math.floor(line.quantity);
     if (!line.itemId || !Number.isFinite(qty) || qty < 1) continue;
-    wanted.set(line.itemId, (wanted.get(line.itemId) ?? 0) + qty);
+    const variantId = line.variantId ?? null;
+    const key = lineKey({ itemId: line.itemId, variantId });
+    const existing = wanted.get(key);
+    if (existing) existing.quantity += qty;
+    else wanted.set(key, { itemId: line.itemId, variantId, quantity: qty });
   }
   if (wanted.size === 0) return empty;
 
-  const { data: rows, error } = await sb
-    .from("items")
-    .select("*")
-    .in("id", [...wanted.keys()]);
+  const itemIds = [...new Set([...wanted.values()].map((w) => w.itemId))];
+  const { data: rows, error } = await sb.from("items").select("*").in("id", itemIds);
   if (error) {
     logDbError("priceCart", error);
     return empty;
   }
 
   const byId = new Map((rows ?? []).map((r) => [r.id, r]));
+
+  // Sizes, for the items that have them. Re-read here rather than trusted
+  // from the browser: the stock figure decides whether this sale can
+  // happen at all.
+  const sizedIds = (rows ?? []).filter((r) => r.has_variants).map((r) => r.id);
+  const variantsByItem = new Map<string, { id: string; size: string; stock: number }[]>();
+  if (sizedIds.length > 0) {
+    const { data: variantRows, error: variantError } = await sb
+      .from("item_variants")
+      .select("id, item_id, size, stock")
+      .in("item_id", sizedIds);
+    if (variantError) logDbError("priceCart variants", variantError);
+    for (const v of variantRows ?? []) {
+      variantsByItem.set(v.item_id, [
+        ...(variantsByItem.get(v.item_id) ?? []),
+        { id: v.id, size: v.size, stock: v.stock },
+      ]);
+    }
+  }
+
   const priced: PricedLine[] = [];
   const rejected: RejectedLine[] = [];
 
-  for (const [itemId, requested] of wanted) {
+  for (const [key, { itemId, variantId, quantity: requested }] of wanted) {
     const item = byId.get(itemId);
     if (!item) {
-      rejected.push({ itemId, name: null, reason: REJECTION.missing });
+      rejected.push({ key, itemId, name: null, reason: REJECTION.missing });
       continue;
     }
     if (item.status !== "available") {
-      rejected.push({ itemId, name: item.name, reason: REJECTION.unavailable });
+      rejected.push({ key, itemId, name: item.name, reason: REJECTION.unavailable });
       continue;
     }
     if (item.price_cents == null || item.price_cents <= 0) {
-      rejected.push({ itemId, name: item.name, reason: REJECTION.unpriced });
+      rejected.push({ key, itemId, name: item.name, reason: REJECTION.unpriced });
       continue;
     }
 
     const fulfillment = (
       item.fulfillment_type === "ship" ? "ship" : "pickup"
     ) as FulfillmentType;
-    const quantity = Math.min(requested, MAX_QUANTITY[fulfillment]);
+
+    let size: string | null = null;
+    let cap: number = MAX_QUANTITY[fulfillment];
+
+    if (item.has_variants) {
+      const options = variantsByItem.get(itemId) ?? [];
+      if (options.length === 0) {
+        // Ticked as sized but nothing typed in yet, so there is no size
+        // to sell. Reads to the buyer as unavailable, which it is.
+        rejected.push({ key, itemId, name: item.name, reason: REJECTION.noSizes });
+        continue;
+      }
+      const chosen = variantId ? options.find((o) => o.id === variantId) : null;
+      if (!chosen) {
+        rejected.push({ key, itemId, name: item.name, reason: REJECTION.needsSize });
+        continue;
+      }
+      if (chosen.stock <= 0) {
+        rejected.push({ key, itemId, name: item.name, reason: REJECTION.sizeGone });
+        continue;
+      }
+      size = chosen.size;
+      // Stock is the real ceiling; MAX_QUANTITY is only the outer bound.
+      cap = Math.min(cap, chosen.stock);
+    } else if (variantId) {
+      // A size on an item that has none is a stale cart or a hand-crafted
+      // post. Drop the size rather than the line.
+      size = null;
+    }
+
+    const quantity = Math.max(1, Math.min(requested, cap));
 
     priced.push({
       itemId,
+      variantId: item.has_variants ? variantId : null,
+      size,
       slug: item.slug,
       name: item.name,
       image: itemImages(item)[0] ?? null,
