@@ -106,7 +106,40 @@ are known gaps with stated consequences.
 | **Transfers to a buyer's own FFL** | not built | Out of scope for launch by decision: it needs licence collection, verification and per-order tracking. The order model can carry it; the flow is not built. Separate from `/transfers`, which handles inbound transfers into the shop. |
 
 
-## 8. Apparel — decisions to confirm
+## 8. The entry program — one thing for the attorney, not for the code
+
+**A person is identified by their email address, and one person can have
+two.** `entrants` is keyed on `(campaign_id, lower(email))`, so entries
+accumulate onto one row per address per campaign — a customer who buys
+four times in a month has one row and one running count, which is what
+makes a total possible at all.
+
+The gap is that the address is the identity. Somebody who enters by the
+free method with a personal address and then buys with a work address
+becomes **two entrants with two separate counts**, and neither the site
+nor the shop has any way to know they are the same human. Nothing
+verifies an address either: the free entry form takes what it is given,
+and so does checkout.
+
+This is deliberately not being fixed in code, and it should not be. Any
+technical fix is a guess about identity — merging on a name match would
+combine two different J. Garcias, and merging on a phone number would
+combine a household. Guessing wrong in a prize draw is the expensive
+direction.
+
+**It belongs in the terms.** The rules need to say which address counts,
+what happens when one person appears twice, and whether entries under
+different addresses are combined, left separate, or disqualified. Worth
+raising with the attorney alongside the rest of the sweepstakes language,
+because whatever he decides is a sentence in the rules rather than a
+change to the site.
+
+One related consequence worth stating in the same breath: because the
+count is per campaign and not lifetime, "your entries" always means "in
+this drawing". If the rules are ever written to promise anything that
+carries across drawings, the schema would need to change to match.
+
+## 9. Apparel — decisions to confirm
 
 | What | Why it needs a person |
 | --- | --- |

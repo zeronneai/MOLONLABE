@@ -17,6 +17,7 @@ import {
   SHIPPING_NOTICE,
 } from "@/lib/legal";
 import { SHOP_ADDRESS, SHOP_NAME, SHOP_PHONE_DISPLAY, SITE_URL } from "@/lib/brand";
+import { RECEIPT_TTL_LABEL, receiptUrl } from "@/lib/receipt";
 
 export type EmailLine = {
   name: string;
@@ -45,9 +46,19 @@ export type OrderEmailData = {
     postalCode: string;
   } | null;
   entriesAwarded: number;
+  /**
+   * The buyer's running total in this campaign after this order, straight
+   * from `add_purchase_entries`, which returns it. Null when there is no
+   * campaign, when this order earned nothing, or when the entry write
+   * failed — in which case the email says nothing about a total rather
+   * than stating a number nobody has verified.
+   */
+  entriesTotal: number | null;
   campaignTitle: string | null;
   cardBrand: string | null;
   cardLast4: string | null;
+  /** Credential for the receipt link. Never rendered on its own. */
+  confirmationToken: string;
 };
 
 export type RenderedEmail = { subject: string; html: string; text: string };
@@ -126,6 +137,20 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
       </div>`
       : "";
 
+  // Deliberately flat. It states two counts and where the free method is,
+  // and says nothing about how entries are drawn, what they are worth or
+  // what anybody's chances are — the rules are the attorney's to write,
+  // and an email that describes the program is an email that can
+  // contradict them.
+  // The campaign is named by the sentence before this one, so this one
+  // does not name it again.
+  const totalSentence =
+    order.entriesTotal !== null
+      ? ` You now have <strong>${order.entriesTotal} ${
+          order.entriesTotal === 1 ? "entry" : "entries"
+        }</strong> in total.`
+      : "";
+
   const entriesBlock =
     order.entriesAwarded > 0
       ? `
@@ -133,11 +158,26 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
         <p style="margin:0;font-size:15px;line-height:1.55;color:#1f3a1a">
           This order earned <strong>${order.entriesAwarded} ${order.entriesAwarded === 1 ? "entry" : "entries"}</strong>${
             order.campaignTitle ? ` in ${escapeHtml(order.campaignTitle)}` : ""
-          }. No purchase is necessary to enter — the free method is at
+          }.${totalSentence} No purchase is necessary to enter — the free method is at
           <a href="${SITE_URL}/featured" style="color:#2e5f28">${SITE_URL}/featured</a>.
         </p>
       </div>`
       : "";
+
+  // The way back to the receipt. Without this the page exists and nobody
+  // can reach it once the tab is closed.
+  const receipt = receiptUrl(order.orderNumber, order.confirmationToken);
+  const receiptBlock = `
+      <div style="margin:28px 0 0;padding-top:20px;border-top:1px solid #e5e2da">
+        <p style="margin:0;font-size:15px;line-height:1.55;color:#16151a">
+          <a href="${receipt}" style="color:#2e5f28"><strong>View this order</strong></a>
+        </p>
+        <p style="margin:8px 0 0;font-size:13px;line-height:1.55;color:#6b6c70">
+          Keep this email — the link is how you get back to it, and it
+          works for ${RECEIPT_TTL_LABEL}. Anyone with the link can see the
+          order, so treat it like a receipt.
+        </p>
+      </div>`;
 
   const html = `<!doctype html>
 <html><body style="margin:0;padding:0;background:#f6f4ef;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
@@ -165,6 +205,7 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
     }
 
     ${entriesBlock}
+    ${receiptBlock}
 
     <div style="margin:32px 0 0;padding-top:20px;border-top:1px solid #e5e2da">
       <p style="margin:0;font-size:13px;line-height:1.6;color:#6b6c70">${escapeHtml(FIREARM_DISCLAIMER)}</p>
@@ -227,9 +268,17 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
       ? [
           ``,
           `This order earned ${order.entriesAwarded} ${order.entriesAwarded === 1 ? "entry" : "entries"}${order.campaignTitle ? ` in ${order.campaignTitle}` : ""}.`,
+          ...(order.entriesTotal !== null
+            ? [
+                `You now have ${order.entriesTotal} ${order.entriesTotal === 1 ? "entry" : "entries"} in total.`,
+              ]
+            : []),
           `No purchase is necessary to enter: ${SITE_URL}/featured`,
         ]
       : []),
+    ``,
+    `View this order: ${receipt}`,
+    `Keep this email — the link is how you get back to it, and it works for ${RECEIPT_TTL_LABEL}.`,
     ``,
     FIREARM_DISCLAIMER,
     ``,

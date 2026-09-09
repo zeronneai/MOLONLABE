@@ -342,6 +342,7 @@ export interface Database {
           card_brand: string | null;
           card_last4: string | null;
           confirmation_token: string;
+          confirmation_expires_at: string;
           confirmation_sent_at: string | null;
           created_at: string;
         };
@@ -379,6 +380,8 @@ export interface Database {
           card_brand?: string | null;
           card_last4?: string | null;
           confirmation_token: string;
+          /** Defaulted by the database to a year out. */
+          confirmation_expires_at?: string;
           confirmation_sent_at?: string | null;
           created_at?: string;
         };

@@ -18,6 +18,24 @@ import "server-only";
 
 export type SendResult = { sent: boolean; detail: string };
 
+const RESEND_ENDPOINT = "https://api.resend.com/emails";
+
+/**
+ * Escape hatch for tests, which point this at a local double so the
+ * confirmation email can be asserted on as it is actually rendered and
+ * sent. Same shape as `AUTHORIZENET_API_BASE`, and ignored the moment a
+ * real key is a production one — a stray variable must not be able to
+ * redirect customer mail.
+ */
+function endpoint(): string {
+  const override = process.env.RESEND_API_BASE?.trim();
+  if (!override) return RESEND_ENDPOINT;
+  return override.startsWith("http://127.0.0.1") ||
+    override.startsWith("http://localhost")
+    ? override
+    : RESEND_ENDPOINT;
+}
+
 export async function sendEmail(params: {
   to: string;
   subject: string;
@@ -38,7 +56,7 @@ export async function sendEmail(params: {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15_000);
-    const response = await fetch("https://api.resend.com/emails", {
+    const response = await fetch(endpoint(), {
       method: "POST",
       headers: {
         authorization: `Bearer ${key}`,

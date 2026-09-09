@@ -355,8 +355,13 @@ export async function submitCheckout(
   // Entries. A failure here must not fail the order — the buyer has their
   // goods either way — but the owner needs to know so it can be fixed by
   // hand before the draw.
+  // The function returns the buyer's running total for the campaign after
+  // the increment, atomically. That is the number the email quotes — no
+  // second read, and no window in which another order lands between the
+  // write and the count.
+  let entriesTotal: number | null = null;
   if (cart.campaign && cart.entriesEarned > 0) {
-    const { error } = await sb.rpc("add_purchase_entries", {
+    const { data: total, error } = await sb.rpc("add_purchase_entries", {
       p_campaign: cart.campaign.id,
       p_email: data.customer.email,
       p_first_name: data.customer.firstName,
@@ -364,6 +369,7 @@ export async function submitCheckout(
       p_phone: data.customer.phone || null,
       p_entries: cart.entriesEarned,
     });
+    if (typeof total === "number" && total > 0) entriesTotal = total;
     if (error) {
       logDbError("checkout entries", error);
       await notifyOwner({
@@ -396,9 +402,14 @@ export async function submitCheckout(
         }
       : null,
     entriesAwarded: cart.entriesEarned,
+    // Null when the entry write failed. The buyer is better served by an
+    // email that says nothing about a total than by one quoting a number
+    // that never made it into the database.
+    entriesTotal,
     campaignTitle: cart.campaign?.title ?? null,
     cardBrand: charge.cardBrand,
     cardLast4: charge.cardLast4,
+    confirmationToken: token,
   });
 
   const sent = await sendEmail({

@@ -24,6 +24,7 @@ import {
   SHIPPING_NOTICE,
 } from "@/lib/legal";
 import { lineKey, type PricedCart } from "@/lib/cart/types";
+import { receiptPath } from "@/lib/receipt";
 
 type AcceptResponse = {
   messages: { resultCode: string; message: { code: string; text: string }[] };
@@ -192,7 +193,7 @@ export default function CheckoutForm({
             }
             clear();
             router.push(
-              `/checkout/confirmation?order=${result.orderNumber}&t=${result.token}`,
+              receiptPath(result.orderNumber, result.token),
             );
           })();
         },

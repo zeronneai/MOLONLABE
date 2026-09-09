@@ -15,6 +15,7 @@ import {
   SHOP_PHONE_DISPLAY,
   SHOP_PHONE_HREF,
 } from "@/lib/brand";
+import { RECEIPT_TTL_LABEL } from "@/lib/receipt";
 
 export const metadata: Metadata = {
   title: "Order confirmed",
@@ -50,6 +51,47 @@ export default async function ConfirmationPage({
     .eq("confirmation_token", token)
     .maybeSingle();
   if (!order) notFound();
+
+  // Expired links get an explanation rather than a 404. Reaching this
+  // point means the token was right, so the reader is the buyer or
+  // someone they gave the email to — telling them the link aged out
+  // reveals nothing a correct token did not already prove, and a bare
+  // 404 would send them hunting for a mistake they did not make.
+  if (
+    order.confirmation_expires_at &&
+    new Date(order.confirmation_expires_at) < new Date()
+  ) {
+    return <ExpiredReceipt orderNumber={order.order_number} />;
+  }
+
+  // The running total, read now rather than stored on the order, so an
+  // old email opened today shows where the buyer actually stands.
+  //
+  // Only while the campaign is still open. Once it has closed the total
+  // is history, and a receipt still announcing a live-sounding count
+  // would be making a claim about a drawing that has already happened.
+  let entriesTotal: number | null = null;
+  let campaignTitle: string | null = null;
+  if (order.campaign_id && order.entries_awarded > 0) {
+    const { data: campaign } = await sb
+      .from("campaigns")
+      .select("title, status, closes_at")
+      .eq("id", order.campaign_id)
+      .maybeSingle();
+    const open =
+      campaign?.status === "live" &&
+      (!campaign.closes_at || new Date(campaign.closes_at) > new Date());
+    if (open) {
+      campaignTitle = campaign.title;
+      const { data: entrant } = await sb
+        .from("entrants")
+        .select("entry_count")
+        .eq("campaign_id", order.campaign_id)
+        .ilike("email", order.email)
+        .maybeSingle();
+      if (entrant && entrant.entry_count > 0) entriesTotal = entrant.entry_count;
+    }
+  }
 
   const { data: lines } = await sb
     .from("order_items")
@@ -152,10 +194,21 @@ export default async function ConfirmationPage({
           </p>
         )}
 
+        {/* Two counts and a link to the free method. Nothing about how a
+            winner is picked, what an entry is worth, or anyone's odds —
+            that is the rules page's job, and the rules are not written
+            yet. */}
         {order.entries_awarded > 0 && (
           <p className="mt-8 border-l-2 border-acid pl-5 text-sm text-acid">
             This order earned {order.entries_awarded}{" "}
-            {order.entries_awarded === 1 ? "entry" : "entries"}.{" "}
+            {order.entries_awarded === 1 ? "entry" : "entries"}
+            {campaignTitle ? ` in ${campaignTitle}` : ""}.{" "}
+            {entriesTotal !== null && (
+              <>
+                You now have {entriesTotal}{" "}
+                {entriesTotal === 1 ? "entry" : "entries"} in total.{" "}
+              </>
+            )}
             <Link href="/featured" className="underline hover:text-bone">
               No purchase is necessary to enter
             </Link>
@@ -230,5 +283,39 @@ function LineList({
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * A receipt link that has aged out.
+ *
+ * The order still exists and the shop can still look it up — the link is
+ * what expired, not the purchase — so the page says exactly that and puts
+ * the phone number in reach. It shows the order number, which the reader
+ * already had in the URL, and nothing else about the order.
+ */
+function ExpiredReceipt({ orderNumber }: { orderNumber: string }) {
+  return (
+    <div className="px-page pb-24 pt-[calc(72px+4rem)]">
+      <p className="label text-amber">Order {orderNumber}</p>
+      <h1 className="display mt-6 text-[clamp(2.5rem,6vw,4.5rem)]">
+        THIS LINK
+        <br />
+        HAS EXPIRED.
+      </h1>
+      <p className="mt-8 max-w-[52ch] leading-relaxed text-muted">
+        Receipt links work for {RECEIPT_TTL_LABEL} from the date of the
+        order. Your order is still on file — call the shop with the order
+        number above and we&apos;ll pull it up.
+      </p>
+      <div className="mt-10 flex flex-wrap gap-3">
+        <a href={SHOP_PHONE_HREF} className="cta-primary">
+          Call {SHOP_PHONE_DISPLAY}
+        </a>
+        <Link href="/" className="control">
+          Home
+        </Link>
+      </div>
+    </div>
   );
 }
