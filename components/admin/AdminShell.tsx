@@ -13,13 +13,16 @@ const tabs = [
   { href: "/admin/inquiries", label: "Inquiries" },
   { href: "/admin/entrants", label: "Entrants" },
   { href: "/admin/game", label: "Game & Offer" },
+  { href: "/admin/commerce", label: "Tax & Shipping" },
+  { href: "/admin/activity", label: "Activity" },
 ];
 
 export default function AdminShell({
-  email,
+  who,
   children,
 }: {
-  email: string;
+  /** The signed-in person's display name. Never their email address. */
+  who: string;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -45,7 +48,7 @@ export default function AdminShell({
           <button
             type="button"
             onClick={signOut}
-            title={email}
+            title={`Signed in as ${who}`}
             className="label flex h-11 items-center text-muted transition-colors hover:text-bone"
           >
             Sign out

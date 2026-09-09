@@ -17,16 +17,18 @@ import {
 
 /**
  * Owner-set commerce settings, in the same key/value table as the game
- * settings.
+ * settings, editable at /admin/commerce.
  *
- * Both default to zero on purpose. A sales-tax rate is a legal figure for
- * the client's jurisdiction and their accountant to state, and a shipping
- * charge is a commercial decision — inventing either would be worse than
- * charging nothing, because a wrong tax rate is a filing problem rather
- * than a rounding error. Zero is visibly wrong, which is the point: it
- * gets set before launch. Tracked in docs/content-needed.md.
+ * The tax rate is real: 8.25% is the El Paso combined rate, given to us by
+ * the client. The two shipping figures are PLACEHOLDERS — the client is
+ * still deciding — and the admin screen says so on screen rather than
+ * presenting them as settled.
  */
-export const COMMERCE_DEFAULTS = { taxRateBps: 0, shippingFlatCents: 0 };
+export const COMMERCE_DEFAULTS = {
+  taxRateBps: 825,
+  shippingStandardCents: 1000,
+  shippingOversizeCents: 2000,
+};
 
 export type CommerceSettings = typeof COMMERCE_DEFAULTS;
 
@@ -45,11 +47,36 @@ export async function getCommerceSettings(
   };
   return {
     taxRateBps: int(raw.tax_rate_bps, COMMERCE_DEFAULTS.taxRateBps),
-    shippingFlatCents: int(
-      raw.shipping_flat_cents,
-      COMMERCE_DEFAULTS.shippingFlatCents,
+    shippingStandardCents: int(
+      raw.shipping_standard_cents,
+      COMMERCE_DEFAULTS.shippingStandardCents,
+    ),
+    shippingOversizeCents: int(
+      raw.shipping_oversize_cents,
+      COMMERCE_DEFAULTS.shippingOversizeCents,
     ),
   };
+}
+
+/**
+ * Postage for a whole order, charged once at the highest tier present.
+ *
+ * Not per line: two t-shirts go in one envelope, and billing twice for
+ * that is the kind of thing people notice and resent. A cart holding a
+ * shirt and a gun safe pays the safe's rate, because that is what the
+ * shipment actually costs.
+ *
+ * Collected items contribute nothing — they are not being posted.
+ */
+export function shippingFor(
+  lines: { fulfillment: FulfillmentType; oversize: boolean }[],
+  settings: CommerceSettings,
+): number {
+  const shipped = lines.filter((l) => l.fulfillment === "ship");
+  if (shipped.length === 0) return 0;
+  return shipped.some((l) => l.oversize)
+    ? settings.shippingOversizeCents
+    : settings.shippingStandardCents;
 }
 
 /**
@@ -156,6 +183,9 @@ export async function priceCart(
 
   const priced: PricedLine[] = [];
   const rejected: RejectedLine[] = [];
+  // Kept beside the priced lines rather than on them: the tier is a
+  // postage input, not something a buyer ever sees on a cart row.
+  const oversizeItems = new Set<string>();
 
   for (const [key, { itemId, variantId, quantity: requested }] of wanted) {
     const item = byId.get(itemId);
@@ -206,6 +236,7 @@ export async function priceCart(
     }
 
     const quantity = Math.max(1, Math.min(requested, cap));
+    if (item.shipping_tier === "oversize") oversizeItems.add(itemId);
 
     priced.push({
       itemId,
@@ -227,7 +258,13 @@ export async function priceCart(
 
   const settings = await getCommerceSettings(sb);
   const hasShipment = shipLines.length > 0;
-  const shippingCents = hasShipment ? settings.shippingFlatCents : 0;
+  const shippingCents = shippingFor(
+    priced.map((l) => ({
+      fulfillment: l.fulfillment,
+      oversize: oversizeItems.has(l.itemId),
+    })),
+    settings,
+  );
   // Tax on merchandise only. Whether this jurisdiction also taxes
   // shipping is a question for the client's accountant; with the rate at
   // zero it changes nothing today, and the narrower rule is the one that

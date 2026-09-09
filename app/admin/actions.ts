@@ -5,7 +5,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { getSessionSupabase } from "@/lib/supabase/session";
 import { slugify } from "@/lib/slug";
 import { parseUsdToCents } from "@/lib/money";
@@ -21,6 +21,12 @@ import {
 } from "@/lib/admin/constants";
 import { countItemReferences } from "@/lib/db/itemRefs";
 import { logDbError } from "@/lib/db/log";
+import {
+  WATCHED_ITEM_FIELDS,
+  changedFields,
+  displayName,
+  logActivity,
+} from "@/lib/admin/audit";
 import { DIFFICULTY_RANGES } from "@/lib/game/settings";
 import { newSeed, redactName, selectWinner } from "@/lib/draw/select";
 import type { DrawRecord } from "@/lib/draw/presentation";
@@ -28,12 +34,24 @@ import type { DrawRecord } from "@/lib/draw/presentation";
 export type { ActionState };
 
 async function requireClient(): Promise<SupabaseClient<Database> | null> {
+  const session = await requireSession();
+  return session?.sb ?? null;
+}
+
+/**
+ * The client AND who is holding it. Authorship and the activity log both
+ * need the user, and every write already had to fetch it to check the
+ * session — so it is returned rather than thrown away.
+ */
+async function requireSession(): Promise<
+  { sb: SupabaseClient<Database>; user: User } | null
+> {
   const sb = await getSessionSupabase();
   if (!sb) return null;
   const {
     data: { user },
   } = await sb.auth.getUser();
-  return user ? sb : null;
+  return user ? { sb, user } : null;
 }
 
 function revalidatePublic(slug?: string) {
@@ -44,10 +62,25 @@ function revalidatePublic(slug?: string) {
 }
 
 export async function setItemStatus(id: string, status: string): Promise<void> {
-  const sb = await requireClient();
-  if (!sb || !ITEM_STATUSES.includes(status as (typeof ITEM_STATUSES)[number])) return;
-  const { error } = await sb.from("items").update({ status }).eq("id", id);
+  const session = await requireSession();
+  if (!session || !ITEM_STATUSES.includes(status as (typeof ITEM_STATUSES)[number])) return;
+  const { sb, user } = session;
+  const { data: was } = await sb
+    .from("items")
+    .select("name, status")
+    .eq("id", id)
+    .maybeSingle();
+  const { error } = await sb
+    .from("items")
+    .update({ status, updated_by_name: displayName(user) })
+    .eq("id", id);
   if (error) console.error("setItemStatus:", error.message);
+  else if (was?.status !== status) {
+    await logActivity(sb, user, {
+      action: "status", entity: "item", entityId: id, entityLabel: was?.name ?? null,
+      field: "status", before: was?.status ?? null, after: status,
+    });
+  }
   revalidatePublic();
   revalidatePath("/admin/inventory");
 }
@@ -59,21 +92,26 @@ export async function setItemStatus(id: string, status: string): Promise<void> {
  * returned so Undo can put it back exactly as it was.
  */
 export async function archiveItem(id: string): Promise<string | null> {
-  const sb = await requireClient();
-  if (!sb) return null;
+  const session = await requireSession();
+  if (!session) return null;
+  const { sb, user } = session;
   const { data: before } = await sb
     .from("items")
-    .select("status")
+    .select("name, status")
     .eq("id", id)
     .maybeSingle();
   const { error } = await sb
     .from("items")
-    .update({ status: ARCHIVED_STATUS })
+    .update({ status: ARCHIVED_STATUS, updated_by_name: displayName(user) })
     .eq("id", id);
   if (error) {
     console.error("archiveItem:", error.message);
     return null;
   }
+  await logActivity(sb, user, {
+    action: "archive", entity: "item", entityId: id, entityLabel: before?.name ?? null,
+    field: "status", before: before?.status ?? null, after: ARCHIVED_STATUS,
+  });
   revalidatePublic();
   revalidatePath("/admin/inventory");
   return before?.status ?? "available";
@@ -81,13 +119,24 @@ export async function archiveItem(id: string): Promise<string | null> {
 
 /** Undo for archive, and the Restore action on the Archived filter. */
 export async function restoreItem(id: string, status: string): Promise<void> {
-  const sb = await requireClient();
-  if (!sb) return;
+  const session = await requireSession();
+  if (!session) return;
+  const { sb, user } = session;
   const next = ITEM_STATUSES.includes(status as (typeof ITEM_STATUSES)[number])
     ? status
     : "available";
-  const { error } = await sb.from("items").update({ status: next }).eq("id", id);
+  const { data: was } = await sb.from("items").select("name").eq("id", id).maybeSingle();
+  const { error } = await sb
+    .from("items")
+    .update({ status: next, updated_by_name: displayName(user) })
+    .eq("id", id);
   if (error) console.error("restoreItem:", error.message);
+  else {
+    await logActivity(sb, user, {
+      action: "restore", entity: "item", entityId: id, entityLabel: was?.name ?? null,
+      field: "status", before: ARCHIVED_STATUS, after: next,
+    });
+  }
   revalidatePublic();
   revalidatePath("/admin/inventory");
 }
@@ -103,8 +152,9 @@ export async function deleteItem(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const sb = await requireClient();
-  if (!sb) return { status: "error", message: "Not signed in." };
+  const session = await requireSession();
+  if (!session) return { status: "error", message: "Not signed in." };
+  const { sb, user } = session;
   const id = String(formData.get("id") ?? "");
   if (!id) return { status: "error", message: "Missing item." };
 
@@ -145,16 +195,33 @@ export async function deleteItem(
     console.error("deleteItem:", error.message);
     return { status: "error", message: "Could not delete that item." };
   }
+  // Logged after the fact but with the label captured before, so the line
+  // still names the thing that no longer exists.
+  await logActivity(sb, user, {
+    action: "delete", entity: "item", entityId: id, entityLabel: item.name,
+    before: { name: item.name } as Json, after: null,
+  });
   revalidatePublic();
   revalidatePath("/admin/inventory");
   redirect("/admin/inventory?deleted=1");
 }
 
 export async function toggleItemFeatured(id: string, next: boolean): Promise<void> {
-  const sb = await requireClient();
-  if (!sb) return;
-  const { error } = await sb.from("items").update({ is_featured: next }).eq("id", id);
+  const session = await requireSession();
+  if (!session) return;
+  const { sb, user } = session;
+  const { data: was } = await sb.from("items").select("name").eq("id", id).maybeSingle();
+  const { error } = await sb
+    .from("items")
+    .update({ is_featured: next, updated_by_name: displayName(user) })
+    .eq("id", id);
   if (error) console.error("toggleItemFeatured:", error.message);
+  else {
+    await logActivity(sb, user, {
+      action: "featured", entity: "item", entityId: id, entityLabel: was?.name ?? null,
+      field: "is_featured", before: !next, after: next,
+    });
+  }
   revalidatePublic();
   revalidatePath("/admin/inventory");
 }
@@ -247,8 +314,10 @@ export async function saveItem(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const sb = await requireClient();
-  if (!sb) return { status: "error", message: "Not signed in." };
+  const session = await requireSession();
+  if (!session) return { status: "error", message: "Not signed in." };
+  const { sb, user } = session;
+  const actor = displayName(user);
 
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
@@ -324,6 +393,8 @@ export async function saveItem(
     price_cents: parseUsdToCents(String(formData.get("price_online") ?? "")),
     fulfillment_type:
       String(formData.get("fulfillment_type") ?? "") === "ship" ? "ship" : "pickup",
+    shipping_tier:
+      String(formData.get("shipping_tier") ?? "") === "oversize" ? "oversize" : "standard",
     has_variants: hasVariants,
     video_url: String(formData.get("video_url") ?? "").trim() || null,
     status,
@@ -332,9 +403,22 @@ export async function saveItem(
     images,
   };
 
+  // Read the old row first: the activity log needs what the price and
+  // status were, and after the write that is gone.
+  const { data: previous } = id
+    ? await sb.from("items").select("*").eq("id", id).maybeSingle()
+    : { data: null };
+
+  // Authorship is never read from the form. These are the only two fields
+  // the browser cannot influence, and the database stamps the ids from the
+  // session on top of this as a second lock.
+  const stamped = id
+    ? { ...row, updated_by_name: actor }
+    : { ...row, created_by_name: actor, updated_by_name: actor };
+
   const { data: saved, error } = id
-    ? await sb.from("items").update(row).eq("id", id).select("id").maybeSingle()
-    : await sb.from("items").insert(row).select("id").maybeSingle();
+    ? await sb.from("items").update(stamped).eq("id", id).select("id").maybeSingle()
+    : await sb.from("items").insert(stamped).select("id").maybeSingle();
 
   if (error || !saved) {
     console.error("saveItem:", error?.message);
@@ -374,6 +458,25 @@ export async function saveItem(
       }
     }
   }
+  if (!id) {
+    await logActivity(sb, user, {
+      action: "create", entity: "item", entityId: saved.id, entityLabel: row.name,
+    });
+  } else {
+    const diffs = changedFields(
+      previous as unknown as Record<string, unknown> | null,
+      row as unknown as Record<string, unknown>,
+      WATCHED_ITEM_FIELDS,
+    );
+    for (const diff of diffs) {
+      await logActivity(sb, user, {
+        action: diff.field === "price_cents" ? "price" : diff.field === "status" ? "status" : "update",
+        entity: "item", entityId: saved.id, entityLabel: row.name,
+        field: diff.field, before: diff.before, after: diff.after,
+      });
+    }
+  }
+
   revalidatePublic(row.slug);
   revalidatePath("/admin/inventory");
   redirect("/admin/inventory");
@@ -388,15 +491,35 @@ export async function setInquiryStatus(id: string, status: string): Promise<void
 }
 
 export async function setCampaignStatus(id: string, status: string): Promise<void> {
-  const sb = await requireClient();
-  if (!sb || !CAMPAIGN_STATUSES.includes(status as (typeof CAMPAIGN_STATUSES)[number]))
+  const session = await requireSession();
+  if (!session || !CAMPAIGN_STATUSES.includes(status as (typeof CAMPAIGN_STATUSES)[number]))
     return;
+  const { sb, user } = session;
+  const actor = displayName(user);
+  const { data: was } = await sb
+    .from("campaigns")
+    .select("title, status")
+    .eq("id", id)
+    .maybeSingle();
   // One live campaign at a time: going live demotes any other live one.
   if (status === "live") {
-    await sb.from("campaigns").update({ status: "closed" }).eq("status", "live").neq("id", id);
+    await sb
+      .from("campaigns")
+      .update({ status: "closed", updated_by_name: actor })
+      .eq("status", "live")
+      .neq("id", id);
   }
-  const { error } = await sb.from("campaigns").update({ status }).eq("id", id);
+  const { error } = await sb
+    .from("campaigns")
+    .update({ status, updated_by_name: actor })
+    .eq("id", id);
   if (error) console.error("setCampaignStatus:", error.message);
+  else if (was?.status !== status) {
+    await logActivity(sb, user, {
+      action: "status", entity: "campaign", entityId: id, entityLabel: was?.title ?? null,
+      field: "status", before: was?.status ?? null, after: status,
+    });
+  }
   revalidatePublic();
   revalidatePath("/admin/featured");
 }
@@ -417,10 +540,14 @@ async function writeSetting(
   sb: SupabaseClient<Database>,
   key: string,
   value: Json,
+  actor?: string,
 ): Promise<boolean> {
   const { error } = await sb
     .from("settings")
-    .upsert({ key, value }, { onConflict: "key" });
+    .upsert(
+      { key, value, ...(actor ? { updated_by_name: actor } : {}) },
+      { onConflict: "key" },
+    );
   if (error) console.error(`writeSetting ${key}:`, error.message);
   return !error;
 }
@@ -432,10 +559,20 @@ function revalidateGame() {
 
 /** The kill switch: flips only `enabled`, touches nothing else. */
 export async function toggleGameOffer(enabled: boolean): Promise<void> {
-  const sb = await requireClient();
-  if (!sb) return;
+  const session = await requireSession();
+  if (!session) return;
+  const { sb, user } = session;
   const current = await readSetting(sb, "game_offer");
-  await writeSetting(sb, "game_offer", { ...current, enabled } as Json);
+  const was = current.enabled === true;
+  await writeSetting(sb, "game_offer", { ...current, enabled } as Json, displayName(user));
+  if (was !== enabled) {
+    // Turning a live discount on or off is the settings change most worth
+    // being able to point at afterwards.
+    await logActivity(sb, user, {
+      action: "offer", entity: "settings", entityLabel: "Game & Offer",
+      field: "enabled", before: was, after: enabled,
+    });
+  }
   revalidateGame();
 }
 
@@ -443,8 +580,10 @@ export async function saveGameOffer(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const sb = await requireClient();
-  if (!sb) return { status: "error", message: "Not signed in." };
+  const session = await requireSession();
+  if (!session) return { status: "error", message: "Not signed in." };
+  const { sb, user } = session;
+  const actor = displayName(user);
 
   const code = String(formData.get("code") ?? "")
     .trim()
@@ -463,8 +602,14 @@ export async function saveGameOffer(
     value,
     expires,
     note,
-  } as Json);
+  } as Json, actor);
   if (!ok) return { status: "error", message: "Save failed — try again." };
+  if (current.code !== code) {
+    await logActivity(sb, user, {
+      action: "offer", entity: "settings", entityLabel: "Game & Offer",
+      field: "code", before: (current.code ?? null) as Json, after: code,
+    });
+  }
   revalidateGame();
   return { status: "idle", message: "Saved." };
 }
@@ -473,8 +618,10 @@ export async function saveGameDifficulty(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const sb = await requireClient();
-  if (!sb) return { status: "error", message: "Not signed in." };
+  const session = await requireSession();
+  if (!session) return { status: "error", message: "Not signed in." };
+  const { sb, user } = session;
+  const actor = displayName(user);
 
   const mode = String(formData.get("mode") ?? "");
   if (mode !== "desktop" && mode !== "mobile")
@@ -503,9 +650,71 @@ export async function saveGameDifficulty(
   const ok = await writeSetting(sb, "game_difficulty", {
     ...current,
     [mode]: { roundMs, targetCount, popMs, magSize },
-  } as Json);
+  } as Json, actor);
   if (!ok) return { status: "error", message: "Save failed — try again." };
+  await logActivity(sb, user, {
+    action: "difficulty", entity: "settings", entityLabel: `Game difficulty (${mode})`,
+    field: mode, before: (current[mode] ?? null) as Json,
+    after: { roundMs, targetCount, popMs, magSize } as Json,
+  });
   revalidateGame();
+  return { status: "idle", message: "Saved." };
+}
+
+/**
+ * Tax and postage.
+ *
+ * The rate is entered as a percentage because that is how a human says it
+ * and how an accountant states it; it is stored in basis points because
+ * 8.25 is not representable in binary floating point and a tax figure is
+ * the last place to accept a rounding error.
+ */
+export async function saveCommerce(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireSession();
+  if (!session) return { status: "error", message: "Not signed in." };
+  const { sb, user } = session;
+  const actor = displayName(user);
+
+  const percent = Number(String(formData.get("tax_percent") ?? "").trim());
+  if (!Number.isFinite(percent) || percent < 0 || percent > 25)
+    return { status: "error", message: "Tax rate must be a percentage between 0 and 25." };
+  const taxRateBps = Math.round(percent * 100);
+
+  const standard = parseUsdToCents(String(formData.get("shipping_standard") ?? ""));
+  const oversize = parseUsdToCents(String(formData.get("shipping_oversize") ?? ""));
+  // Zero is a legitimate answer — free postage is a decision — so an empty
+  // or malformed field is the failure, not a zero.
+  const standardCents = String(formData.get("shipping_standard") ?? "").trim() === "0" ? 0 : standard;
+  const oversizeCents = String(formData.get("shipping_oversize") ?? "").trim() === "0" ? 0 : oversize;
+  if (standardCents === null || oversizeCents === null)
+    return { status: "error", message: "Both postage amounts need a number." };
+
+  const current = await readSetting(sb, "commerce");
+  const ok = await writeSetting(sb, "commerce", {
+    ...current,
+    tax_rate_bps: taxRateBps,
+    shipping_standard_cents: standardCents,
+    shipping_oversize_cents: oversizeCents,
+  } as Json, actor);
+  if (!ok) return { status: "error", message: "Save failed — try again." };
+
+  for (const [field, before, after] of [
+    ["tax_rate_bps", current.tax_rate_bps, taxRateBps],
+    ["shipping_standard_cents", current.shipping_standard_cents, standardCents],
+    ["shipping_oversize_cents", current.shipping_oversize_cents, oversizeCents],
+  ] as const) {
+    if ((before ?? null) === after) continue;
+    await logActivity(sb, user, {
+      action: "commerce", entity: "settings", entityLabel: "Tax & Shipping",
+      field, before: (before ?? null) as Json, after: after as Json,
+    });
+  }
+
+  revalidatePublic();
+  revalidatePath("/admin/commerce");
   return { status: "idle", message: "Saved." };
 }
 
@@ -513,8 +722,10 @@ export async function saveCampaign(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const sb = await requireClient();
-  if (!sb) return { status: "error", message: "Not signed in." };
+  const session = await requireSession();
+  if (!session) return { status: "error", message: "Not signed in." };
+  const { sb, user } = session;
+  const actor = displayName(user);
 
   const id = String(formData.get("id") ?? "");
   const title = String(formData.get("title") ?? "").trim();
@@ -543,8 +754,10 @@ export async function saveCampaign(
   };
 
   const { error } = id
-    ? await sb.from("campaigns").update(row).eq("id", id)
-    : await sb.from("campaigns").insert({ ...row, status: "draft" });
+    ? await sb.from("campaigns").update({ ...row, updated_by_name: actor }).eq("id", id)
+    : await sb
+        .from("campaigns")
+        .insert({ ...row, status: "draft", created_by_name: actor, updated_by_name: actor });
 
   if (error) {
     console.error("saveCampaign:", error.message);
@@ -580,8 +793,9 @@ export async function saveCampaign(
  * without touching the result.
  */
 export async function commitDraw(campaignId: string): Promise<DrawRecord> {
-  const sb = await requireClient();
-  if (!sb) return { ok: false, error: "Not signed in." };
+  const session = await requireSession();
+  if (!session) return { ok: false, error: "Not signed in." };
+  const { sb, user } = session;
 
   const { data: already } = await sb
     .from("winners")
@@ -624,14 +838,14 @@ export async function commitDraw(campaignId: string): Promise<DrawRecord> {
 
   // Redacted at write time: the surname never reaches the winners table,
   // so no future component can leak it by rendering the wrong column.
-  const displayName = redactName(winner.first_name, winner.last_name);
+  const displayNameOfWinner = redactName(winner.first_name, winner.last_name);
 
   const { data: written, error: insertError } = await sb
     .from("winners")
     .insert({
       campaign_id: campaignId,
       entrant_id: winner.id,
-      display_name: displayName,
+      display_name: displayNameOfWinner,
       seed: result.seed,
       ticket: result.ticket,
       entry_total: result.total,
@@ -643,14 +857,24 @@ export async function commitDraw(campaignId: string): Promise<DrawRecord> {
     return { ok: false, error: "Could not record the winner." };
   }
 
-  await sb.from("campaigns").update({ status: "awarded" }).eq("id", campaignId);
+  await sb
+    .from("campaigns")
+    .update({ status: "awarded", updated_by_name: displayName(user) })
+    .eq("id", campaignId);
+  // The draw is the single least reversible thing anyone does in here.
+  await logActivity(sb, user, {
+    action: "draw", entity: "campaign", entityId: campaignId,
+    entityLabel: null,
+    field: "winner", before: null,
+    after: { name: displayNameOfWinner, ticket: result.ticket, total: result.total, seed: result.seed } as Json,
+  });
   revalidatePublic();
   revalidatePath("/admin/featured");
 
   return {
     ok: true,
     replay: false,
-    name: displayName,
+    name: displayNameOfWinner,
     ticket: result.ticket,
     total: result.total,
     seed: result.seed,

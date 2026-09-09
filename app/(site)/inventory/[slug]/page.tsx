@@ -18,6 +18,7 @@ import TrackView from "@/components/analytics/TrackView";
 import PurchasePanel from "@/components/inventory/PurchasePanel";
 import { getLiveCampaign } from "@/lib/db/campaigns";
 import { getItemVariants } from "@/lib/db/items";
+import { needsFirearmDisclaimer } from "@/lib/admin/constants";
 import { entriesFor } from "@/lib/cart/pricing";
 
 // Rendered per request; inventory changes too often to cache.
@@ -118,6 +119,7 @@ export default async function ItemPage({ params }: Params) {
           entriesEarned={entriesFor(item.price_cents ?? 0, rate)}
           campaignTitle={open ? (campaign?.title ?? null) : null}
           variants={variants}
+          showDisclaimer={needsFirearmDisclaimer(item.category)}
         />
 
         {item.short_desc && (

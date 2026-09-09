@@ -56,10 +56,19 @@ are live values the client should set deliberately.
 
 | What | Default | Where |
 | --- | --- | --- |
-| Discount code | `MOLON10` | Admin → Game & Offer |
-| Reward description | "10% off your next accessory" | Admin → Game & Offer |
+| ~~Discount code~~ — **cleared, and the offer switched off.** | was `MOLON10` | Admin → Game & Offer |
+| ~~Reward description~~ — **cleared with it.** | was "10% off one accessory" | Admin → Game & Offer |
 | Exclusions note | "Accessories and apparel only. Not valid on firearms." | Admin → Game & Offer (from the brief, self-heals if blanked) |
 | Game difficulty | ~30% win rate target | Admin → Game & Offer |
+
+The code and its value were mine, seeded by `20260812100000` with
+`enabled: true`. That meant a discount the client never chose was live
+and being handed to winners. `20260916100000` switches it off and blanks
+both fields — conditionally, only where the seeded code and wording are
+still exactly as seeded, so an edit the client has already made is left
+alone. Nothing is offered by the game until they set their own and turn
+it back on; the exclusions note is kept so a blank one can never mean
+"valid on everything".
 
 ## 6. Confirmed — no longer needs anything
 
@@ -85,13 +94,14 @@ are known gaps with stated consequences.
 
 | What | Where | Why it matters |
 | --- | --- | --- |
-| **Sales tax rate** | `settings` row `commerce.tax_rate_bps`, basis points | Defaults to **0**, which is certainly wrong. The correct figure for the shop's jurisdiction is the client's accountant's to state — inventing one is a filing problem, not a rounding error. `docs/authorizenet-sandbox.md` step 4 has the SQL. |
-| **Shipping charge** | `settings` row `commerce.shipping_flat_cents` | Defaults to **0**, so shipped orders currently post free. Flat rate only; anything by weight or zone needs building. |
+| ~~**Sales tax rate**~~ — **answered.** | `settings` row `commerce.tax_rate_bps` | Set to **825** — 8.25%, the El Paso combined rate, given by the client. Charged on the merchandise subtotal only, never on postage. Editable at Admin → Tax & Shipping. |
+| **Postage amounts** | `settings` rows `commerce.shipping_standard_cents` and `commerce.shipping_oversize_cents` | **Placeholders — $10.00 and $20.00 — and the only numbers on this list that will be charged to a real card without anyone re-reading them.** Two tiers, set per item: standard for apparel and small accessories, oversize for bulky gear. Collected-in-store is always zero. One charge per order, at the highest tier in the cart. The admin screen says in amber that these are stand-ins; it cannot make anyone read it. Set them before payments open. |
 | **No-refunds wording** | `REFUND_POLICY` in `lib/legal.ts` | **Placeholder.** The substance was specified and the line is live and stored on every order, but the exact phrasing is still owed by the client. Currently "All sales are final. No refunds or exchanges." |
 | **Pickup notice wording** | `PICKUP_NOTICE` in `lib/legal.ts` | Mine, not the attorney's. The client asked for a line making clear that paying is not completing the sale; this is my attempt at it and should go past the attorney with the rest. |
 | **The footer disclaimer now contradicts the site** | `components/layout/Footer.tsx` line 110 | It reads "All firearm sales are conducted in person through a licensed dealer…", which was true when nothing was sold online. Accessories and optics now ship. The firearm half is still accurate; the sentence as a whole is not. This is legal-adjacent copy, so it is flagged rather than quietly rewritten. |
 | **No stock counts on unsized items** | `items` has no quantity column | Partly closed: an item with sizes now has a real per-size count that decrements on purchase and cannot oversell. An item *without* sizes still has no figure, so a shipped one — a patch, a sticker — can be ordered up to 10 regardless of what is on the shelf. Firearms are unaffected: the status column already models one unit per row. |
-| **The firearm disclaimer shows on apparel** | `components/inventory/PurchasePanel.tsx` | The attorney's text is on every product page, including a T-shirt, where the FFL sentence plainly does not apply. It was left in place rather than removed on our judgment — taking attorney-supplied copy off a page is the client's call. Worth asking whether they want it scoped to firearms only. The checkout checkbox must stay regardless, since a cart can mix both. |
+| ~~**The firearm disclaimer shows on apparel**~~ — **scoped, on the client's instruction.** | `needsFirearmDisclaimer()` in `lib/admin/constants.ts`, applied by `components/inventory/PurchasePanel.tsx` | The attorney's text now appears on firearms and ammunition only — `pistol`, `revolver`, `rifle`, `shotgun`, `pcc`, `ammunition`. It no longer appears on apparel, accessories, optics or magazines. **Two things for the client to take back to the attorney.** First, the list itself: that is our reading of "firearms and ammunition", and `magazine` is the debatable one — it is excluded here because a magazine is not a firearm and needs no FFL, but several states regulate capacity, so if the attorney wants it covered it is one entry in that array. Second, the text is unchanged, and it opens "Know your state and local laws before purchasing" — a sentence that applied usefully to a magazine and now does not appear on one. The no-refunds line still appears on every product, since it applies to everything. The checkout checkbox is untouched and still blocks payment on every order, firearms or not, because a cart can mix both — so nobody buys anything without accepting the terms. |
+| **Where the disclaimer lives is now a per-category decision** | `DISCLAIMER_CATEGORIES` in `lib/admin/constants.ts` | Worth knowing for later: a category added to the catalogue does **not** get the attorney's notice unless it is added to that array. If suppressors or other NFA items are ever stocked, that is a line to change and a lawyer to ask, not a default that will cover them. |
 | **Entry packs** | `ENTRY_PACKS` in `lib/payments/index.ts` | Empty and unimplemented, by decision. The order model's second line type exists so adding them later is an implementation rather than a migration. The client decides whether they exist at all. |
 | **Transfers to a buyer's own FFL** | not built | Out of scope for launch by decision: it needs licence collection, verification and per-order tracking. The order model can carry it; the flow is not built. Separate from `/transfers`, which handles inbound transfers into the shop. |
 

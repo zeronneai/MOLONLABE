@@ -27,8 +27,13 @@ export interface Database {
           price_display: string | null;
           price_cents: number | null;
           fulfillment_type: string;
+          shipping_tier: string;
           has_variants: boolean;
           status: string;
+          created_by: string | null;
+          created_by_name: string | null;
+          updated_by: string | null;
+          updated_by_name: string | null;
           is_featured: boolean | null;
           sort_order: number | null;
           images: Json;
@@ -48,8 +53,11 @@ export interface Database {
           price_display?: string | null;
           price_cents?: number | null;
           fulfillment_type?: string;
+          shipping_tier?: string;
           has_variants?: boolean;
           status?: string;
+          created_by_name?: string | null;
+          updated_by_name?: string | null;
           is_featured?: boolean | null;
           sort_order?: number | null;
           images?: Json;
@@ -69,8 +77,11 @@ export interface Database {
           price_display?: string | null;
           price_cents?: number | null;
           fulfillment_type?: string;
+          shipping_tier?: string;
           has_variants?: boolean;
           status?: string;
+          created_by_name?: string | null;
+          updated_by_name?: string | null;
           is_featured?: boolean | null;
           sort_order?: number | null;
           images?: Json;
@@ -91,6 +102,10 @@ export interface Database {
           status: string;
           winner_note: string | null;
           entries_per_dollar: number;
+          created_by: string | null;
+          created_by_name: string | null;
+          updated_by: string | null;
+          updated_by_name: string | null;
           created_at: string | null;
         };
         Insert: {
@@ -103,6 +118,8 @@ export interface Database {
           status?: string;
           winner_note?: string | null;
           entries_per_dollar?: number;
+          created_by_name?: string | null;
+          updated_by_name?: string | null;
           created_at?: string | null;
         };
         Update: {
@@ -115,6 +132,8 @@ export interface Database {
           status?: string;
           winner_note?: string | null;
           entries_per_dollar?: number;
+          created_by_name?: string | null;
+          updated_by_name?: string | null;
           created_at?: string | null;
         };
         Relationships: [
@@ -411,20 +430,54 @@ export interface Database {
           },
         ];
       };
+      admin_activity: {
+        Row: {
+          id: string;
+          at: string;
+          actor_id: string | null;
+          actor_name: string;
+          action: string;
+          entity: string;
+          entity_id: string | null;
+          entity_label: string | null;
+          field: string | null;
+          before_value: Json | null;
+          after_value: Json | null;
+        };
+        Insert: {
+          id?: string;
+          at?: string;
+          actor_id?: string | null;
+          actor_name: string;
+          action: string;
+          entity: string;
+          entity_id?: string | null;
+          entity_label?: string | null;
+          field?: string | null;
+          before_value?: Json | null;
+          after_value?: Json | null;
+        };
+        Update: { id?: string };
+        Relationships: [];
+      };
       settings: {
         Row: {
           key: string;
           value: Json;
           updated_at: string | null;
+          updated_by: string | null;
+          updated_by_name: string | null;
         };
         Insert: {
           key: string;
           value?: Json;
           updated_at?: string | null;
+          updated_by_name?: string | null;
         };
         Update: {
           key?: string;
           value?: Json;
+          updated_by_name?: string | null;
           updated_at?: string | null;
         };
         Relationships: [];
@@ -494,6 +547,7 @@ export type WinnerRow = Database["public"]["Tables"]["winners"]["Row"];
 export type InquiryInsert = Database["public"]["Tables"]["inquiries"]["Insert"];
 export type OrderRow = Database["public"]["Tables"]["orders"]["Row"];
 export type OrderItemRow = Database["public"]["Tables"]["order_items"]["Row"];
+export type ActivityRow = Database["public"]["Tables"]["admin_activity"]["Row"];
 export type ItemVariantRow = Database["public"]["Tables"]["item_variants"]["Row"];
 
 export type ItemStatus = "available" | "reserved" | "sold";

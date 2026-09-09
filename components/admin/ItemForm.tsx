@@ -11,6 +11,15 @@ import type { ItemRow } from "@/lib/database.types";
 import ImageUploader from "./ImageUploader";
 import VariantEditor, { type VariantDraft } from "./VariantEditor";
 
+const stamp = (iso: string | null | undefined) =>
+  iso
+    ? new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Denver",
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(new Date(iso))
+    : null;
+
 export default function ItemForm({
   item,
   variants = [],
@@ -164,6 +173,42 @@ export default function ItemForm({
           </p>
         </div>
 
+        {/* Only asked when the thing is actually posted. A collected
+            firearm has no postage tier, and offering one would imply it
+            might be shipped. */}
+        {fulfillment === "ship" && (
+          <div className="sm:col-span-2">
+            <p className="field-label">Postage tier</p>
+            <div className="seg mt-2">
+              <label className="control control-sm has-[:checked]:!bg-surface-sunken has-[:checked]:!border-muted has-[:checked]:!text-bone">
+                <input
+                  type="radio"
+                  name="shipping_tier"
+                  value="standard"
+                  defaultChecked={(item?.shipping_tier ?? "standard") !== "oversize"}
+                  className="sr-only"
+                />
+                Standard
+              </label>
+              <label className="control control-sm has-[:checked]:!bg-surface-sunken has-[:checked]:!border-amber has-[:checked]:!text-amber">
+                <input
+                  type="radio"
+                  name="shipping_tier"
+                  value="oversize"
+                  defaultChecked={item?.shipping_tier === "oversize"}
+                  className="sr-only"
+                />
+                Oversize
+              </label>
+            </div>
+            <p className="label mt-2 text-muted">
+              Standard is apparel and small accessories. Oversize is bulky
+              gear — cases, safes, anything that needs its own box. Rates are
+              set under Tax &amp; Shipping.
+            </p>
+          </div>
+        )}
+
         <VariantEditor initial={variants} initialEnabled={Boolean(item?.has_variants)} />
 
         <div className="sm:col-span-2">
@@ -264,6 +309,30 @@ export default function ItemForm({
       <button type="submit" disabled={pending} className="cta-primary control-go mt-10 w-full sm:w-auto">
         {pending ? "Saving…" : item ? "Save changes" : "Add item"}
       </button>
+
+      {/* Who touched this, quietly. Two people work in here and until now
+          there was no way to tell which of them changed a price. Names,
+          never email addresses, and never rendered outside the admin. */}
+      {item && (
+        <div className="mt-12 border-t hairline pt-5">
+          <dl className="space-y-1">
+            <div className="flex flex-wrap gap-x-2">
+              <dt className="label text-muted">Added</dt>
+              <dd className="label text-muted">
+                {item.created_by_name ?? "before this was tracked"}
+                {stamp(item.created_at) ? ` · ${stamp(item.created_at)}` : ""}
+              </dd>
+            </div>
+            <div className="flex flex-wrap gap-x-2">
+              <dt className="label text-muted">Last edited</dt>
+              <dd className="label text-muted">
+                {item.updated_by_name ?? "before this was tracked"}
+                {stamp(item.updated_at) ? ` · ${stamp(item.updated_at)}` : ""}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      )}
     </form>
   );
 }

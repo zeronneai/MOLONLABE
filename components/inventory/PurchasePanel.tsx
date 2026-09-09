@@ -24,6 +24,7 @@ export default function PurchasePanel({
   entriesEarned,
   campaignTitle,
   variants,
+  showDisclaimer,
 }: {
   itemId: string;
   /** Null when the item is not sold online. */
@@ -35,6 +36,11 @@ export default function PurchasePanel({
   campaignTitle: string | null;
   /** Empty for anything sold as a single unit. */
   variants: VariantOption[];
+  /**
+   * Firearms and ammunition only. Decided by the caller from the item's
+   * category so this component never has to know the taxonomy.
+   */
+  showDisclaimer: boolean;
 }) {
   const { add, lines } = useCart();
   const [added, setAdded] = useState(false);
@@ -121,13 +127,16 @@ export default function PurchasePanel({
         </p>
       )}
 
-      {/* Placement 1 of 3. Verbatim, never abridged, never behind a
-          "read more". */}
+      {/* Placement 1 of 3, and the only one that is conditional. Verbatim,
+          never abridged, never behind a "read more" — but only where it
+          applies. The refund line is on everything, because it is. */}
       <div className="mt-6 max-w-[62ch] border-t hairline pt-5">
         <p className="label text-muted">Before you buy</p>
-        <p className="mt-3 text-sm leading-relaxed text-muted">
-          {FIREARM_DISCLAIMER}
-        </p>
+        {showDisclaimer && (
+          <p className="mt-3 text-sm leading-relaxed text-muted">
+            {FIREARM_DISCLAIMER}
+          </p>
+        )}
         <p className="mt-3 text-sm leading-relaxed text-muted">
           {REFUND_POLICY}
         </p>

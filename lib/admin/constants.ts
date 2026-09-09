@@ -48,6 +48,35 @@ export const CATEGORIES = [
  */
 export const SHOP_CATEGORIES = ["apparel", "accessory"] as const;
 
+/**
+ * Which categories carry the attorney's firearms notice on their product
+ * page.
+ *
+ * Firearms and ammunition only. It used to be on everything, which meant
+ * it appeared on t-shirts — and a legal notice that turns up everywhere
+ * becomes one nobody reads, which weakens it exactly where it has to
+ * work. Magazines and optics are out because the notice is about
+ * transfers through an FFL, which is not what they are.
+ *
+ * The checkout checkbox is separate and still applies to every order,
+ * because a cart can mix a shirt and a pistol.
+ */
+export const DISCLAIMER_CATEGORIES = [
+  "pistol",
+  "revolver",
+  "rifle",
+  "shotgun",
+  "pcc",
+  "ammunition",
+] as const;
+
+export function needsFirearmDisclaimer(category: string): boolean {
+  return (DISCLAIMER_CATEGORIES as readonly string[]).includes(category);
+}
+
+/** Shipping tiers. Only meaningful for items that ship. */
+export const SHIPPING_TIERS = ["standard", "oversize"] as const;
+
 export function isShopCategory(category: string): boolean {
   return (SHOP_CATEGORIES as readonly string[]).includes(category);
 }

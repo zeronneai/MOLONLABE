@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { getSessionSupabase } from "@/lib/supabase/session";
 import AdminLogin from "@/components/admin/AdminLogin";
 import AdminShell from "@/components/admin/AdminShell";
+import { displayName } from "@/lib/admin/audit";
 
 export const metadata: Metadata = {
   title: "MLF Admin",
@@ -40,5 +41,5 @@ export default async function AdminLayout({
 
   if (!user) return <AdminLogin />;
 
-  return <AdminShell email={user.email ?? ""}>{children}</AdminShell>;
+  return <AdminShell who={displayName(user)}>{children}</AdminShell>;
 }
