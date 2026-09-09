@@ -412,11 +412,14 @@ export async function submitCheckout(
     confirmationToken: token,
   });
 
+  // Never allowed to fail the order: sendEmail resolves a result, it does
+  // not throw, and a false here only leaves confirmation_sent_at null.
   const sent = await sendEmail({
     to: data.customer.email,
     subject: email.subject,
     html: email.html,
     text: email.text,
+    orderNumber: number,
   });
   if (sent.sent) {
     await sb

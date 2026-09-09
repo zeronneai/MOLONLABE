@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
+import { emailProvider } from "@/lib/email/send";
 
 // Diagnostic endpoint: shows exactly why Supabase queries succeed or fail
 // at request time, without exposing secrets. Safe to leave deployed —
@@ -123,11 +124,16 @@ export async function GET() {
       // either missing the order still completes and is recorded, and the
       // receipt page says the copy could not be sent.
       orderConfirmations: {
-        provider: "resend",
-        configured: Boolean(
-          process.env.RESEND_API_KEY?.trim() &&
-            process.env.ORDER_EMAIL_FROM?.trim(),
-        ),
+        // EMAIL_PROVIDER picks the transport. Unset means apps_script.
+        provider: emailProvider(),
+        configured:
+          emailProvider() === "resend"
+            ? Boolean(
+                process.env.RESEND_API_KEY?.trim() &&
+                  process.env.ORDER_EMAIL_FROM?.trim(),
+              )
+            : Boolean(process.env.GOOGLE_SCRIPT_URL?.trim()),
+        EMAIL_PROVIDER: process.env.EMAIL_PROVIDER?.trim() || null,
         RESEND_API_KEY: { present: Boolean(process.env.RESEND_API_KEY?.trim()) },
         ORDER_EMAIL_FROM: process.env.ORDER_EMAIL_FROM?.trim() || null,
       },
