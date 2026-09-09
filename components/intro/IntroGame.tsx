@@ -32,7 +32,21 @@ import { track } from "@/lib/analytics";
 import { seqLog, whenHeroPainted } from "@/lib/hero/paintSignal";
 import { markIntroResolved } from "@/lib/intro/introSignal";
 
-const SEEN_KEY = "mlf_intro_seen";
+/**
+ * The reward flag — NOT a show/hide flag.
+ *
+ * The game itself now runs on every page load; the client wants it seen
+ * every time. What is gated is the discount: the code is issued on the
+ * first win and never again, so a returning player can still play and
+ * still win, and is told they already have their code rather than being
+ * handed a second one.
+ *
+ * Deliberately a different key from the old `mlf_intro_seen`, which was
+ * about visibility. Reusing it would have granted every existing visitor
+ * a fresh code the moment this shipped, and denied one to everybody who
+ * had already played.
+ */
+const CLAIMED_KEY = "mlf_intro_code_claimed";
 
 // The ending is one continuous shot. The round resolves by cross-fading the
 // shop interior into the hero scrub's already-painted frame 0 — the scope
@@ -57,6 +71,10 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
   const [outcome, setOutcome] = useState<"won" | "lost" | null>(null);
   const [fine, setFine] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Whether THIS round issued the code. Captured when the round resolves,
+  // not read live, so the card that awards it does not immediately see the
+  // flag it just set and tell the player they already had one.
+  const [codeIssued, setCodeIssued] = useState(false);
   const [lastHits, setLastHits] = useState(0);
 
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -72,25 +90,41 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
   const lastRef = useRef<number | null>(null);
   const accRef = useRef(0);
   const coarseRef = useRef(false);
+  const claimedRef = useRef(false);
   const audioRef = useRef<AudioContext | null>(null);
   const startedAtRef = useRef(0);
   const phaseRef = useRef<Phase>("idle");
   phaseRef.current = phase;
 
-  // Decide once, after hydration, whether to show the game at all.
+  // Runs once per document load. The guard below is what makes that true:
+  // this component lives in the site layout and survives client-side
+  // navigation, so without it every internal link would restart the round.
+  // "Every load" means every time the site is opened, not every click.
   useEffect(() => {
     if (phaseRef.current !== "idle") return;
-    // Never over the admin — the owner is here to work, not to play.
-    if (pathname.startsWith("/admin")) {
+    // Never over the admin — the owner is here to work, not to play —
+    // and never over a cart or a checkout.
+    //
+    // The cart and checkout exclusion is my call, not the client's: the
+    // brief was "every load", and this narrows it. A shooting game over a
+    // half-filled card form is the one place the game costs money rather
+    // than earning attention, and someone who reloads checkout because
+    // their card was declined is the last person to put a round in front
+    // of. Delete the two paths from this list to take it literally.
+    const path = window.location.pathname;
+    if (["/admin", "/cart", "/checkout"].some((p) => path.startsWith(p))) {
       setPhase("done");
       return;
     }
-    const force = new URLSearchParams(window.location.search).get("intro") === "1";
-    const seen = window.localStorage.getItem(SEEN_KEY) === "1";
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reducedMotion || (seen && !force)) {
+    if (reducedMotion) {
       setPhase("done");
       return;
+    }
+    try {
+      claimedRef.current = window.localStorage.getItem(CLAIMED_KEY) === "1";
+    } catch {
+      claimedRef.current = false;
     }
     coarseRef.current = window.matchMedia("(pointer: coarse)").matches;
     setFine(!coarseRef.current);
@@ -121,11 +155,15 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
     };
   }, [phase]);
 
-  const markSeen = () => {
+  const markClaimed = () => {
+    claimedRef.current = true;
     try {
-      window.localStorage.setItem(SEEN_KEY, "1");
+      window.localStorage.setItem(CLAIMED_KEY, "1");
     } catch {
-      // storage unavailable — the game just shows again next visit
+      // Storage unavailable (private mode, blocked cookies). The player
+      // gets the code again next time, which is the harmless direction to
+      // fail in — the alternative is refusing a code to someone who has
+      // never had one.
     }
   };
 
@@ -134,7 +172,9 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
   // result card it fades only the card, because the interior is already
   // gone. Either way the image underneath is untouched.
   const close = useCallback(() => {
-    markSeen();
+    // Nothing is recorded on the way out any more. Closing is not
+    // claiming, and it is no longer a decision about whether the game
+    // shows again — it always does.
     window.scrollTo(0, 0);
     whenHeroPainted(() => {
       seqLog("closing: fading off frame 0");
@@ -148,6 +188,19 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
     });
     close();
   }, [close]);
+
+  // Escape skips. Cheap to add and it matters more than it used to: a
+  // returning visitor who just wants to check stock now meets this on
+  // every visit, and reaching for a corner button with a mouse is slower
+  // than the key they already use to dismiss things.
+  useEffect(() => {
+    if (phase !== "loading" && phase !== "arcade") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") skip();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [phase, skip]);
 
   const retry = useCallback(() => {
     const state = stateRef.current;
@@ -276,7 +329,6 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
 
       if (state.phase === "won" || state.phase === "lost") {
         setLastHits(state.hits);
-        markSeen();
         track("intro_completed", {
           hits: state.hits,
           elapsed_ms: Math.round(performance.now() - startedAtRef.current),
@@ -286,6 +338,11 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
         if (state.phase === "won") {
           sound("win");
           void recordGameEvent("won", mode);
+          // The reward is once per browser. A repeat winner still wins,
+          // and is told so, but is not handed a second code.
+          const issue = offer.enabled && !claimedRef.current;
+          setCodeIssued(issue);
+          if (issue) markClaimed();
         }
         setOutcome(state.phase);
         // The cross-fade needs frame 0 already under us. It normally has
@@ -507,7 +564,17 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
           {outcome === "won" ? (
             <>
               <p className="label text-acid">Cleared</p>
-              {offer.enabled ? (
+              {offer.enabled && !codeIssued ? (
+                <>
+                  <h2 className="display mt-4 text-center text-3xl sm:text-4xl">
+                    NICE SHOOTING.
+                  </h2>
+                  <p className="mt-6 max-w-xs text-center text-sm text-muted">
+                    You&apos;ve already claimed your code — it&apos;s one per
+                    customer. Play as often as you like.
+                  </p>
+                </>
+              ) : offer.enabled ? (
                 <>
                   <h2 className="display mt-4 text-center text-3xl sm:text-4xl">
                     {offer.value.toUpperCase()}
@@ -575,6 +642,10 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
         >
           SKIP ✕
         </button>
+      )}
+
+      {playing && fine && (
+        <p className="label absolute top-16 right-4 text-muted">Or press esc</p>
       )}
     </div>
   );

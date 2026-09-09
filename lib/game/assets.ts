@@ -18,18 +18,14 @@ export const GAME_ASSETS = {
     "https://res.cloudinary.com/dsprn0ew4/image/upload/v1786484199/Firearms_showroom_interior_with___202608111535_a42wut.jpg",
     1080,
   ),
-  // chroma-cut sprites, clean edges, spill removed (~256KB all three)
-  alien1: cld(
-    "https://res.cloudinary.com/dsprn0ew4/image/upload/v1786489222/alien-1_ox2itj.webp",
+  // The target. One sprite for every spawn point — the three depth slots
+  // are still distinguished by tint and by how much help each gets against
+  // a bright backdrop, but they are the same artwork now, so the round
+  // fetches one image instead of three. That matters more than it used to:
+  // the game runs on every visit rather than only the first.
+  target: cld(
+    "https://res.cloudinary.com/dsprn0ew4/image/upload/v1788969345/ChatGPT_Image_Sep_9_2026_09_52_39_AM_cmyn3b.png",
     900,
-  ),
-  alien2: cld(
-    "https://res.cloudinary.com/dsprn0ew4/image/upload/v1786489222/alien-2_rgk1wu.webp",
-    900,
-  ),
-  alien3: cld(
-    "https://res.cloudinary.com/dsprn0ew4/image/upload/v1786489222/alien-3_rpqmel.webp",
-    500, // the pale one; only ever renders small at the distant anchors
   ),
   pistol: cld(
     "https://res.cloudinary.com/dsprn0ew4/image/upload/v1786484323/pistol_1_pqjirg.webp",
@@ -38,13 +34,14 @@ export const GAME_ASSETS = {
 };
 
 // --- Spawn anchors, normalized to the viewport -----------------------------
-// x/y: where the alien stands; y is the cover line (or floor line for open
-// points). scale: relative alien size (1 = near foreground).
-// sprite: '1'/'2' are cooler and darker — near and mid points where they
-// render large. '3' is noticeably lighter and reads better small — the two
-// most distant points only. Mirroring is randomized per spawn.
-// tint: 0..1 darker/cooler for depth (kept light on '3' — it earns its
-// distance slot by being pale).
+// x/y: where the target stands; y is the cover line (or floor line for
+// open points). scale: relative target size (1 = near foreground).
+// sprite: the depth slot, kept from when these were three different
+// sprites. They now share one image, so the slot no longer says anything
+// about the artwork — it says how far away the point is, which is what
+// drives the tint and how readily the backdrop halo kicks in. '3' is the
+// distant pair. Mirroring is randomized per spawn.
+// tint: 0..1 darker/cooler for depth.
 // expose: fraction of the sprite standing above the cover line when fully
 // up. Near anchors stay partially occluded — emerging from behind cover
 // reads better than floating — while mids show more and open points show
@@ -52,7 +49,8 @@ export const GAME_ASSETS = {
 // mode: 'rise' pops up from behind an occluder; 'pop' grows in place for
 // spots with nothing in front of them.
 // darkDrop: soft dark halo behind the sprite where the background is
-// bright (lit display cases) so a pale alien never disappears into it.
+// bright (lit display cases) so a small distant target never disappears
+// into it.
 
 export interface SpawnAnchor {
   x: number;
@@ -124,7 +122,7 @@ export const PISTOL_LAYOUT = {
 
 // --- Parallax (desktop only) ----------------------------------------------
 export const PARALLAX = {
-  bg: 0.02, // background + aliens + mid occluders
+  bg: 0.02, // background + targets + mid occluders
   fg: 0.05, // foreground crate band
   smoothing: 0.1, // per-frame lerp toward the cursor
   overscan: 1.07, // background drawn this much larger so edges never show
@@ -137,8 +135,11 @@ export const PARALLAX = {
  * pale sprite gets help sooner than a dark one.
  */
 export const BACKDROP = {
-  paleThreshold: 0.3, // above this mean luminance, ALIEN_3 needs a drop
-  darkThreshold: 0.5, // sprites 1 and 2 hold their own for longer
+  // The distant slot gets help sooner. It renders small, so it loses
+  // against a lit case at a lower background luminance than a large near
+  // target does.
+  paleThreshold: 0.3, // above this mean luminance, slot '3' needs a drop
+  darkThreshold: 0.5, // the near and mid slots hold their own for longer
   maxDrop: 0.62, // opacity of the halo at its strongest
   minFlagged: 0.35, // an anchor with darkDrop set never gets less than this
 };

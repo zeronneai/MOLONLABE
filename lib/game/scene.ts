@@ -1,7 +1,7 @@
 // Scene assembly over the photographed backgrounds: loads assets, builds
 // tinted sprite variants, and maps normalized anchors/occluders into
 // viewport pixels. Occluders are regions of the background re-cropped and
-// drawn on top of the aliens so rise-mode spawns emerge from behind cover.
+// drawn on top of the targets so rise-mode spawns emerge from behind cover.
 
 import {
   ASSET_LOAD_TIMEOUT_MS,
@@ -22,7 +22,7 @@ export interface SpawnPoint {
   anchor: SpawnAnchor;
   /**
    * How much dark halo this point needs, 0..1, measured from the actual
-   * background rather than guessed. A pale alien over a lit display case
+   * background rather than guessed. A small target over a lit display case
    * would otherwise disappear, and which points land on a lit case is a
    * property of the photograph, not of the code.
    */
@@ -45,9 +45,7 @@ export interface Occluder {
 export interface GameArt {
   bg: HTMLImageElement;
   portrait: boolean;
-  alien1: HTMLImageElement;
-  alien2: HTMLImageElement;
-  alien3: HTMLImageElement;
+  target: HTMLImageElement;
   pistol: HTMLImageElement;
 }
 
@@ -79,16 +77,86 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+/**
+ * Is the target sprite actually cut out?
+ *
+ * The targets are drawn straight onto a photograph, so a sprite exported
+ * with a solid background renders as a rectangle sitting on the shop
+ * floor. That is obvious once you see it and invisible in code review, and
+ * the asset lives on a CDN where it can be replaced without a deploy — so
+ * the game checks rather than assumes.
+ *
+ * Returns null when the check could not run (a tainted canvas, a zero-size
+ * image); a null is not a failure, just an unknown.
+ */
+export type CutoutReport = {
+  clean: boolean;
+  /** Fraction of the outer ring of pixels that is fully opaque. */
+  opaqueEdge: number;
+  /** Fraction of the whole image that is fully transparent. */
+  transparent: number;
+};
+
+export function inspectCutout(img: HTMLImageElement): CutoutReport | null {
+  try {
+    const w = Math.min(160, img.naturalWidth);
+    const h = Math.min(160, img.naturalHeight);
+    if (w < 4 || h < 4) return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0, w, h);
+    const { data } = ctx.getImageData(0, 0, w, h);
+
+    let edgeTotal = 0;
+    let edgeOpaque = 0;
+    let clear = 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const alpha = data[(y * w + x) * 4 + 3];
+        if (alpha < 8) clear++;
+        if (x === 0 || y === 0 || x === w - 1 || y === h - 1) {
+          edgeTotal++;
+          if (alpha > 250) edgeOpaque++;
+        }
+      }
+    }
+    const opaqueEdge = edgeOpaque / Math.max(1, edgeTotal);
+    const transparent = clear / Math.max(1, w * h);
+    // A cut-out sprite is transparent around its edges. A flat export is
+    // opaque all the way to the corners and has almost no clear pixels.
+    return { clean: opaqueEdge < 0.5 && transparent > 0.05, opaqueEdge, transparent };
+  } catch {
+    return null;
+  }
+}
+
 /** Preload everything for one orientation. Rejects → the game is skipped. */
 export async function loadGameArt(portrait: boolean): Promise<GameArt> {
-  const [bg, alien1, alien2, alien3, pistol] = await Promise.all([
+  const [bg, target, pistol] = await Promise.all([
     loadImage(portrait ? GAME_ASSETS.bgMobile : GAME_ASSETS.bgDesktop),
-    loadImage(GAME_ASSETS.alien1),
-    loadImage(GAME_ASSETS.alien2),
-    loadImage(GAME_ASSETS.alien3),
+    loadImage(GAME_ASSETS.target),
     loadImage(GAME_ASSETS.pistol),
   ]);
-  return { bg, portrait, alien1, alien2, alien3, pistol };
+
+  // Exposed in every environment so the asset can be checked against the
+  // deployed site from a console, not just in development.
+  const cutout = inspectCutout(target);
+  (window as unknown as { __mlfTargetCutout?: CutoutReport | null }).__mlfTargetCutout =
+    cutout;
+  if (process.env.NODE_ENV !== "production" && cutout && !cutout.clean) {
+    console.warn(
+      "[intro game] The target sprite does not look cut out: " +
+        `${Math.round(cutout.opaqueEdge * 100)}% of its outer edge is opaque and only ` +
+        `${Math.round(cutout.transparent * 100)}% of it is transparent. It will render ` +
+        "as a rectangle on the shop floor. Replace the asset with a PNG that has a " +
+        "real alpha channel.",
+    );
+  }
+
+  return { bg, portrait, target, pistol };
 }
 
 /** Load just the other orientation's background (device rotated mid-game). */
@@ -96,7 +164,7 @@ export async function loadBackground(portrait: boolean): Promise<HTMLImageElemen
   return loadImage(portrait ? GAME_ASSETS.bgMobile : GAME_ASSETS.bgDesktop);
 }
 
-/** Darker + cooler variant for distant aliens so depth reads. */
+/** Darker + cooler variant for distant targets so depth reads. */
 function tintSprite(img: HTMLImageElement, tint: number): CanvasImageSource {
   if (tint <= 0) return img;
   const canvas = document.createElement("canvas");
@@ -172,20 +240,23 @@ export function buildScene(art: GameArt, w: number, h: number): Scene {
     };
   };
 
-  const sources = { "1": art.alien1, "2": art.alien2, "3": art.alien3 } as const;
+  // One image behind all three depth slots. The slot still selects the
+  // tint and the backdrop threshold; it no longer selects artwork.
+  const sources = { "1": art.target, "2": art.target, "3": art.target } as const;
   const spawnPoints: SpawnPoint[] = anchors.map((anchor) => {
     const source = sources[anchor.sprite];
     const aspect = source.naturalHeight / Math.max(1, source.naturalWidth);
     const width = Math.min(w, h) * 0.24 * anchor.scale;
-    // Sample what is actually behind this point, over the box the alien
+    // Sample what is actually behind this point, over the box the target
     // occupies when fully up.
     const height = width * aspect;
     const region = toSource(anchor.x * w - width / 2, anchor.y * h - height, width, height);
     const luma = sampleLuminance(art.bg, region.sx, region.sy, region.sw, region.sh);
 
-    // Pale sprites need help sooner than dark ones. Below the threshold the
-    // background is doing the work already and a halo would just look like
-    // a smudge.
+    // Distant points need help sooner: they render small, so they lose
+    // against a lit case at a lower background luminance. Below the
+    // threshold the background is doing the work already and a halo would
+    // just look like a smudge.
     const threshold = anchor.sprite === "3" ? BACKDROP.paleThreshold : BACKDROP.darkThreshold;
     const measured =
       luma === null

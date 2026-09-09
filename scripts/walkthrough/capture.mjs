@@ -40,14 +40,31 @@ const skipped = [];
 
 const browser = await chromium.launch();
 
-/** A context that has already cleared the intro game and the age gate. */
+/**
+ * A context with the age gate already answered.
+ *
+ * The intro game no longer has a "seen" flag to set — it runs on every
+ * load by design — so pages that are not about the game have to skip past
+ * it. `dismissIntro` does that after each navigation.
+ */
 async function seen(viewport) {
   const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2 });
   await ctx.addInitScript(() => {
     window.localStorage.setItem("mlf_age_ok", "1");
-    window.localStorage.setItem("mlf_intro_seen", "1");
   });
   return ctx;
+}
+
+/** Clears the intro overlay if it is up. Safe to call when it is not. */
+async function dismissIntro(page) {
+  const skip = page.getByRole("button", { name: /^SKIP/ });
+  try {
+    await skip.waitFor({ state: "visible", timeout: 8000 });
+    await skip.click();
+    await page.waitForTimeout(1200);
+  } catch {
+    // Not showing — reduced motion, an asset failure, or already closed.
+  }
 }
 
 async function shoot(page, id, opts = {}) {
@@ -104,15 +121,16 @@ await section("02 age gate", async () => {
     viewport: { width: 1440, height: 900 },
     deviceScaleFactor: 2,
   });
-  // Intro seen but age not yet answered: exactly the moment the gate
-  // stands on its own.
+  // Age not yet answered, so the gate stands on its own once the game
+  // has been skipped below.
   await ctx.addInitScript(() => {
-    window.localStorage.setItem("mlf_intro_seen", "1");
     window.localStorage.removeItem("mlf_age_ok");
   });
   const page = await ctx.newPage();
   await page.goto(BASE, { waitUntil: "networkidle" });
-  await page.waitForTimeout(2500);
+  // The game runs first even here; skip it so the gate stands alone.
+  await dismissIntro(page);
+  await page.waitForTimeout(2000);
   await shoot(page, "agegate");
   await ctx.close();
 });
@@ -122,7 +140,8 @@ await section("03 hero", async () => {
   const ctx = await seen({ width: 1440, height: 900 });
   const page = await ctx.newPage();
   await page.goto(BASE, { waitUntil: "networkidle" });
-  await page.waitForTimeout(2500);
+  await dismissIntro(page);
+  await page.waitForTimeout(2000);
   // Three points across the scrub so the pull-back reads as a sequence.
   const stops = [0, 0.45, 0.9];
   for (let i = 0; i < stops.length; i++) {
@@ -141,6 +160,7 @@ await section("04 inventory", async () => {
   const ctx = await seen({ width: 1440, height: 900 });
   const page = await ctx.newPage();
   await page.goto(`${BASE}/inventory`, { waitUntil: "networkidle" });
+  await dismissIntro(page);
   await page.waitForTimeout(1200);
   // Hover a row so the panel on the right is showing something.
   const row = page.locator(".edx-row").nth(1);
@@ -157,6 +177,7 @@ await section("05 item detail", async () => {
   const ctx = await seen({ width: 1440, height: 1000 });
   const page = await ctx.newPage();
   await page.goto(`${BASE}/inventory`, { waitUntil: "networkidle" });
+  await dismissIntro(page);
   const href = await page
     .locator('a[href^="/inventory/"]')
     .first()
@@ -176,6 +197,7 @@ await section("06 featured", async () => {
   const ctx = await seen({ width: 1440, height: 1000 });
   const page = await ctx.newPage();
   await page.goto(`${BASE}/featured`, { waitUntil: "networkidle" });
+  await dismissIntro(page);
   await page.waitForTimeout(1600);
   await shoot(page, "featured-top");
   const form = page.locator("form").last();

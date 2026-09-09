@@ -9,7 +9,7 @@
 export const READY_MS = 900; // "READY" card
 export const GO_MS = 500; // "GO" card
 export const RELOAD_MS = 700; // reload downtime
-export const RISE_MS = 130; // alien pop-up / duck animation
+export const RISE_MS = 130; // target pop-up / duck animation
 
 // The one transition in the ending: the shop interior cross-fades into the
 // hero scrub's frame 0 (the scope view) when the round resolves. Everything
@@ -20,11 +20,11 @@ export const CROSSFADE_MS = 300;
 export const DESKTOP_TUNING = {
   roundMs: 10_000, // round length
   targetCount: 8, // hits needed to win
-  popMinMs: 500, // alien stays up between these...
+  popMinMs: 500, // target stays up between these...
   popMaxMs: 900, // ...before ducking
   spawnStartMs: 850, // spawn interval at round start
   spawnEndMs: 420, // spawn interval at round end (accelerates)
-  maxUp: 3, // max aliens up at once
+  maxUp: 3, // max targets up at once
   hitboxGrow: 1.0,
   magSize: 6, // shots per magazine
 };

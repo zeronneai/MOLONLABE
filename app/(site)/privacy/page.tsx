@@ -32,8 +32,11 @@ export const metadata: Metadata = {
 //   - submissions are also POSTed to a Google Apps Script endpoint that
 //     appends a sheet row and emails the owner (GOOGLE_SCRIPT_URL)
 //   - GA4 runs on the public site only, never on /admin
-//   - localStorage holds three flags: mlf_intro_seen, mlf_age_ok,
-//     mlf_admin_lock. None identify a person.
+//   - localStorage holds four flags: mlf_intro_code_claimed, mlf_age_ok,
+//     mlf_admin_lock and mlf_cart. None identify a person. The intro game
+//     no longer records that it has been seen — it runs every visit — and
+//     mlf_intro_seen is a leftover on returning browsers that nothing
+//     reads.
 // ---------------------------------------------------------------------------
 
 const UPDATED = "August 2026";
@@ -124,11 +127,12 @@ export default function PrivacyPage() {
             Analytics does not run on the shop&apos;s own admin pages.
           </p>
           <p className="mt-4">
-            The site also stores three small flags in your browser&apos;s local
-            storage: whether you have seen the intro, whether you have
-            confirmed your age, and a counter that slows down repeated failed
-            admin logins. None of them identify you, and clearing your browser
-            data removes them.
+            The site also stores a few small things in your browser&apos;s local
+            storage: whether you have already claimed the intro game&apos;s
+            discount code, whether you have confirmed your age, what is in your
+            cart, and a counter that slows down repeated failed admin logins.
+            None of them identify you, and clearing your browser data removes
+            them.
           </p>
         </Section>
 

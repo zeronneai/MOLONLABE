@@ -1,4 +1,4 @@
-// Frame renderer over the photographic scene. Order: background → aliens
+// Frame renderer over the photographic scene. Order: background → targets
 // → occluders (bg-speed patches, then the fg crate band) → pistol →
 // muzzle bloom → HUD → vignette, chromatic fringe, grain → reticle.
 // Desktop gets mouse-look parallax; mobile renders everything fixed.
@@ -107,7 +107,7 @@ export function renderFrame(
   const { dx, dy, dw, dh } = scene.bgDraw;
   ctx.drawImage(scene.art.bg, dx + bgOff.x, dy + bgOff.y, dw, dh);
 
-  // aliens (bg layer speed)
+  // targets (bg layer speed)
   for (const target of state.targets) {
     if (riseProgress(target) <= 0.01) continue;
     const sp = state.spawnPoints[target.sp];
@@ -149,7 +149,7 @@ export function renderFrame(
   }
   ctx.globalAlpha = 1;
 
-  // occluders: re-cropped background regions the rise-mode aliens emerge behind
+  // occluders: re-cropped background regions the rise-mode targets emerge behind
   for (const oc of scene.occluders) {
     const off = oc.layer === "fg" ? fgOff : bgOff;
     ctx.drawImage(
