@@ -113,8 +113,54 @@ export async function GET() {
       NEXT_PUBLIC_SUPABASE_URL: describeUrl(rawUrl),
       NEXT_PUBLIC_SUPABASE_ANON_KEY: describeKey(rawAnon),
       SUPABASE_SERVICE_ROLE_KEY: describeKey(rawService),
-      GOOGLE_SCRIPT_URL: { present: Boolean(process.env.GOOGLE_SCRIPT_URL) },
     },
+
+    // Which of the two mail paths are actually configured. Presence only
+    // — a key is never echoed, and the from-address is shown because a
+    // typo in it is a common cause of silent non-delivery.
+    email: {
+      // Customer order confirmations, via Resend. Both are required; with
+      // either missing the order still completes and is recorded, and the
+      // receipt page says the copy could not be sent.
+      orderConfirmations: {
+        provider: "resend",
+        configured: Boolean(
+          process.env.RESEND_API_KEY?.trim() &&
+            process.env.ORDER_EMAIL_FROM?.trim(),
+        ),
+        RESEND_API_KEY: { present: Boolean(process.env.RESEND_API_KEY?.trim()) },
+        ORDER_EMAIL_FROM: process.env.ORDER_EMAIL_FROM?.trim() || null,
+      },
+      // Everything that reaches the owner — inquiries, transfer requests,
+      // free entries, order placed, and the urgent order failures. Missing
+      // means those notifications are silently dropped.
+      ownerNotifications: {
+        provider: "google apps script",
+        configured: Boolean(process.env.GOOGLE_SCRIPT_URL?.trim()),
+        GOOGLE_SCRIPT_URL: {
+          present: Boolean(process.env.GOOGLE_SCRIPT_URL?.trim()),
+        },
+      },
+    },
+
+    payments: {
+      NEXT_PUBLIC_AUTHORIZENET_ENV:
+        process.env.NEXT_PUBLIC_AUTHORIZENET_ENV?.trim() || null,
+      AUTHORIZENET_API_LOGIN_ID: {
+        present: Boolean(process.env.AUTHORIZENET_API_LOGIN_ID?.trim()),
+      },
+      AUTHORIZENET_TRANSACTION_KEY: {
+        present: Boolean(process.env.AUTHORIZENET_TRANSACTION_KEY?.trim()),
+      },
+      NEXT_PUBLIC_AUTHORIZENET_CLIENT_KEY: {
+        present: Boolean(
+          process.env.NEXT_PUBLIC_AUTHORIZENET_CLIENT_KEY?.trim(),
+        ),
+      },
+    },
+
+    // The confirmation email's links are absolute and are built from this.
+    NEXT_PUBLIC_SITE_URL: describeUrl(process.env.NEXT_PUBLIC_SITE_URL),
   };
 
   if (rawUrl?.trim() && rawAnon?.trim()) {

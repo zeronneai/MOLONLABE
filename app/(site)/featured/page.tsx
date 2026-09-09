@@ -10,6 +10,7 @@ import { INSTAGRAM_HANDLE, INSTAGRAM_URL } from "@/lib/brand";
 import { getLiveCampaign } from "@/lib/db/campaigns";
 import { getEntrantTotal, getEntryTotal, getWinners } from "@/lib/db/entries";
 import { itemImages } from "@/lib/db/items";
+import { ENTRY_CLAIM, freeEntryStep } from "@/lib/legal";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/featured" },
   title: "Current Feature",
   description:
-    "The current sweepstakes feature at Molon Labe Firearms x SunCity Outdoors, El Paso, TX. No purchase necessary to enter.",
+    `The current sweepstakes feature at Molon Labe Firearms x SunCity Outdoors, El Paso, TX. ${ENTRY_CLAIM.short}`,
 };
 
 // Step one depends on whether the paid tier exists. Describing packs
@@ -29,13 +30,7 @@ export const metadata: Metadata = {
 const steps = (entriesPerDollar: number) => [
   {
     n: "01",
-    title: entriesPerDollar > 0 ? "Enter free, or shop" : "Enter free",
-    body:
-      entriesPerDollar > 0
-        ? `One entry, no purchase, no catch — the form below is all it takes. Every dollar you spend in the shop earns ${
-            entriesPerDollar === 1 ? "another entry" : `${entriesPerDollar} more`
-          } on top. A free entry is worth exactly what an earned one is worth.`
-        : "One entry, no purchase, no catch. Fill in the form below and you are in the draw.",
+    ...freeEntryStep(entriesPerDollar),
   },
   {
     n: "02",
@@ -255,8 +250,7 @@ function RulesLink() {
         Official sweepstakes rules
       </Link>
       <p className="mt-2 max-w-[60ch] text-xs text-muted">
-        No purchase necessary. A purchase does not improve your chances of
-        winning. Void where prohibited.
+        {ENTRY_CLAIM.statement}
       </p>
     </div>
   );

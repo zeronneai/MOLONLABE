@@ -9,6 +9,7 @@
 import { useActionState, useEffect, useRef } from "react";
 import { submitFreeEntry, type EntryState } from "@/app/actions/entry";
 import { track } from "@/lib/analytics";
+import { ENTRY_CLAIM } from "@/lib/legal";
 
 const initial: EntryState = { status: "idle" };
 
@@ -35,8 +36,7 @@ export default function FreeEntry({ campaignId }: { campaignId: string }) {
         <p className="label text-acid">You&apos;re in</p>
         <p className="display mt-4 text-2xl sm:text-3xl">ENTRY RECEIVED.</p>
         <p className="mt-4 max-w-[52ch] text-sm text-muted">
-          {state.message ??
-            "One entry, no purchase, same odds per entry as any other. We'll email the winner and post the result here."}
+          {state.message ?? ENTRY_CLAIM.received}
         </p>
       </div>
     );
@@ -44,12 +44,10 @@ export default function FreeEntry({ campaignId }: { campaignId: string }) {
 
   return (
     <div className="border border-bone p-8 sm:p-10">
-      <p className="label text-acid">Free entry — no purchase necessary</p>
+      <p className="label text-acid">{ENTRY_CLAIM.formLabel}</p>
       <h3 className="display mt-4 text-2xl sm:text-3xl">ENTER WITHOUT BUYING.</h3>
       <p className="mt-4 max-w-[60ch] text-sm leading-relaxed text-muted">
-        A free entry counts the same as a purchased one. Fill this in and
-        you are entered — there is nothing else to do, nothing to buy, and
-        no step behind this one.
+        {ENTRY_CLAIM.formBody}
       </p>
 
       <form action={action} className="mt-8" onFocusCapture={onFirstInput}>

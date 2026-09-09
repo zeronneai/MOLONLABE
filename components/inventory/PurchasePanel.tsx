@@ -12,7 +12,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/lib/cart/store";
 import { formatUsd } from "@/lib/money";
-import { FIREARM_DISCLAIMER, PICKUP_NOTICE, REFUND_POLICY } from "@/lib/legal";
+import { FIREARM_DISCLAIMER, PICKUP_NOTICE, REFUND_POLICY, ENTRY_CLAIM} from "@/lib/legal";
 import type { FulfillmentType, VariantOption } from "@/lib/cart/types";
 
 export default function PurchasePanel({
@@ -75,7 +75,7 @@ export default function PurchasePanel({
           Earns {entriesEarned} {entriesEarned === 1 ? "entry" : "entries"}
           {campaignTitle ? ` in ${campaignTitle}` : ""}.{" "}
           <Link href="/featured" className="underline hover:text-bone">
-            No purchase necessary to enter
+            {ENTRY_CLAIM.link}
           </Link>
           .
         </p>

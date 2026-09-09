@@ -15,6 +15,7 @@ import {
   PICKUP_NOTICE,
   REFUND_POLICY,
   SHIPPING_NOTICE,
+  ENTRY_CLAIM,
 } from "@/lib/legal";
 import { SHOP_ADDRESS, SHOP_NAME, SHOP_PHONE_DISPLAY, SITE_URL } from "@/lib/brand";
 import { RECEIPT_TTL_LABEL, receiptUrl } from "@/lib/receipt";
@@ -158,7 +159,7 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
         <p style="margin:0;font-size:15px;line-height:1.55;color:#1f3a1a">
           This order earned <strong>${order.entriesAwarded} ${order.entriesAwarded === 1 ? "entry" : "entries"}</strong>${
             order.campaignTitle ? ` in ${escapeHtml(order.campaignTitle)}` : ""
-          }.${totalSentence} No purchase is necessary to enter — the free method is at
+          }.${totalSentence} ${ENTRY_CLAIM.link} — the free method is at
           <a href="${SITE_URL}/featured" style="color:#2e5f28">${SITE_URL}/featured</a>.
         </p>
       </div>`
@@ -273,7 +274,7 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
                 `You now have ${order.entriesTotal} ${order.entriesTotal === 1 ? "entry" : "entries"} in total.`,
               ]
             : []),
-          `No purchase is necessary to enter: ${SITE_URL}/featured`,
+          `${ENTRY_CLAIM.link}: ${SITE_URL}/featured`,
         ]
       : []),
     ``,

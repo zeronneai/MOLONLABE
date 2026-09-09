@@ -8,7 +8,9 @@ import {
   PICKUP_NOTICE,
   REFUND_POLICY,
   SHIPPING_NOTICE,
+  ENTRY_CLAIM,
 } from "@/lib/legal";
+
 import {
   DIRECTIONS_URL,
   SHOP_ADDRESS,
@@ -210,7 +212,7 @@ export default async function ConfirmationPage({
               </>
             )}
             <Link href="/featured" className="underline hover:text-bone">
-              No purchase is necessary to enter
+              {ENTRY_CLAIM.link}
             </Link>
             .
           </p>

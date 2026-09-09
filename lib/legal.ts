@@ -56,3 +56,84 @@ export const PICKUP_NOTICE =
 /** Shown against shipped lines, so the two routes read as deliberate. */
 export const SHIPPING_NOTICE =
   "Ships to the address you give at checkout. Nothing in this group requires a background check.";
+
+// ---------------------------------------------------------------------
+// The entry program's no-purchase claims
+// ---------------------------------------------------------------------
+//
+// Every sentence on the site that asserts a person can enter without
+// buying anything. They were written in eight different files and drifted
+// already — the same claim appeared as both "No purchase necessary to
+// enter" and "No purchase is necessary to enter".
+//
+// They are gathered here for one reason: the client has asked twice to
+// remove the no-purchase method, and it is with his attorney. If that
+// model changes, every one of these becomes false at the same moment, and
+// one of them now lives in a customer's inbox rather than on a page we
+// control. Scattered, that is a copy hunt with no way to know it finished.
+//
+// To remove the claim: delete the key. TypeScript then names every place
+// that asserted it and the build fails until each has been dealt with
+// deliberately — a claim about a prize draw should not be removable by
+// forgetting. Verified: emptying this object produces 12 errors across
+// four files, which is every site that makes the claim.
+//
+// The exception is `freeEntryStep` below, which is a function rather than
+// a key. Its two sentences make the same claim and have to be rewritten
+// by hand; nothing will fail the build for them. It is here so that the
+// hand edit is in the same file as everything else.
+//
+// Nothing here is the attorney's text. It is my wording of a standard
+// disclosure and should be read alongside the rules when he returns them.
+export const ENTRY_CLAIM = {
+  /**
+   * The short form: a link label on the product page, in the cart and on
+   * the receipt, and the sentence in the confirmation email that carries
+   * a URL after it. One string for all four — this is where the two
+   * spellings were.
+   */
+  link: "No purchase necessary to enter",
+
+  /** The full disclosure. Footnotes, and the head of the rules page. */
+  statement:
+    "No purchase necessary to enter or win. A purchase does not improve your chances of winning. Void where prohibited.",
+
+  /** Compressed, for page metadata and search results. */
+  short: "No purchase necessary.",
+
+  /** The free entry form's own heading. */
+  formLabel: "Free entry — no purchase necessary",
+
+  /** The form's standing explanation of what a free entry is worth. */
+  formBody:
+    "A free entry counts the same as a purchased one. Fill this in and you are entered — there is nothing else to do, nothing to buy, and no step behind this one.",
+
+  /** Shown after a free entry lands, when the server sends no message. */
+  received:
+    "One entry, no purchase, same odds per entry as any other. We'll email the winner and post the result here.",
+} as const;
+
+/**
+ * Step one of "how it works" on /featured.
+ *
+ * A function because the sentence changes shape with the campaign's rate,
+ * and both shapes make the same claim — so both belong here rather than
+ * one being centralised and the other left behind in the page.
+ */
+export function freeEntryStep(entriesPerDollar: number): {
+  title: string;
+  body: string;
+} {
+  if (entriesPerDollar <= 0) {
+    return {
+      title: "Enter free",
+      body: "One entry, no purchase, no catch. Fill in the form below and you are in the draw.",
+    };
+  }
+  return {
+    title: "Enter free, or shop",
+    body: `One entry, no purchase, no catch — the form below is all it takes. Every dollar you spend in the shop earns ${
+      entriesPerDollar === 1 ? "another entry" : `${entriesPerDollar} more`
+    } on top. A free entry is worth exactly what an earned one is worth.`,
+  };
+}

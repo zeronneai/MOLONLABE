@@ -14,7 +14,7 @@ import Image from "next/image";
 import { useCart } from "@/lib/cart/store";
 import { quoteCart } from "@/app/actions/cart";
 import { formatUsd } from "@/lib/money";
-import { PICKUP_NOTICE, SHIPPING_NOTICE } from "@/lib/legal";
+import { PICKUP_NOTICE, SHIPPING_NOTICE, ENTRY_CLAIM} from "@/lib/legal";
 import { lineKey, type PricedCart, type PricedLine } from "@/lib/cart/types";
 import EmptyState from "@/components/ui/EmptyState";
 
@@ -123,7 +123,7 @@ export default function CartView() {
               {cart.campaign ? ` in ${cart.campaign.title}` : ""}.
               <br />
               <Link href="/featured" className="text-muted underline hover:text-bone">
-                No purchase necessary to enter
+                {ENTRY_CLAIM.link}
               </Link>
             </p>
           )}
