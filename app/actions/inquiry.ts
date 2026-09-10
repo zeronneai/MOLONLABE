@@ -71,8 +71,13 @@ export async function submitInquiry(
 
   await notifyOwner({
     kind: "inquiry",
-    ...row,
+    type: data.type,
+    item_id: row.item_id ?? null,
     item_slug: data.item_slug || null,
+    name: row.name,
+    email: row.email,
+    phone: row.phone ?? null,
+    message: row.message ?? null,
   });
 
   return { status: "success" };

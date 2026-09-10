@@ -14,15 +14,18 @@ wired up. It exists for the day the client has a domain — see
 | Method | `POST`, `content-type: application/json` |
 | Sent by | `lib/notify.ts` (owner) and `lib/email/send.ts` (customer) |
 | Every payload has | `kind` and `submitted_at` (ISO 8601, UTC) |
+| Every owner-facing payload has | `summary` — pre-rendered plain text, ready to print |
 
 Two things the script must honour:
 
-1. **The customer's email arrives already rendered.** `kind:
-   "order_confirmation"` carries finished `html` and `text`. Send them as
-   they are. Do not rebuild the email in the script — the design, the
-   attorney's disclaimer and the running entry total live in
-   `lib/email/orderConfirmation.ts`, and a second copy in Apps Script is
-   a second thing to keep in step and one nothing here can test.
+1. **Nothing needs formatting.** The customer's email arrives already
+   rendered — `kind: "order_confirmation"` carries finished `html` and
+   `text`, send them as they are. Every owner-facing kind carries
+   **`summary`**, a plain-text block written to be printed as the body of
+   the owner's email with no assembly at all. Both exist so there is one
+   opinion about wording and about which fields matter, and it lives
+   where it can be tested. A script that rebuilds either is a second copy
+   to keep in step.
 
 2. **Answer quickly and never make the site wait.** The request is made
    with a 15-second timeout and its result only decides whether
@@ -108,9 +111,14 @@ All four site forms. `type` says which: `item`, `transfer`, `general`,
   "phone": "915-555-0142",
   "message": null,
   "item_slug": null,
+  "summary": "FFL TRANSFER REQUEST\nAlma Cortez · alma.cortez@example.com · (915) 555-0142",
   "submitted_at": "2026-09-09T21:59:47.493Z"
 }
 ```
+
+`summary` opens with the request type in words — ITEM ENQUIRY, FFL
+TRANSFER REQUEST, GENERAL MESSAGE or SERVICE REQUEST — then who it was,
+then the item if there is one, then the message.
 
 `phone`, `message`, `item_id` and `item_slug` are `null` when not given —
 present as keys, never absent. `item_id` and `item_slug` are set only for
@@ -128,6 +136,7 @@ A free entry was submitted.
   "phone": "915-555-0188",
   "campaign": "September Rifle Giveaway",
   "method": "free",
+  "summary": "FREE ENTRY — September Rifle Giveaway\nMarco Peña · marco.pena@example.com · (915) 555-0188\n\nNo purchase. One entry.",
   "submitted_at": "2026-09-09T22:00:08.108Z"
 }
 ```
@@ -144,57 +153,128 @@ why it can report whether that worked.
 ```json
 {
   "kind": "order",
-  "order_number": "MLF-AFUVLU",
-  "total_cents": 2299,
+  "order_number": "MLF-FB259M",
   "name": "Dana Ruiz",
   "email": "dana.ruiz@example.com",
-  "phone": null,
-  "ships": ["Skull Patch"],
-  "collects": [],
-  "entries_awarded": 12,
+  "phone": "9155550100",
+  "subtotal_cents": 223100,
+  "tax_cents": 18406,
+  "shipping_cents": 1000,
+  "total_cents": 242506,
+  "card_brand": "Visa",
+  "card_last4": "1111",
+  "ships": ["Molon Labe Tee"],
+  "collects": ["SIG MPX Carbon"],
+  "ship_lines": [
+    { "name": "Molon Labe Tee", "size": "Medium", "quantity": 1, "line_total_cents": 3200 }
+  ],
+  "pickup_lines": [
+    { "name": "SIG MPX Carbon", "size": null, "quantity": 1, "line_total_cents": 219900 }
+  ],
+  "entries_awarded": 2231,
+  "campaign": "September Rifle Giveaway",
   "confirmation_emailed": true,
-  "submitted_at": "2026-09-09T21:59:50.618Z"
+  "summary": "NEW ORDER — MLF-FB259M\nDana Ruiz · …",
+  "submitted_at": "2026-09-10T14:52:53.864Z"
 }
+```
+
+`summary` renders as:
+
+```
+NEW ORDER — MLF-FB259M
+Dana Ruiz · dana.ruiz@example.com · (915) 555-0100
+
+COLLECT AT SHOP
+  SIG MPX Carbon — $2,199.00
+
+SHIPS
+  Molon Labe Tee, Medium — $32.00
+
+Subtotal $2,231.00 · Tax $184.06 · Shipping $10.00
+Total $2,425.06 · Visa ending 1111
+
+Earned 2231 entries in September Rifle Giveaway.
+
+Background check due at pickup.
 ```
 
 | Field | Notes |
 | --- | --- |
-| `total_cents` | Integer cents. `2299` is $22.99 |
-| `ships` | Item names going in the post. Array, possibly empty |
-| `collects` | Item names collected at the counter. **A non-empty `collects` means somebody is driving to the shop and a background check is due** |
+| `*_cents` | Integer cents. `242506` is $2,425.06 |
+| `phone` | **As the customer typed it.** The summary formats it; the field is raw, so the sheet keeps what was actually entered |
+| `ships` / `collects` | Item names only. Unchanged, for the sheet columns that already exist |
+| `ship_lines` / `pickup_lines` | The same lines with size, quantity and price. What the summary is built from |
 | `entries_awarded` | This order only, not the running total |
-| `confirmation_emailed` | `false` means the customer has no copy and needs one sent by hand |
+| `confirmation_emailed` | `false` means the customer has no copy. The summary says so in words too |
 
-An order can have both `ships` and `collects` — an optic in the post and
-a pistol at the counter is one order.
+`ships`/`collects` duplicate what is in `ship_lines`/`pickup_lines` and
+are kept only so the existing sheet does not break. They can go once its
+columns read the detailed arrays.
+
+An order can have both — an optic in the post and a pistol at the counter
+is one order. **A non-empty `collects` means somebody is driving to the
+shop and a background check is due**, which is why the summary ends with
+that line.
 
 ### `order_error` → the shop, urgently
 
-Three cases, each with `severity: "urgent"`. These want a different
-subject line and probably a different colour in the sheet.
+Three cases, each with `severity: "urgent"` and a `failure` field naming
+which. **Read `failure`, not `message`** — the message is prose and the
+three payloads differ in shape.
 
 ```json
 {
   "kind": "order_error",
   "severity": "urgent",
+  "failure": "charged_not_saved",
   "message": "A card was charged but the order could not be saved.",
-  "transaction_id": "60000123456",
-  "order_number": "MLF-AFUVLU",
+  "order_number": "MLF-QQLQR6",
+  "transaction_id": "60000344344",
   "total_cents": 2299,
   "email": "dana.ruiz@example.com",
-  "submitted_at": "2026-09-09T21:59:50.618Z"
+  "summary": "!!!!!!!!!!…",
+  "submitted_at": "2026-09-10T14:55:02.118Z"
 }
 ```
 
-| `message` | What happened | Fields carried |
+| `failure` | What happened | Extra fields |
 | --- | --- | --- |
-| `A card was charged but the order could not be saved.` | **The bad one.** Money moved and nothing recorded it. The buyer was told not to pay again and to call with the order number | `transaction_id`, `order_number`, `total_cents`, `email` |
-| `Order saved but its line items did not.` | The order exists with totals but no lines | `order_number` |
-| `Order <number> did not receive its <n> entries.` | The purchase earned entries that were not credited. Fixable by hand before the draw | `order_number`, `email` |
+| `charged_not_saved` | **The bad one.** Money moved and nothing recorded it | `transaction_id`, `total_cents`, `email` |
+| `lines_not_saved` | The order exists with totals but no line items | — |
+| `entries_not_awarded` | The purchase earned entries that were not credited | `email`, `entries_awarded` |
 
-Fields not listed for a case are absent, not null — the payloads differ
-in shape between the three. Read `message` to tell them apart, or check
-for `transaction_id`, which only the first carries.
+The `charged_not_saved` summary is deliberately impossible to skim past:
+
+```
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!  A CARD WAS CHARGED AND THE ORDER WAS   !!
+!!  NOT SAVED. NOTHING RECORDED THIS SALE. !!
+!!  ACT NOW.                               !!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+----------------------------------------------
+A card was charged but the order could not be saved.
+----------------------------------------------
+
+Order number  MLF-QQLQR6
+Charged       $22.99
+Transaction   60000344344
+Customer      dana.ruiz@example.com
+
+The customer has been told not to pay again and to call
+with this order number. The money is at the gateway and
+the order is not in the database. Find the transaction in
+Authorize.net and write the order up by hand.
+```
+
+The other two open with `!! URGENT — SOMETHING DID NOT RECORD !!` and
+carry the same shape: what happened, then what to do about it.
+
+**Worth doing in the script:** give `kind: "order_error"` its own subject
+line and its own colour in the sheet, and consider a separate recipient
+or an SMS for `failure: "charged_not_saved"`. It is the only message here
+where a delay costs the shop money.
 
 ---
 

@@ -297,6 +297,7 @@ export async function submitCheckout(
     await notifyOwner({
       kind: "order_error",
       severity: "urgent",
+      failure: "charged_not_saved",
       message: "A card was charged but the order could not be saved.",
       transaction_id: charge.transactionId,
       order_number: number,
@@ -333,6 +334,7 @@ export async function submitCheckout(
     await notifyOwner({
       kind: "order_error",
       severity: "urgent",
+      failure: "lines_not_saved",
       message: "Order saved but its line items did not.",
       order_number: number,
     });
@@ -375,9 +377,11 @@ export async function submitCheckout(
       await notifyOwner({
         kind: "order_error",
         severity: "urgent",
+        failure: "entries_not_awarded",
         message: `Order ${number} did not receive its ${cart.entriesEarned} entries.`,
         order_number: number,
         email: data.customer.email,
+        entries_awarded: cart.entriesEarned,
       });
     }
   }
@@ -430,16 +434,39 @@ export async function submitCheckout(
     console.error(`Order ${number}: confirmation not sent — ${sent.detail}`);
   }
 
+  // `ships` and `collects` stay as bare names because the owner's sheet
+  // already has columns for them. The detailed arrays beside them are
+  // what the readable summary is built from.
+  const toNotifyLine = (l: {
+    name: string;
+    size: string | null;
+    quantity: number;
+    lineTotalCents: number;
+  }) => ({
+    name: l.name,
+    size: l.size,
+    quantity: l.quantity,
+    line_total_cents: l.lineTotalCents,
+  });
+
   await notifyOwner({
     kind: "order",
     order_number: number,
-    total_cents: cart.totalCents,
     name: `${data.customer.firstName} ${data.customer.lastName}`,
     email: data.customer.email,
     phone: data.customer.phone || null,
+    subtotal_cents: cart.subtotalCents,
+    tax_cents: cart.taxCents,
+    shipping_cents: cart.shippingCents,
+    total_cents: cart.totalCents,
+    card_brand: charge.cardBrand,
+    card_last4: charge.cardLast4,
     ships: cart.shipLines.map((l) => l.name),
     collects: cart.pickupLines.map((l) => l.name),
+    ship_lines: cart.shipLines.map(toNotifyLine),
+    pickup_lines: cart.pickupLines.map(toNotifyLine),
     entries_awarded: cart.entriesEarned,
+    campaign: cart.campaign?.title ?? null,
     confirmation_emailed: sent.sent,
   });
 
