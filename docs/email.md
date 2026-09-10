@@ -14,15 +14,19 @@ wired up. It exists for the day the client has a domain — see
 | Method | `POST`, `content-type: application/json` |
 | Sent by | `lib/notify.ts` (owner) and `lib/email/send.ts` (customer) |
 | Every payload has | `kind` and `submitted_at` (ISO 8601, UTC) |
-| Every owner-facing payload has | `summary` — pre-rendered plain text, ready to print |
+| Every owner-facing payload has | `subject` and `summary` — the inbox line and a body, both ready to use as-is |
 
 Two things the script must honour:
 
 1. **Nothing needs formatting.** The customer's email arrives already
    rendered — `kind: "order_confirmation"` carries finished `html` and
    `text`, send them as they are. Every owner-facing kind carries
-   **`summary`**, a plain-text block written to be printed as the body of
-   the owner's email with no assembly at all. Both exist so there is one
+   **`subject`** and **`summary`** — the inbox line and a plain-text body,
+   both written to be used exactly as they arrive.
+
+   The summary is written to survive a **proportional font**, which is
+   what most clients use for `text/plain`. It has no aligned columns and
+   no ASCII box art, because both collapse into nonsense in one. Both exist so there is one
    opinion about wording and about which fields matter, and it lives
    where it can be tested. A script that rebuilds either is a second copy
    to keep in step.
@@ -229,52 +233,45 @@ three payloads differ in shape.
   "severity": "urgent",
   "failure": "charged_not_saved",
   "message": "A card was charged but the order could not be saved.",
-  "order_number": "MLF-QQLQR6",
-  "transaction_id": "60000344344",
-  "total_cents": 2299,
+  "order_number": "MLF-APTK24",
+  "transaction_id": "60000751175",
+  "total_cents": 242506,
   "email": "dana.ruiz@example.com",
-  "summary": "!!!!!!!!!!…",
-  "submitted_at": "2026-09-10T14:55:02.118Z"
+  "held": [
+    { "name": "SIG MPX Carbon", "size": null, "quantity": 1, "hold": "reserved" },
+    { "name": "Molon Labe Tee", "size": "Medium", "quantity": 1, "hold": "stock" }
+  ],
+  "subject": "URGENT: card charged, order NOT saved — MLF-APTK24",
+  "summary": "URGENT. READ THIS NOW.\n\nA CARD WAS CHARGED…",
+  "submitted_at": "2026-09-10T15:13:09.377Z"
 }
 ```
 
 | `failure` | What happened | Extra fields |
 | --- | --- | --- |
-| `charged_not_saved` | **The bad one.** Money moved and nothing recorded it | `transaction_id`, `total_cents`, `email` |
+| `charged_not_saved` | **The bad one.** Money moved and nothing recorded it | `transaction_id`, `total_cents`, `email`, `held` |
 | `lines_not_saved` | The order exists with totals but no line items | — |
 | `entries_not_awarded` | The purchase earned entries that were not credited | `email`, `entries_awarded` |
 
-The `charged_not_saved` summary is deliberately impossible to skim past:
+`held` is what checkout is still keeping off the shelf. Stock is claimed
+*before* the card is charged and this path deliberately does not release
+it — the customer paid. `hold` is `"reserved"` for a single-unit item or
+`"stock"` for a size whose count was decremented. It is in the payload
+because a refund without putting the stock back leaves the item
+unsellable on the site indefinitely, and the recovery steps have to be
+able to name what to restore.
 
-```
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!  A CARD WAS CHARGED AND THE ORDER WAS   !!
-!!  NOT SAVED. NOTHING RECORDED THIS SALE. !!
-!!  ACT NOW.                               !!
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+The `charged_not_saved` summary is a full runbook — roughly 3KB, five
+numbered steps, and who to call. It covers checking the admin first,
+finding the transaction, the void-versus-refund decision, calling the
+customer before deciding, restoring the held stock, and writing down what
+happened. The same steps are in `docs/admin-decisions.md` so they survive
+outside the email.
 
-----------------------------------------------
-A card was charged but the order could not be saved.
-----------------------------------------------
-
-Order number  MLF-QQLQR6
-Charged       $22.99
-Transaction   60000344344
-Customer      dana.ruiz@example.com
-
-The customer has been told not to pay again and to call
-with this order number. The money is at the gateway and
-the order is not in the database. Find the transaction in
-Authorize.net and write the order up by hand.
-```
-
-The other two open with `!! URGENT — SOMETHING DID NOT RECORD !!` and
-carry the same shape: what happened, then what to do about it.
-
-**Worth doing in the script:** give `kind: "order_error"` its own subject
-line and its own colour in the sheet, and consider a separate recipient
-or an SMS for `failure: "charged_not_saved"`. It is the only message here
-where a delay costs the shop money.
+**Worth doing in the script:** give `kind: "order_error"` its own colour
+in the sheet, and consider a separate recipient or an SMS for
+`failure: "charged_not_saved"`. Use the `subject` field as-is — it is
+written so the inbox row alone says what happened.
 
 ---
 

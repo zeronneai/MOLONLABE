@@ -15,6 +15,7 @@
 // knows what an order looks like; the script should not have to.
 
 import { formatUsd } from "@/lib/money";
+import { AGENCY_CONTACT, AGENCY_NAME } from "@/lib/brand";
 
 // ---------------------------------------------------------------- types
 //
@@ -81,7 +82,25 @@ export type OwnerNotification =
       total_cents?: number;
       email?: string;
       entries_awarded?: number;
+      /**
+       * What the checkout is still holding off the shelf.
+       *
+       * Stock is claimed before the card is charged and is deliberately
+       * NOT released on this path — the customer paid, so the goods stay
+       * theirs until a person decides otherwise. The consequence is that
+       * a refund without putting the stock back leaves an item invisible
+       * on the site forever, which is why the recovery steps name it.
+       */
+      held?: HeldItem[];
     };
+
+export type HeldItem = {
+  name: string;
+  size: string | null;
+  quantity: number;
+  /** A single-unit row sits at "reserved"; a size has had stock taken. */
+  hold: "reserved" | "stock";
+};
 
 // ------------------------------------------------------------ summaries
 
@@ -181,53 +200,212 @@ export function summarize(n: OwnerNotification): string {
         "No purchase. One entry.",
       ].join("\n");
 
-    case "order_error": {
-      // This one is read at a glance or not at all, so it does not open
-      // with a noun phrase. The first case means money moved and nothing
-      // recorded it; the banner says so before anything else.
-      const banner =
-        n.failure === "charged_not_saved"
-          ? [
-              "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",
-              "!!  A CARD WAS CHARGED AND THE ORDER WAS   !!",
-              "!!  NOT SAVED. NOTHING RECORDED THIS SALE. !!",
-              "!!  ACT NOW.                               !!",
-              "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",
-            ]
-          : ["!! URGENT — SOMETHING DID NOT RECORD !!"];
+    case "order_error":
+      return orderErrorSummary(n);
+  }
+}
 
-      const detail =
-        n.failure === "charged_not_saved"
-          ? [
-              `Order number  ${n.order_number}`,
-              `Charged       ${n.total_cents != null ? formatUsd(n.total_cents) : "unknown"}`,
-              `Transaction   ${n.transaction_id ?? "unknown"}`,
-              `Customer      ${n.email ?? "unknown"}`,
-              "",
-              "The customer has been told not to pay again and to call",
-              "with this order number. The money is at the gateway and",
-              "the order is not in the database. Find the transaction in",
-              "Authorize.net and write the order up by hand.",
-            ]
-          : n.failure === "lines_not_saved"
-            ? [
-                `Order number  ${n.order_number}`,
-                "",
-                "The order exists with its totals but none of its line",
-                "items were written, so nothing says what was bought.",
-                "The customer's confirmation email has the list.",
-              ]
-            : [
-                `Order number  ${n.order_number}`,
-                `Customer      ${n.email ?? "unknown"}`,
-                `Entries owed  ${n.entries_awarded ?? "unknown"}`,
-                "",
-                "The purchase earned entries that were not credited.",
-                "Fixable by hand, and it has to happen before the draw.",
-              ];
+/**
+ * The one message where a slow read costs the shop money.
+ *
+ * Written to survive a proportional font, because that is what most mail
+ * clients use for text/plain and an ASCII box collapses into nonsense in
+ * one. No aligned columns, no box art — capitals, blank lines and short
+ * lines do the work instead, and they do it in any font.
+ *
+ * It is long, deliberately. It arrives rarely and it is a runbook, not a
+ * notification: somebody is reading it having never seen one before,
+ * probably from a phone, probably with a customer on hold.
+ */
+function orderErrorSummary(
+  n: Extract<OwnerNotification, { kind: "order_error" }>,
+): string {
+  const facts = [
+    `Order number: ${n.order_number}`,
+    n.total_cents != null ? `Amount charged: ${formatUsd(n.total_cents)}` : null,
+    n.transaction_id ? `Authorize.net transaction ID: ${n.transaction_id}` : null,
+    n.email ? `Customer: ${n.email}` : null,
+  ].filter(Boolean) as string[];
 
-      return [...banner, "", RULE, n.message, RULE, "", ...detail].join("\n");
-    }
+  if (n.failure === "charged_not_saved") {
+    const heldLines = (n.held ?? []).map((h) => {
+      const name = [h.name, h.size].filter(Boolean).join(", ");
+      const qty = h.quantity > 1 ? ` ×${h.quantity}` : "";
+      return h.hold === "reserved"
+        ? `  ${name}${qty} — marked RESERVED, off the website`
+        : `  ${name}${qty} — taken out of that size's stock`;
+    });
+
+    return [
+      "URGENT. READ THIS NOW.",
+      "",
+      "A CARD WAS CHARGED AND THE ORDER WAS NOT SAVED.",
+      "The money moved. Nothing in the system recorded the sale.",
+      "",
+      ...facts,
+      "",
+      "WHAT HAPPENED",
+      "",
+      "Authorize.net approved the card and took the money. Writing the",
+      "order to the database failed straight afterwards, so the shop has",
+      "no record of what was bought. The customer has been shown the",
+      "order number above and told not to pay again and to call you.",
+      ...(heldLines.length
+        ? [
+            "",
+            "WHAT IS BEING HELD",
+            "",
+            "The stock was already taken off the shelf before the card was",
+            "charged, and it has NOT been put back:",
+            "",
+            ...heldLines,
+            "",
+            "That is deliberate — they paid for it. But it means step 4",
+            "below is not optional.",
+          ]
+        : []),
+      "",
+      "WHAT TO DO, IN THIS ORDER",
+      "",
+      "1. CHECK THE ADMIN FIRST.",
+      "",
+      `   Open Orders and search for ${n.order_number}. If it is there,`,
+      "   the write recovered by itself and there is nothing to fix.",
+      "   Stop here. If it is not there, keep going.",
+      "",
+      "2. FIND THE MONEY IN AUTHORIZE.NET.",
+      "",
+      "   Sign in to the Merchant Interface and search the transactions",
+      "   for the transaction ID above. If you cannot find it by ID,",
+      "   search by today's date and the amount. What you do next",
+      "   depends on its status:",
+      "",
+      "   UNSETTLED / PENDING SETTLEMENT — the daily batch has not",
+      "   closed yet. You can VOID it. A void is clean: in most cases",
+      "   the customer never sees the charge on their statement at all.",
+      "",
+      "   SETTLED SUCCESSFULLY — the batch has closed and voiding is no",
+      "   longer possible. A REFUND is the only way back, it needs the",
+      "   last four digits of the card, and it takes a few days to show",
+      "   on their statement.",
+      "",
+      "   Do not void or refund yet. Do step 3 first.",
+      "",
+      "3. CALL THE CUSTOMER BEFORE YOU DECIDE.",
+      "",
+      "   They paid and they are waiting. Two ways this goes:",
+      "",
+      "   THEY STILL WANT IT, and you still have it — keep the money,",
+      "   write the order up by hand the way you would a counter sale,",
+      "   and treat it as a normal sale from there. A firearm still",
+      "   needs its background check at pickup like any other.",
+      "",
+      "   THEY DO NOT WANT IT, or it is already gone — void it if the",
+      "   batch has not closed, refund it if it has. Tell them which,",
+      "   and roughly when the money comes back.",
+      "",
+      "4. PUT THE STOCK BACK IF YOU REFUNDED.",
+      "",
+      "   Only if you voided or refunded. The item is still held and",
+      "   will stay invisible on the website until somebody changes it",
+      "   by hand:",
+      "",
+      "   - A single item is sitting at RESERVED. Set it back to",
+      "     AVAILABLE in the admin.",
+      "   - A size had its stock reduced. Add the quantity back to that",
+      "     size on the item.",
+      "",
+      "   Skip this and the shop quietly stops being able to sell it.",
+      "",
+      "5. WRITE DOWN WHAT YOU DID.",
+      "",
+      "   The order number, the transaction ID, and whether you kept,",
+      "   voided or refunded it. Nothing else recorded this sale, so",
+      "   what you write down is the only record it happened.",
+      "",
+      "WHO TO CALL",
+      "",
+      ...(n.email ? [`Customer: ${n.email}`] : []),
+      "Authorize.net merchant support: the number is on your merchant",
+      "  statement and on the Support page inside the Merchant Interface.",
+      `${AGENCY_NAME}: ${AGENCY_CONTACT} — tell us it happened even if`,
+      "  you already fixed it, so we can find out why.",
+    ].join("\n");
+  }
+
+  if (n.failure === "lines_not_saved") {
+    return [
+      "URGENT — AN ORDER SAVED WITHOUT ITS ITEMS.",
+      "",
+      "The order and its totals were written. The list of what was",
+      "actually bought was not, so the order looks empty in the admin.",
+      "",
+      ...facts,
+      "",
+      "WHAT TO DO",
+      "",
+      "1. The customer's confirmation email has the full list. Ask them",
+      "   to forward it, or find the order in Authorize.net for the",
+      "   amount and work back from that.",
+      "2. Write the items onto the order by hand so the shop knows what",
+      "   to hand over or post.",
+      "3. The money is fine. Nothing needs voiding or refunding.",
+      "",
+      `${AGENCY_NAME}: ${AGENCY_CONTACT}`,
+    ].join("\n");
+  }
+
+  return [
+    "URGENT — A PURCHASE DID NOT GET ITS SWEEPSTAKES ENTRIES.",
+    "",
+    "The sale is fine and the money is fine. The entries the purchase",
+    "earned were not credited to the customer.",
+    "",
+    ...facts,
+    ...(n.entries_awarded != null
+      ? [`Entries owed: ${n.entries_awarded}`]
+      : []),
+    "",
+    "WHAT TO DO",
+    "",
+    "1. Add the entries by hand in the admin, under Entrants, against",
+    "   the email above.",
+    "2. It has to happen before the drawing. After the draw it cannot",
+    "   be put right.",
+    "",
+    `${AGENCY_NAME}: ${AGENCY_CONTACT}`,
+  ].join("\n");
+}
+
+/**
+ * The inbox line.
+ *
+ * Supplied rather than left to the script, because this is the whole of
+ * what the owner sees before deciding whether to open something. The
+ * urgent one leads with the words that matter and does not bury them
+ * behind a prefix.
+ */
+export function subjectFor(n: OwnerNotification): string {
+  switch (n.kind) {
+    case "order":
+      return `New order ${n.order_number} — ${formatUsd(n.total_cents)}${
+        n.collects.length ? " — COLLECT AT SHOP" : ""
+      }`;
+    case "inquiry":
+      return {
+        item: `Item enquiry — ${n.name}`,
+        transfer: `FFL transfer request — ${n.name}`,
+        general: `Message from the website — ${n.name}`,
+        service: `Service request — ${n.name}`,
+      }[n.type];
+    case "entry":
+      return `Free entry — ${n.name}`;
+    case "order_error":
+      return n.failure === "charged_not_saved"
+        ? `URGENT: card charged, order NOT saved — ${n.order_number}`
+        : n.failure === "lines_not_saved"
+          ? `URGENT: order ${n.order_number} saved without its items`
+          : `URGENT: order ${n.order_number} did not get its entries`;
   }
 }
 
@@ -242,6 +420,7 @@ export async function notifyOwner(payload: OwnerNotification): Promise<void> {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         ...payload,
+        subject: subjectFor(payload),
         summary: summarize(payload),
         submitted_at: new Date().toISOString(),
       }),

@@ -63,6 +63,17 @@ export const SHOP_HOURS = HOURS.map((h) => ({
   display: `${to12Hour(h.opens)} – ${to12Hour(h.closes)}`,
 }));
 
+/**
+ * Who the shop calls when the site does something it should not.
+ *
+ * PLACEHOLDER — the agency's real number has not been supplied. It is
+ * printed in the one email where the owner needs a person rather than a
+ * page: the card-charged-but-order-not-saved alert. Tracked in
+ * docs/content-needed.md.
+ */
+export const AGENCY_NAME = "Purple Roots";
+export const AGENCY_CONTACT = "(number to be supplied)";
+
 export const INSTAGRAM_HANDLE = "@molonlabe.fa";
 export const INSTAGRAM_URL = "https://instagram.com/molonlabe.fa";
 

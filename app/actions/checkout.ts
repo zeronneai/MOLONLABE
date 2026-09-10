@@ -303,6 +303,15 @@ export async function submitCheckout(
       order_number: number,
       total_cents: cart.totalCents,
       email: data.customer.email,
+      // Claimed before the charge and deliberately not released here —
+      // the customer paid. The recovery steps need to name it, because a
+      // refund without putting it back leaves it invisible on the site.
+      held: cart.lines.map((l) => ({
+        name: l.name,
+        size: l.size,
+        quantity: l.quantity,
+        hold: l.variantId ? ("stock" as const) : ("reserved" as const),
+      })),
     });
     return {
       ok: false,

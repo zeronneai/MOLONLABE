@@ -56,3 +56,99 @@ defaults.
    database trigger from `auth.uid()`, so a hand-crafted request cannot
    forge them; the display names are written by the server action from
    the session, and no action reads a name out of the submitted form.
+
+---
+
+# When a card is charged and the order does not save
+
+The shop gets an email with the subject **"URGENT: card charged, order
+NOT saved"**. It is the only message the site sends where waiting costs
+money, and it is rare enough that whoever reads it will never have seen
+one before. The full steps are printed inside that email so they are
+there when it is needed. They are here as well so they survive the email
+being deleted, the Apps Script being rewritten, or the owner asking
+somebody else what to do.
+
+## What has actually happened
+
+Authorize.net approved the card and took the money. Writing the order to
+the database failed immediately afterwards, so there is no order record —
+no line items, no receipt, nothing in the admin. The customer saw the
+order number and was told not to pay again and to call the shop.
+
+**The stock is already held.** Checkout claims stock *before* charging
+the card, and this failure path deliberately does not release it: the
+customer paid, so the goods stay theirs until a person decides
+otherwise. A single item sits at `reserved`; a size has had its stock
+decremented. Both are invisible to shoppers until somebody changes them.
+
+## The steps
+
+1. **Check the admin first.** Search Orders for the order number. If it
+   is there, the write recovered on its own — nothing to fix.
+
+2. **Find the money in Authorize.net.** Sign in to the Merchant
+   Interface and search transactions for the transaction ID in the
+   email; failing that, by date and amount. The status decides what is
+   possible:
+
+   - **Unsettled / pending settlement** — the daily batch has not closed.
+     The transaction can be **voided**, and a void usually means the
+     customer never sees the charge on their statement at all.
+   - **Settled successfully** — the batch has closed. Voiding is no
+     longer possible and a **refund** is the only route back. It needs
+     the card's last four digits and takes a few days to appear.
+
+   Do not act yet. Step 3 first.
+
+3. **Call the customer before deciding.** They paid and they are
+   waiting, and this is their call, not ours.
+
+   - **They still want it and we still have it** — keep the money and
+     write the order up by hand as a counter sale. A firearm still needs
+     its background check at collection like any other.
+   - **They do not, or it is gone** — void if unsettled, refund if
+     settled. Tell them which, and roughly when the money returns.
+
+4. **Put the stock back, but only if you voided or refunded.** Set a
+   reserved item back to Available; add the quantity back to the size.
+   Skipping this leaves the item unsellable on the site indefinitely, and
+   nothing will remind anybody.
+
+5. **Write down what happened.** Order number, transaction ID, and
+   whether it was kept, voided or refunded. Nothing else recorded this
+   sale, so that note is the only record it existed.
+
+## Who to call
+
+- **The customer** — their address is in the email.
+- **Authorize.net merchant support** — the number is on the merchant
+  statement and on the Support page inside the Merchant Interface. We
+  have deliberately not printed a number here that we cannot verify.
+- **Purple Roots** — even after it is fixed, so the cause can be found.
+  The email prints `AGENCY_CONTACT` from `lib/brand.ts`, which is still
+  a placeholder until the real number is supplied.
+
+## The two lesser alerts
+
+The same subject prefix, far less urgent, and neither involves money
+moving incorrectly:
+
+- **"order saved without its items"** — the order and its totals exist
+  but the list of what was bought did not write. The customer's
+  confirmation email has the list; copy it onto the order by hand. No
+  refund is involved.
+- **"did not get its entries"** — the sale is fine; the sweepstakes
+  entries it earned were not credited. Add them by hand under Entrants
+  against the customer's email. It has to happen before the drawing,
+  because after the draw it cannot be put right.
+
+## What has not been verified
+
+The Authorize.net steps describe void-before-settlement and
+refund-after-settlement, which is how card processing works and is not
+specific to their interface. **The exact menu labels and screen names in
+the current Merchant Interface have not been checked against a live
+account** — nobody here has one. Worth walking through once with the
+client's real login before launch, and correcting the wording in
+`lib/notify.ts` and here if anything is named differently.
