@@ -11,7 +11,6 @@ const tabs = [
   { href: "/admin/games", label: "Games" },
   { href: "/admin/orders", label: "Orders" },
   { href: "/admin/inquiries", label: "Inquiries" },
-  
   { href: "/admin/game", label: "Arcade & Offer" },
   { href: "/admin/commerce", label: "Tax & Shipping" },
   { href: "/admin/activity", label: "Activity" },
