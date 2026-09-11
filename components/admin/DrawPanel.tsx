@@ -6,6 +6,7 @@
 // the game and states the pool size.
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { drawWinner } from "@/app/admin/actions";
 
 export default function DrawPanel({
@@ -27,6 +28,10 @@ export default function DrawPanel({
 }) {
   const [confirming, setConfirming] = useState(false);
   const [pending, start] = useTransition();
+  // A refusal has to land on screen. It used to go to the server log,
+  // which meant the dialog closed and nothing visibly happened.
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const router = useRouter();
 
   if (winnerName) {
     return (
@@ -49,6 +54,18 @@ export default function DrawPanel({
   return (
     <section className="mt-20 border-t hairline pt-10">
       <h2 className="label text-amber">Draw a winner</h2>
+
+      {refusal && (
+        <div
+          role="alert"
+          className="mt-5 border-l-2 border-danger pl-5"
+        >
+          <p className="label text-danger">The draw did not run</p>
+          <p className="mt-2 max-w-[56ch] text-sm leading-relaxed text-bone">
+            {refusal}
+          </p>
+        </div>
+      )}
       <p className="mt-3 max-w-[56ch] text-sm text-muted">
         Picks one spot at random from the {spotsSold}{" "}
         {spotsSold === 1 ? "spot" : "spots"} sold, held by {buyers}{" "}
@@ -107,8 +124,16 @@ export default function DrawPanel({
                 disabled={pending}
                 onClick={() =>
                   start(async () => {
-                    await drawWinner(gameId);
+                    const result = await drawWinner(gameId);
                     setConfirming(false);
+                    if (!result.ok) {
+                      setRefusal(result.error);
+                      return;
+                    }
+                    setRefusal(null);
+                    // The server revalidates, but this page was rendered
+                    // before the draw; ask for the new one.
+                    router.refresh();
                   })
                 }
                 className="control control-caution flex-1"

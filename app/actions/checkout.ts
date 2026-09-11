@@ -81,6 +81,13 @@ const checkoutSchema = z.object({
    * inferred from anything else.
    */
   showName: z.boolean().optional(),
+  /**
+   * One per rendered checkout form. The server refuses to charge twice
+   * for the same one, which is what protects against a double-submit
+   * that a disabled button cannot — a reload, a slow network retry, or
+   * two tabs.
+   */
+  idempotencyKey: z.string().min(8).max(64).optional(),
   opaqueData: z.object({
     dataDescriptor: z.string().min(1).max(200),
     dataValue: z.string().min(1).max(8000),
@@ -260,12 +267,54 @@ export async function submitCheckout(
     });
   }
 
+  // Layer 2 of 3 against a double charge, and the only one that holds
+  // against a reload or a second tab. Claimed BEFORE the gateway call:
+  // whoever wins this insert is the only request allowed to charge.
+  const key = data.idempotencyKey ?? null;
+  if (key) {
+    const { data: claim, error: claimError } = await sb.rpc("claim_checkout", {
+      p_key: key,
+    });
+    if (claimError) logDbError("checkout claim key", claimError);
+
+    if (typeof claim === "string" && claim.startsWith("done:")) {
+      // This exact submission already went through. Hand back the order
+      // it produced rather than charging again.
+      const existing = claim.slice(5);
+      await releaseClaims(sb, claims);
+      const { data: row } = await sb
+        .from("orders")
+        .select("order_number, confirmation_token")
+        .eq("order_number", existing)
+        .maybeSingle();
+      if (row) {
+        return {
+          ok: true,
+          orderNumber: row.order_number,
+          token: row.confirmation_token,
+        };
+      }
+    }
+
+    if (claim === "in_flight") {
+      // Another request with this key is mid-charge. Refuse without
+      // touching the card, and do NOT release its claims — they belong
+      // to the attempt that is still running.
+      return {
+        ok: false,
+        message:
+          "This payment is already going through. Give it a few seconds — don't pay again.",
+      };
+    }
+  }
+
   // 3. Charge.
   const number = orderNumber();
   const charge = await provider.charge({
     amountCents: cart.totalCents,
     opaqueData: data.opaqueData,
     invoiceNumber: number,
+    idempotencyKey: key ?? undefined,
     description: `${SHOP_NAME} order ${number}`,
     customer: {
       email: data.customer.email,
@@ -286,6 +335,10 @@ export async function submitCheckout(
 
   if (!charge.ok) {
     await releaseClaims(sb, claims);
+    // No money moved, so the buyer must be able to try again with the
+    // same form. Holding the key here would refuse their second, honest
+    // attempt as a duplicate.
+    if (key) await sb.rpc("release_checkout", { p_key: key });
     console.error("checkout charge failed:", charge.detail);
     return { ok: false, message: charge.message };
   }
@@ -339,6 +392,7 @@ export async function submitCheckout(
       card_brand: charge.cardBrand,
       card_last4: charge.cardLast4,
       confirmation_token: token,
+      idempotency_key: key,
     })
     .select("id")
     .single();
@@ -575,6 +629,16 @@ export async function submitCheckout(
         item: cart.spotGame.title,
       });
     }
+  }
+
+  // The attempt is now settled. A replay of the same key from here on
+  // returns this order instead of charging.
+  if (key) {
+    await sb.rpc("finish_checkout", {
+      p_key: key,
+      p_order: number,
+      p_outcome: "paid",
+    });
   }
 
   revalidatePath("/inventory");

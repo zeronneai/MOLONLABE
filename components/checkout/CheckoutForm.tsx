@@ -10,7 +10,7 @@
 // database, and it only holds if nobody ever "helpfully" adds a name or a
 // controlled value to these four fields.
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCart } from "@/lib/cart/store";
@@ -31,6 +31,9 @@ import {
   SHOW_NAME_LABEL,
 } from "@/lib/games/terms";
 import { receiptPath } from "@/lib/receipt";
+
+/** Where the per-form idempotency key lives, so a reload reuses it. */
+const CHECKOUT_KEY = "mlf_checkout_key";
 
 type AcceptResponse = {
   messages: { resultCode: string; message: { code: string; text: string }[] };
@@ -80,7 +83,44 @@ export default function CheckoutForm({
   const buyingSpots = Boolean(cart?.spotGame && cart.spotCount > 0);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [pending, start] = useTransition();
+
+  /**
+   * Layer 1 of 3 against a double charge.
+   *
+   * A ref, not state, and set synchronously at the very top of the
+   * handler — before tokenisation, before any await. State updates are
+   * batched and a second click can land before React has re-rendered;
+   * a ref changes on the assignment, so the second click sees it.
+   *
+   * `useTransition` used to be the only guard here and it was the bug:
+   * startTransition ends when its callback RETURNS, and this callback
+   * returns the instant it hands off to Accept.js. The button re-enabled
+   * while tokenisation was still in flight.
+   */
+  const submitting = useRef(false);
+  const [working, setWorking] = useState(false);
+
+  /**
+   * Layer 3: one key per rendered form, minted here and sent with the
+   * payment. The server refuses to charge twice for the same key.
+   *
+   * Kept in sessionStorage rather than only in memory so that a reload
+   * — the other way people react to a slow payment — reuses the same key
+   * instead of minting a fresh one and buying the same thing again.
+   */
+  const [idempotencyKey] = useState(() => {
+    if (typeof window === "undefined") return "";
+    try {
+      const existing = window.sessionStorage.getItem(CHECKOUT_KEY);
+      if (existing) return existing;
+      const minted = crypto.randomUUID();
+      window.sessionStorage.setItem(CHECKOUT_KEY, minted);
+      return minted;
+    } catch {
+      // Private mode. The other two layers still hold.
+      return crypto.randomUUID();
+    }
+  });
 
   const card = {
     number: useRef<HTMLInputElement>(null),
@@ -134,6 +174,9 @@ export default function CheckoutForm({
 
   const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // Before anything else, including the validation below: a second
+    // click must find this already true.
+    if (submitting.current) return;
     setError(null);
     setFieldErrors({});
 
@@ -170,8 +213,15 @@ export default function CheckoutForm({
         }
       : null;
 
-    start(() => {
-      window.Accept!.dispatchData(
+    submitting.current = true;
+    setWorking(true);
+
+    const unlock = () => {
+      submitting.current = false;
+      setWorking(false);
+    };
+
+    window.Accept!.dispatchData(
         {
           authData: { clientKey, apiLoginID: apiLoginId },
           cardData: {
@@ -191,6 +241,8 @@ export default function CheckoutForm({
               response.messages.message?.[0]?.text ??
                 "We couldn't read that card. Check the number and try again.",
             );
+            // Nothing was charged, so let them fix it and try again.
+            unlock();
             return;
           }
 
@@ -202,21 +254,28 @@ export default function CheckoutForm({
               disclaimerAccepted: true,
               gameTermsAccepted: buyingSpots ? gameTerms : undefined,
               showName: buyingSpots ? showName : undefined,
+              idempotencyKey,
               opaqueData: response.opaqueData!,
             });
             if (!result.ok) {
               setError(result.message);
               setFieldErrors(result.fieldErrors ?? {});
+              unlock();
               return;
             }
+            // Deliberately still locked: we are navigating away, and
+            // re-enabling the button for the half second that takes is
+            // exactly the window this whole guard exists to close.
+            try {
+              window.sessionStorage.removeItem(CHECKOUT_KEY);
+            } catch {
+              // Nothing to clean up.
+            }
             clear();
-            router.push(
-              receiptPath(result.orderNumber, result.token),
-            );
+            router.push(receiptPath(result.orderNumber, result.token));
           })();
         },
       );
-    });
   };
 
   const err = (key: string) =>
@@ -484,10 +543,10 @@ export default function CheckoutForm({
 
           <button
             type="submit"
-            disabled={!accepted || (buyingSpots && !gameTerms) || !acceptReady || pending}
+            disabled={working || !accepted || (buyingSpots && !gameTerms) || !acceptReady}
             className="cta-primary control-go mt-7 w-full"
           >
-            {pending
+            {working
               ? "Processing…"
               : !acceptReady
                 ? "Loading secure form…"

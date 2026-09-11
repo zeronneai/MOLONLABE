@@ -127,7 +127,11 @@ export const authorizeNetProvider: PaymentProvider = {
       createTransactionRequest: {
         merchantAuthentication: { name: apiLoginId, transactionKey },
         // Both capped by the gateway; over-length is rejected outright.
-        refId: request.invoiceNumber.slice(0, 20),
+        // The merchant-side reference. Preferring the idempotency key
+        // means two attempts from one form share a refId, so they sit
+        // next to each other in the Merchant Interface rather than
+        // looking like two unrelated sales.
+        refId: (request.idempotencyKey ?? request.invoiceNumber).slice(0, 20),
         transactionRequest: {
           transactionType: "authCaptureTransaction",
           amount: centsToAmount(request.amountCents),

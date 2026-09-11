@@ -853,10 +853,38 @@ export async function commitDraw(gameId: string): Promise<DrawRecord> {
     .order("spot_number");
   if (error) {
     console.error("commitDraw:", error.message);
-    return { ok: false, error: "Could not read the spots." };
+    return {
+      ok: false,
+      error:
+        "Couldn't read the spots for this game. Nothing has been drawn. " +
+        "Reload and try again; if it keeps happening, call Purple Roots.",
+    };
   }
+
   if (!spots || spots.length === 0) {
-    return { ok: false, error: "No spots have sold, so there is nothing to draw." };
+    // Say which of the two reasons it is. "Nothing to draw" when the
+    // board looks full is maddening, and the usual cause is spots stuck
+    // mid-checkout rather than genuinely unsold.
+    const { count: heldCount } = await sb
+      .from("game_spots")
+      .select("id", { count: "exact", head: true })
+      .eq("game_id", gameId)
+      .eq("status", "held");
+    if ((heldCount ?? 0) > 0) {
+      return {
+        ok: false,
+        error:
+          `No spots are recorded as sold yet, but ${heldCount} ${heldCount === 1 ? "is" : "are"} ` +
+          "still held from a checkout that didn't finish. Those release " +
+          "themselves after 15 minutes. Wait, refresh, and draw then.",
+      };
+    }
+    return {
+      ok: false,
+      error:
+        "No spots have sold, so there is nobody to draw from. A game has " +
+        "to sell at least one spot before it can be drawn.",
+    };
   }
 
   const seed = newSeed();
@@ -869,7 +897,13 @@ export async function commitDraw(gameId: string): Promise<DrawRecord> {
   if (!result) return { ok: false, error: "There is nothing to draw from." };
 
   const winner = spots.find((sp) => sp.id === result.entrantId);
-  if (!winner) return { ok: false, error: "Could not resolve the winner." };
+  if (!winner)
+    return {
+      ok: false,
+      error:
+        "Picked a spot that then couldn't be matched to a buyer. Nothing " +
+        "has been drawn and nothing has changed. Call Purple Roots.",
+    };
 
   // Redacted at write time: the surname never reaches the winners table,
   // so no future component can leak it by rendering the wrong column.
@@ -892,13 +926,25 @@ export async function commitDraw(gameId: string): Promise<DrawRecord> {
     .maybeSingle();
   if (insertError) {
     console.error("commitDraw insert:", insertError.message);
-    return { ok: false, error: "Could not record the winner." };
+    return {
+      ok: false,
+      error:
+        "Couldn't save the winner, so nothing has been drawn — the game " +
+        "is untouched and safe to try again. If it fails twice, stop and " +
+        "call Purple Roots rather than drawing on camera.",
+    };
   }
 
-  await sb
+  const { error: statusError } = await sb
     .from("games")
     .update({ status: "drawn", updated_by_name: displayName(user) })
     .eq("id", gameId);
+  if (statusError) {
+    // The winner IS recorded — this is cosmetic, and saying "it failed"
+    // would invite a second draw that the idempotency check would then
+    // refuse confusingly. Log it and carry on.
+    logDbError("commitDraw status", statusError);
+  }
   // The draw is the single least reversible thing anyone does in here.
   await logActivity(sb, user, {
     action: "draw", entity: "game", entityId: gameId,
@@ -908,6 +954,12 @@ export async function commitDraw(gameId: string): Promise<DrawRecord> {
   });
   revalidatePublic();
   revalidatePath("/admin/games");
+  // The detail page is where the draw happens, and a dynamic child is
+  // not covered by revalidating its parent. Without this the winner is
+  // written and the screen still says nobody has been drawn — which
+  // reads exactly like a failure.
+  revalidatePath(`/admin/games/${gameId}`);
+  revalidatePath(`/draw/${gameId}`);
 
   return {
     ok: true,
@@ -921,7 +973,16 @@ export async function commitDraw(gameId: string): Promise<DrawRecord> {
 }
 
 /** The plain admin-panel draw. Same algorithm, no theater. */
-export async function drawWinner(campaignId: string): Promise<void> {
-  const record = await commitDraw(campaignId);
+/**
+ * The plain button, for a draw nobody is filming.
+ *
+ * Returns the record rather than void. It used to swallow the reason into
+ * the server log, which meant a refusal reached the owner as a dialog
+ * quietly closing and nothing happening — on the one day he is about to
+ * go live, that is the worst possible failure mode.
+ */
+export async function drawWinner(gameId: string): Promise<DrawRecord> {
+  const record = await commitDraw(gameId);
   if (!record.ok) console.error("drawWinner:", record.error);
+  return record;
 }

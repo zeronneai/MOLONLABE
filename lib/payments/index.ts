@@ -22,6 +22,14 @@ export type ChargeRequest = {
   opaqueData: OpaqueData;
   /** Shown on the buyer's statement and in the gateway's dashboard. */
   invoiceNumber: string;
+  /**
+   * One per rendered checkout form, carried through so two attempts from
+   * the same form are recognisable as one intent in the gateway's own
+   * records. Authorize.net has no idempotency-key header — its guard is
+   * `duplicateWindow`, set in the request — so this is for tracing rather
+   * than enforcement. The enforcement is `claim_checkout` server-side.
+   */
+  idempotencyKey?: string;
   description: string;
   customer: {
     email: string;

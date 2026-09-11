@@ -330,6 +330,7 @@ export interface Database {
           card_last4: string | null;
           confirmation_token: string;
           confirmation_expires_at: string;
+          idempotency_key: string | null;
           game_terms_accepted_at: string | null;
           game_terms_text: string | null;
           confirmation_sent_at: string | null;
@@ -371,6 +372,7 @@ export interface Database {
           confirmation_token: string;
           /** Defaulted by the database to a year out. */
           confirmation_expires_at?: string;
+          idempotency_key?: string | null;
           game_terms_accepted_at?: string | null;
           game_terms_text?: string | null;
           confirmation_sent_at?: string | null;
@@ -552,6 +554,19 @@ export interface Database {
       game_spots_remaining: {
         Args: { p_game: string };
         Returns: number;
+      };
+      /** 'claimed' | 'in_flight' | 'done:<order number>' */
+      claim_checkout: {
+        Args: { p_key: string };
+        Returns: string;
+      };
+      finish_checkout: {
+        Args: { p_key: string; p_order: string | null; p_outcome: string | null };
+        Returns: undefined;
+      };
+      release_checkout: {
+        Args: { p_key: string };
+        Returns: undefined;
       };
     };
     Enums: Record<string, never>;
