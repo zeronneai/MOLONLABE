@@ -21,13 +21,21 @@ export const metadata: Metadata = {
 // stale one is worse than a slow one.
 export const dynamic = "force-dynamic";
 
-const fmtDate = (iso: string) =>
-  new Intl.DateTimeFormat("en-US", {
+// Guarded because this is a public page and Intl throws on an invalid
+// date rather than degrading. drawn_at is not-null with a default, so a
+// bad value should be impossible — but one unparseable timestamp taking
+// down the whole featured page is a poor trade against returning an
+// empty string for that one line.
+const fmtDate = (iso: string) => {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return "";
+  return new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Denver",
     month: "short",
     day: "numeric",
     year: "numeric",
-  }).format(new Date(iso));
+  }).format(at);
+};
 
 export default async function FeaturedPage() {
   const game = await getCurrentGame();

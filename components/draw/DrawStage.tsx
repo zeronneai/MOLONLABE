@@ -294,12 +294,12 @@ export default function DrawStage({
       "",
       reveal.name,
       "",
-      `Winning entry ${reveal.ticket} of ${reveal.total}`,
-      `${activeEntrants} entrants`,
+      `Winning spot ${reveal.ticket}`,
+      `${reveal.total} ${reveal.total === 1 ? "spot" : "spots"} sold to ${activeEntrants} ${activeEntrants === 1 ? "buyer" : "buyers"}`,
       `Drawn ${stamp(reveal.drawnAt)} MT`,
       `Seed ${reveal.seed}`,
       "",
-      `Every entry was one ticket. ${SHOP_SHORT_NAME}`,
+      `Every spot was one ticket. ${SHOP_SHORT_NAME}`,
     ].join("\n");
   }, [reveal, prizeName, activeEntrants]);
 
@@ -373,11 +373,11 @@ export default function DrawStage({
 
             <dl className="draw-stats">
               <div>
-                <dt className="label">Entries</dt>
+                <dt className="label">Spots sold</dt>
                 <dd>{activeEntries.toLocaleString()}</dd>
               </div>
               <div>
-                <dt className="label">Entrants</dt>
+                <dt className="label">Buyers</dt>
                 <dd>{activeEntrants.toLocaleString()}</dd>
               </div>
               <div>
@@ -388,7 +388,7 @@ export default function DrawStage({
 
             {alreadyDrawn && !rehearsal && (
               <p className="draw-note">
-                This campaign already has a winner. Starting replays the
+                This game already has a winner. Starting replays the
                 recorded result — it will not draw again.
               </p>
             )}
@@ -405,7 +405,7 @@ export default function DrawStage({
                 {busy
                   ? "Drawing…"
                   : activeEntries === 0
-                    ? "No entries"
+                    ? "No spots sold"
                     : rehearsal
                       ? "Start rehearsal"
                       : alreadyDrawn
@@ -482,7 +482,7 @@ export default function DrawStage({
             {poolView.hidden > 0 && (
               <p className="draw-pool-note label">
                 showing {poolView.tiles.length.toLocaleString()} of{" "}
-                {poolView.total.toLocaleString()} entries
+                {poolView.total.toLocaleString()} spots
               </p>
             )}
           </>
@@ -503,9 +503,18 @@ export default function DrawStage({
         {/* ---------------------------------------------------------- 5 */}
         {phase === "lock" && reveal && (
           <div className="draw-record">
+            {/* `ticket` is the winning SPOT NUMBER, not an index into
+                the pool. This used to read "Entry N of TOTAL", which was
+                the per-dollar model's wording: there, N really was the
+                Nth ticket of TOTAL. A spot number is not an ordinal, and
+                on a partly-sold game it routinely exceeds the pool — a
+                20-spot game with 12 sold and spot 16 drawn rendered
+                "Entry 16 of 12" on the screen being filmed. */}
             <p>
-              Entry <strong>{reveal.ticket.toLocaleString()}</strong> of{" "}
-              {reveal.total.toLocaleString()} · {stamp(reveal.drawnAt)} MT
+              Spot <strong>{reveal.ticket.toLocaleString()}</strong> ·{" "}
+              {reveal.total.toLocaleString()}{" "}
+              {reveal.total === 1 ? "spot" : "spots"} sold ·{" "}
+              {stamp(reveal.drawnAt)} MT
             </p>
             <p>seed {reveal.seed}</p>
             {error && <p className="draw-error label">{error}</p>}

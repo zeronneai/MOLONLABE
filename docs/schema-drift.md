@@ -122,26 +122,41 @@ silently destroy whatever they find. The guards make them quiet, not safe.
 And the deeper problem: a run where nine of fourteen abort does not leave
 you in a known state. It leaves you in a different unknown one.
 
-### Do this instead
+### Do this instead — one pass
 
-1. **Find out what is actually wrong.** Run `scripts/check-schema.sql` in
-   the Supabase SQL editor. It needs no clone and nothing installed, and
-   it returns one row per problem — so an editor row cap cannot truncate
-   it into a wrong answer, which is exactly how a complete
-   `information_schema` dump misleads.
-2. **Apply `supabase/repair/2026-09-20-bring-to-head.sql`.** Idempotent:
-   every statement is `if not exists` / `if exists` / `create or replace`.
-   It adds and replaces; it never drops a column or a table and never
-   touches a row.
-3. **If step 1 reported a MISSING TABLE**, run that table's own migration
-   in full — the five listed above are safe whole.
-4. **Run `scripts/check-schema.sql` again** and confirm it returns nothing.
+1. **Apply `supabase/repair/baseline.sql`.** One script, any starting
+   state — empty, partially applied, or already correct. It contains no
+   `drop table`, no `drop column`, no `delete` and no `update`, so it
+   cannot lose data. It is generated from a database built by the chain,
+   so it cannot drift from the chain by transcription error.
+2. **Run `scripts/check-schema.sql`** and confirm it returns nothing.
 
-Verified end to end: a database with the audit columns, the rebuild tail
-and `checkout_attempts` removed, repaired by this procedure, comes out
-**identical to one built from the chain** — 156 columns, 46 constraints,
-37 indexes, 30 policies, all matching. The repair script was then run
-twice more with no effect.
+That is the whole procedure. There is no conditional step and nothing to
+diagnose first — diagnosing first is how you find the next missing piece
+by accident.
+
+Verified, and the verification is the point of trusting it:
+
+| Applied to | Result |
+|---|---|
+| An empty database | identical to the chain |
+| A database already correct, run **twice** | identical to the chain |
+| A database with the audit columns, the rebuild tail, `checkout_attempts`, a function and a policy all removed | identical to the chain |
+
+"Identical" means columns with their defaults and nullability,
+constraints, indexes, policies, functions, views, and execute grants —
+all diffed, all matching.
+
+Separately: a database seeded with items, a game, sold spots, a winner
+and an order, then damaged, then repaired — **every row survived**, and
+the schema check came out clean.
+
+One thing the baseline cannot do: a dropped column's **data** is gone for
+good. It restores the column, not the values that were in it.
+
+`supabase/repair/2026-09-20-bring-to-head.sql` is the smaller, targeted
+version of the same repair, kept for when you want to read every
+statement before running it. The baseline supersedes it.
 
 ### Reading an `information_schema` dump: don't
 
