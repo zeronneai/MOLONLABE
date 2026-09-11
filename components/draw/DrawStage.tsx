@@ -51,7 +51,7 @@ function stamp(iso: string): string {
 }
 
 export default function DrawStage({
-  campaignId,
+  gameId,
   prizeName,
   prizeImage,
   closesLabel,
@@ -60,7 +60,7 @@ export default function DrawStage({
   entrants,
   alreadyDrawn,
 }: {
-  campaignId: string;
+  gameId: string;
   prizeName: string;
   prizeImage: string | null;
   closesLabel: string | null;
@@ -196,7 +196,7 @@ export default function DrawStage({
       };
     } else {
       setBusy(true);
-      const result = await commitDraw(campaignId);
+      const result = await commitDraw(gameId);
       setBusy(false);
       if (!result.ok) {
         setError(result.error);
@@ -222,7 +222,7 @@ export default function DrawStage({
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     setPhase(still ? "lock" : "pool");
-  }, [busy, rehearsal, activePool, campaignId]);
+  }, [busy, rehearsal, activePool, gameId]);
 
   // Pool holds, then hands off to the spin.
   useEffect(() => {

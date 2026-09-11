@@ -34,31 +34,45 @@ export default async function DrawPresentation({
   const sb = await getSessionSupabase();
   if (!sb) return null;
 
-  const { data: campaign } = await sb
-    .from("campaigns")
-    .select("id, title, closes_at, item_id")
+  const { data: game } = await sb
+    .from("games")
+    .select("id, title, item_id, total_spots")
     .eq("id", id)
     .maybeSingle();
-  if (!campaign) notFound();
+  if (!game) notFound();
 
-  const [{ data: item }, { data: entrants }, { data: winner }] = await Promise.all([
-    campaign.item_id
-      ? sb.from("items").select("name, images").eq("id", campaign.item_id).maybeSingle()
+  const [{ data: item }, { data: spots }, { data: winner }] = await Promise.all([
+    game.item_id
+      ? sb.from("items").select("name, images").eq("id", game.item_id).maybeSingle()
       : Promise.resolve({ data: null }),
     sb
-      .from("entrants")
-      .select("id, first_name, last_name, entry_count")
-      .eq("campaign_id", id),
-    sb.from("winners").select("id").eq("campaign_id", id).maybeSingle(),
+      .from("game_spots")
+      .select("id, spot_number, first_name, last_name, show_name")
+      .eq("game_id", id)
+      .eq("status", "sold")
+      .order("spot_number"),
+    sb.from("winners").select("id").eq("game_id", id).maybeSingle(),
   ]);
 
-  // Redaction happens here, at the boundary. The surnames and the rest of
-  // the entrant row never cross into the client bundle, so nothing that
-  // gets broadcast can contain them even if a component asked.
-  const pool: PoolMember[] = (entrants ?? []).map((e) => ({
-    id: e.id,
-    name: redactName(e.first_name, e.last_name),
-    weight: ticketsFor(e.entry_count),
+  // One tile per sold spot, weight one. Somebody holding five spots
+  // occupies five tiles because they own five of them, not because of any
+  // arithmetic about weights.
+  //
+  // The opt-in applies here too, and this is the stricter case: the board
+  // is a web page somebody chooses to open, and this is filmed and posted
+  // publicly. A buyer who declined to appear on the board has not agreed
+  // to appear on Instagram either, so their spot shows as its number.
+  //
+  // Redaction happens at this boundary. Surnames never cross into the
+  // client bundle, so nothing that gets broadcast can contain one even if
+  // a component asked for it.
+  const pool: PoolMember[] = (spots ?? []).map((sp) => ({
+    id: sp.id,
+    name:
+      sp.show_name && sp.first_name
+        ? redactName(sp.first_name, sp.last_name ?? "")
+        : `Spot ${sp.spot_number}`,
+    weight: 1,
   }));
 
   const images = Array.isArray(item?.images) ? (item.images as unknown[]) : [];
@@ -66,13 +80,13 @@ export default async function DrawPresentation({
 
   return (
     <DrawStage
-      campaignId={campaign.id}
-      prizeName={item?.name ?? campaign.title}
+      gameId={game.id}
+      prizeName={item?.name ?? game.title}
       prizeImage={prizeImage}
-      closesLabel={closesLabel(campaign.closes_at)}
+      closesLabel={`${pool.length} of ${game.total_spots} spots sold`}
       pool={pool}
-      entries={pool.reduce((sum, m) => sum + m.weight, 0)}
-      entrants={pool.length}
+      entries={pool.length}
+      entrants={new Set((spots ?? []).map((sp) => sp.spot_number)).size}
       alreadyDrawn={Boolean(winner)}
     />
   );

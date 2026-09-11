@@ -12,7 +12,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/lib/cart/store";
 import { formatUsd } from "@/lib/money";
-import { FIREARM_DISCLAIMER, PICKUP_NOTICE, REFUND_POLICY, ENTRY_CLAIM} from "@/lib/legal";
+import { FIREARM_DISCLAIMER, PICKUP_NOTICE, REFUND_POLICY } from "@/lib/legal";
 import type { FulfillmentType, VariantOption } from "@/lib/cart/types";
 
 export default function PurchasePanel({
@@ -21,8 +21,6 @@ export default function PurchasePanel({
   priceDisplay,
   fulfillment,
   available,
-  entriesEarned,
-  campaignTitle,
   variants,
   showDisclaimer,
 }: {
@@ -32,8 +30,6 @@ export default function PurchasePanel({
   priceDisplay: string | null;
   fulfillment: FulfillmentType;
   available: boolean;
-  entriesEarned: number;
-  campaignTitle: string | null;
   /** Empty for anything sold as a single unit. */
   variants: VariantOption[];
   /**
@@ -70,16 +66,6 @@ export default function PurchasePanel({
         {formatUsd(priceCents)}
       </p>
 
-      {entriesEarned > 0 && (
-        <p className="mt-3 text-sm text-acid">
-          Earns {entriesEarned} {entriesEarned === 1 ? "entry" : "entries"}
-          {campaignTitle ? ` in ${campaignTitle}` : ""}.{" "}
-          <Link href="/featured" className="underline hover:text-bone">
-            {ENTRY_CLAIM.link}
-          </Link>
-          .
-        </p>
-      )}
 
       {/* Sizes, when there are any. Sold-out ones stay on screen and
           disabled: seeing that the large has gone is information, and

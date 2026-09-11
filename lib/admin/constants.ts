@@ -5,7 +5,15 @@ export const ITEM_STATUSES = ["available", "reserved", "sold", "hidden"] as cons
 export const ITEM_LIVE_STATUSES = ["available", "reserved", "sold"] as const;
 export const ARCHIVED_STATUS = "hidden";
 export const PRODUCT_BUCKET = "product-images";
-export const CAMPAIGN_STATUSES = ["draft", "live", "closed", "awarded"] as const;
+/**
+ * A game's three states, and it is never set by hand.
+ *
+ * `open` from creation, `full` the moment the last spot sells (inside the
+ * same statement that sells it), `drawn` once a winner is recorded. There
+ * is no draft and no closing date — the game ends when it fills.
+ */
+export const GAME_STATUSES = ["open", "full", "drawn"] as const;
+export type GameStatus = (typeof GAME_STATUSES)[number];
 /**
  * Ordered the way a counter is walked: handguns, long guns, what feeds
  * them, glass, then everything else.

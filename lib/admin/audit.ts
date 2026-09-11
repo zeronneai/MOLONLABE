@@ -43,7 +43,7 @@ export type ActivityAction =
 
 export type ActivityEntry = {
   action: ActivityAction;
-  entity: "item" | "campaign" | "settings";
+  entity: "item" | "game" | "settings";
   entityId?: string | null;
   /** Name or title as it was, so a deleted record stays identifiable. */
   entityLabel?: string | null;

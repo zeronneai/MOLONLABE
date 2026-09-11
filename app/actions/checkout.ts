@@ -6,12 +6,14 @@
 //
 //   1. Price the cart from the database. The browser's numbers are never
 //      trusted, or read at all.
-//   2. Claim the stock. Inventory rows are individual units, so the claim
-//      is a conditional update that only succeeds if the item is still
-//      available. This closes the window where two people check out the
-//      same pistol.
+//   2. Claim the stock, and claim the spots. Inventory rows are
+//      individual units, so the claim is a conditional update that only
+//      succeeds if the item is still available. Spots are claimed by a
+//      function using `for update skip locked`, which is what stops two
+//      people buying the same last spot at the same instant. Both close
+//      the window between deciding to sell and being paid.
 //   3. Charge. Only now, with the goods held.
-//   4. Record. Order, lines, entries, item finalisation.
+//   4. Record. Order, lines, spots sold, item finalisation.
 //
 // If the charge fails, the claim is released. If the charge succeeds but
 // recording fails, the claim is NOT released and the failure is shouted
@@ -34,6 +36,7 @@ import {
   FIREARM_DISCLAIMER,
   REFUND_POLICY,
 } from "@/lib/legal";
+import { GAME_TERMS_TEXT } from "@/lib/games/terms";
 import { SHOP_NAME } from "@/lib/brand";
 import type { CartLine } from "@/lib/cart/types";
 
@@ -49,7 +52,8 @@ const checkoutSchema = z.object({
   lines: z
     .array(
       z.object({
-        itemId: z.string().min(1),
+        itemId: z.string().min(1).optional(),
+        gameId: z.string().min(1).optional(),
         quantity: z.number().int().min(1),
         variantId: z.string().min(1).nullable().optional(),
       }),
@@ -66,6 +70,17 @@ const checkoutSchema = z.object({
   disclaimerAccepted: z.literal(true, {
     message: "You have to accept the terms before we can take payment.",
   }),
+  /**
+   * Only demanded when the cart holds spots, and checked again on the
+   * server below rather than trusted from the form — a cart can gain a
+   * spot line between the page rendering and the post arriving.
+   */
+  gameTermsAccepted: z.boolean().optional(),
+  /**
+   * Opt-in, and it stays false unless the buyer ticked the box. Never
+   * inferred from anything else.
+   */
+  showName: z.boolean().optional(),
   opaqueData: z.object({
     dataDescriptor: z.string().min(1).max(200),
     dataValue: z.string().min(1).max(8000),
@@ -175,6 +190,9 @@ export async function submitCheckout(
   //    because the larges are still there.
   const claims: Claim[] = [];
   for (const line of cart.lines) {
+    // Spots are claimed below, by their own function. They are not rows
+    // on a shelf and the inventory claim would refuse them.
+    if (line.gameId) continue;
     let held = false;
     if (line.variantId) {
       const { data, error } = await sb.rpc("claim_variant_stock", {
@@ -205,6 +223,41 @@ export async function submitCheckout(
           : `${line.name} was taken while you were checking out. Nothing has been charged.`,
       };
     }
+  }
+
+  // Spots, claimed the same way and for the same reason. The function
+  // is all-or-nothing: asking for four when three remain takes none,
+  // rather than handing somebody three of the four they are paying for.
+  let claimedSpots: number[] = [];
+  if (cart.spotGame && cart.spotCount > 0) {
+    if (!data.gameTermsAccepted) {
+      await releaseClaims(sb, claims);
+      return {
+        ok: false,
+        message: "Accept the game terms before we can take payment.",
+      };
+    }
+    const { data: spots, error } = await sb.rpc("claim_game_spots", {
+      p_game: cart.spotGame.id,
+      p_qty: cart.spotCount,
+    });
+    if (error) logDbError("checkout claim spots", error);
+    claimedSpots = spots ?? [];
+    if (claimedSpots.length !== cart.spotCount) {
+      await releaseClaims(sb, claims);
+      return {
+        ok: false,
+        message:
+          cart.spotCount === 1
+            ? "That spot went while you were checking out. Nothing has been charged."
+            : `There aren't ${cart.spotCount} spots left any more. Nothing has been charged.`,
+      };
+    }
+    claims.push({
+      kind: "spots",
+      gameId: cart.spotGame.id,
+      spots: claimedSpots,
+    });
   }
 
   // 3. Charge.
@@ -274,9 +327,11 @@ export async function submitCheckout(
       disclaimer_text: FIREARM_DISCLAIMER,
       disclaimer_version: DISCLAIMER_VERSION,
       refund_policy_text: REFUND_POLICY,
-      campaign_id: cart.campaign?.id ?? null,
-      entries_per_dollar: cart.entriesPerDollar,
-      entries_awarded: cart.entriesEarned,
+      game_id: cart.spotGame?.id ?? null,
+      // Same pairing as the firearms disclaimer: the timestamp means
+      // nothing without the words it refers to, so both or neither.
+      game_terms_accepted_at: cart.spotGame ? acceptedAt : null,
+      game_terms_text: cart.spotGame ? GAME_TERMS_TEXT : null,
       gateway: provider.name,
       gateway_transaction_id: charge.transactionId,
       gateway_auth_code: charge.authCode,
@@ -306,12 +361,29 @@ export async function submitCheckout(
       // Claimed before the charge and deliberately not released here —
       // the customer paid. The recovery steps need to name it, because a
       // refund without putting it back leaves it invisible on the site.
-      held: cart.lines.map((l) => ({
-        name: l.name,
-        size: l.size,
-        quantity: l.quantity,
-        hold: l.variantId ? ("stock" as const) : ("reserved" as const),
-      })),
+      held: [
+        ...cart.lines
+          .filter((l) => !l.gameId)
+          .map((l) => ({
+            name: l.name,
+            size: l.size,
+            quantity: l.quantity,
+            hold: l.variantId ? ("stock" as const) : ("reserved" as const),
+          })),
+        // Spots are the urgent half of this: a held spot releases itself
+        // after 15 minutes, so unlike a reserved item it will quietly go
+        // back on sale to somebody else while this order sits unrecorded.
+        ...(cart.spotGame && claimedSpots.length > 0
+          ? [
+              {
+                name: `${cart.spotGame.title} — ${claimedSpots.length === 1 ? "spot" : "spots"} ${claimedSpots.join(", ")}`,
+                size: null,
+                quantity: claimedSpots.length,
+                hold: "spot" as const,
+              },
+            ]
+          : []),
+      ],
     });
     return {
       ok: false,
@@ -324,8 +396,12 @@ export async function submitCheckout(
   const { error: linesError } = await sb.from("order_items").insert(
     cart.lines.map((line) => ({
       order_id: order.id,
-      line_type: "inventory",
-      item_id: line.itemId,
+      line_type: line.gameId ? "game_spot" : "inventory",
+      item_id: line.gameId ? null : line.itemId,
+      game_id: line.gameId,
+      // Which spots, by number, on the order itself — so the receipt can
+      // say "spots 12, 13 and 40" without joining back to the pool.
+      spot_numbers: line.gameId ? claimedSpots : null,
       variant_id: line.variantId,
       // Snapshotted as text as well as by id: the shop may stop carrying
       // that size and delete the row, and the receipt still has to say
@@ -349,6 +425,38 @@ export async function submitCheckout(
     });
   }
 
+  // The spots are the buyer's now. `sell_game_spots` also closes the
+  // game if that was the last one — derived from a count inside the same
+  // statement rather than from anything this code passes in, so a
+  // miscount here cannot close a game early.
+  if (cart.spotGame && claimedSpots.length > 0) {
+    const { error } = await sb.rpc("sell_game_spots", {
+      p_game: cart.spotGame.id,
+      p_spots: claimedSpots,
+      p_order: order.id,
+      p_first_name: data.customer.firstName,
+      p_last_name: data.customer.lastName,
+      p_email: data.customer.email,
+      p_phone: data.customer.phone || null,
+      // Opt-in. False unless the box was ticked, never inferred.
+      p_show_name: data.showName === true,
+    });
+    if (error) {
+      logDbError("checkout sell spots", error);
+      await notifyOwner({
+        kind: "order_error",
+        severity: "urgent",
+        failure: "spots_not_sold",
+        message: `Order ${number} paid for ${claimedSpots.length} spots that were not recorded as sold.`,
+        order_number: number,
+        email: data.customer.email,
+        spot_numbers: claimedSpots,
+        game: cart.spotGame.title,
+      });
+    }
+    revalidatePath("/featured");
+  }
+
   // Shipped goods are done; collected goods stay reserved until the
   // background check clears at the counter, because a check that fails
   // puts the firearm back on the shelf.
@@ -361,38 +469,6 @@ export async function submitCheckout(
       .update({ status: "sold" })
       .in("id", shipIds);
     if (error) logDbError("checkout mark sold", error);
-  }
-
-  // Entries. A failure here must not fail the order — the buyer has their
-  // goods either way — but the owner needs to know so it can be fixed by
-  // hand before the draw.
-  // The function returns the buyer's running total for the campaign after
-  // the increment, atomically. That is the number the email quotes — no
-  // second read, and no window in which another order lands between the
-  // write and the count.
-  let entriesTotal: number | null = null;
-  if (cart.campaign && cart.entriesEarned > 0) {
-    const { data: total, error } = await sb.rpc("add_purchase_entries", {
-      p_campaign: cart.campaign.id,
-      p_email: data.customer.email,
-      p_first_name: data.customer.firstName,
-      p_last_name: data.customer.lastName,
-      p_phone: data.customer.phone || null,
-      p_entries: cart.entriesEarned,
-    });
-    if (typeof total === "number" && total > 0) entriesTotal = total;
-    if (error) {
-      logDbError("checkout entries", error);
-      await notifyOwner({
-        kind: "order_error",
-        severity: "urgent",
-        failure: "entries_not_awarded",
-        message: `Order ${number} did not receive its ${cart.entriesEarned} entries.`,
-        order_number: number,
-        email: data.customer.email,
-        entries_awarded: cart.entriesEarned,
-      });
-    }
   }
 
   const email = renderOrderConfirmation({
@@ -414,12 +490,14 @@ export async function submitCheckout(
           postalCode: data.shipping.postalCode,
         }
       : null,
-    entriesAwarded: cart.entriesEarned,
-    // Null when the entry write failed. The buyer is better served by an
-    // email that says nothing about a total than by one quoting a number
-    // that never made it into the database.
-    entriesTotal,
-    campaignTitle: cart.campaign?.title ?? null,
+    spots: cart.spotGame
+      ? {
+          game: cart.spotGame.title,
+          numbers: claimedSpots,
+          totalSpots: cart.spotGame.totalSpots,
+          unitPriceCents: cart.spotGame.spotPriceCents,
+        }
+      : null,
     cardBrand: charge.cardBrand,
     cardLast4: charge.cardLast4,
     confirmationToken: token,
@@ -474,10 +552,30 @@ export async function submitCheckout(
     collects: cart.pickupLines.map((l) => l.name),
     ship_lines: cart.shipLines.map(toNotifyLine),
     pickup_lines: cart.pickupLines.map(toNotifyLine),
-    entries_awarded: cart.entriesEarned,
-    campaign: cart.campaign?.title ?? null,
+    spot_numbers: claimedSpots,
+    game: cart.spotGame?.title ?? null,
     confirmation_emailed: sent.sent,
   });
+
+  // If that was the last spot, the game is now full and the owner has
+  // something to do. Sent after the order notification so the two arrive
+  // in the order they happened.
+  if (cart.spotGame && claimedSpots.length > 0) {
+    const { data: after } = await sb
+      .from("games")
+      .select("status, title, total_spots")
+      .eq("id", cart.spotGame.id)
+      .maybeSingle();
+    if (after?.status === "full") {
+      await notifyOwner({
+        kind: "game_full",
+        game: after.title,
+        game_id: cart.spotGame.id,
+        total_spots: after.total_spots,
+        item: cart.spotGame.title,
+      });
+    }
+  }
 
   revalidatePath("/inventory");
   revalidatePath("/featured");
@@ -503,7 +601,8 @@ function toEmailLine(line: {
 /** A held claim, and enough to undo it. */
 type Claim =
   | { kind: "unit"; itemId: string }
-  | { kind: "variant"; variantId: string; quantity: number };
+  | { kind: "variant"; variantId: string; quantity: number }
+  | { kind: "spots"; gameId: string; spots: number[] };
 
 /** Puts unsold claims back. Only ever called before a successful charge. */
 async function releaseClaims(
@@ -520,6 +619,14 @@ async function releaseClaims(
     if (error) logDbError("checkout release", error);
   }
   for (const claim of claims) {
+    if (claim.kind === "spots") {
+      const { error } = await sb.rpc("release_game_spots", {
+        p_game: claim.gameId,
+        p_spots: claim.spots,
+      });
+      if (error) logDbError("checkout release spots", error);
+      continue;
+    }
     if (claim.kind !== "variant") continue;
     const { error } = await sb.rpc("release_variant_stock", {
       p_variant: claim.variantId,

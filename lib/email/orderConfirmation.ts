@@ -34,7 +34,6 @@ import {
   PICKUP_NOTICE,
   REFUND_POLICY,
   SHIPPING_NOTICE,
-  ENTRY_CLAIM,
 } from "@/lib/legal";
 import {
   LOGO_URL,
@@ -73,16 +72,17 @@ export type OrderEmailData = {
     region: string;
     postalCode: string;
   } | null;
-  entriesAwarded: number;
   /**
-   * The buyer's running total in this campaign after this order, straight
-   * from `add_purchase_entries`, which returns it. Null when there is no
-   * campaign, when this order earned nothing, or when the entry write
-   * failed — in which case the email says nothing about a total rather
-   * than stating a number nobody has verified.
+   * The spots this order bought, if any. Null on a plain merchandise
+   * sale — ordinary purchases earn nothing at all now.
    */
-  entriesTotal: number | null;
-  campaignTitle: string | null;
+  spots: {
+    game: string;
+    /** The actual numbers held, which is what makes them checkable. */
+    numbers: number[];
+    totalSpots: number;
+    unitPriceCents: number;
+  } | null;
   cardBrand: string | null;
   cardLast4: string | null;
   /** Credential for the receipt link. Never rendered on its own. */
@@ -223,34 +223,33 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
       )}`
     : "";
 
-  // Deliberately flat. It states two counts and where the free method is,
-  // and says nothing about how entries are drawn, what they are worth or
-  // what anybody's chances are — the rules are the attorney's to write,
-  // and an email that describes the program is an email that can
-  // contradict them. The campaign is named by the first sentence, so the
-  // second does not name it again.
-  const totalSentence =
-    order.entriesTotal !== null
-      ? ` You now have <strong style="color:${C.acid}">${order.entriesTotal} ${
-          order.entriesTotal === 1 ? "entry" : "entries"
-        }</strong> in total.`
-      : "";
-
-  const entriesBlock =
-    order.entriesAwarded > 0
-      ? panel(
-          C.acid,
-          C.bone,
-          `This order earned <strong style="color:${C.acid}">${order.entriesAwarded} ${
-            order.entriesAwarded === 1 ? "entry" : "entries"
-          }</strong>${
-            order.campaignTitle ? ` in ${escapeHtml(order.campaignTitle)}` : ""
-          }.${totalSentence}
-           <div style="height:10px;line-height:10px">&nbsp;</div>
-           <span style="${SMALL};color:${C.muted}">${escapeHtml(ENTRY_CLAIM.link)} —
-           <a href="${SITE_URL}/featured" style="color:${C.acid};text-decoration:underline">${SITE_URL}/featured</a></span>`,
-        )
-      : "";
+  // Deliberately flat. It says which spots are theirs and what happens
+  // next, and nothing about how a winner is picked or anybody's chances
+  // — the rules are the attorney's to write, and an email that describes
+  // the program is an email that can contradict them.
+  //
+  // The numbers are the point. "You have 3 spots" is a claim; "spots 12,
+  // 13 and 40 of 100" is something the buyer can check against the board.
+  const spotsBlock = order.spots
+    ? panel(
+        C.acid,
+        C.bone,
+        `<strong style="color:${C.acid}">${
+          order.spots.numbers.length === 1
+            ? "Spot"
+            : `${order.spots.numbers.length} spots`
+        }</strong> in ${escapeHtml(order.spots.game)} —
+         ${
+           order.spots.numbers.length === 1
+             ? `number <strong style="color:${C.acid}">${order.spots.numbers[0]}</strong>`
+             : `numbers <strong style="color:${C.acid}">${order.spots.numbers.join(", ")}</strong>`
+         } of ${order.spots.totalSpots}.
+         <div style="height:10px;line-height:10px">&nbsp;</div>
+         <span style="${SMALL};color:${C.muted}">The draw happens once the last
+         spot sells. There is no end date — the game runs until it fills.
+         <a href="${SITE_URL}/featured" style="color:${C.acid};text-decoration:underline">Watch the board</a>.</span>`,
+      )
+    : "";
 
   const html = `<!doctype html>
 <html lang="en" style="color-scheme:dark light;supported-color-schemes:dark light">
@@ -335,7 +334,7 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
     }
   </td></tr>
 
-  ${order.entriesAwarded > 0 ? row(entriesBlock, "padding-top:28px") : ""}
+  ${order.spots ? row(spotsBlock, "padding-top:28px") : ""}
 
   <!-- The way back to the receipt. Without this the page exists and
        nobody can reach it once the tab is closed. A bordered block rather
@@ -461,18 +460,17 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
     ...(order.cardLast4
       ? [`  Paid with ${order.cardBrand ?? "card"} ending ${order.cardLast4}.`]
       : []),
-    ...(order.entriesAwarded > 0
+    ...(order.spots
       ? [
           ``,
-          `ENTRIES`,
+          `YOUR SPOTS`,
           RULE,
-          `This order earned ${order.entriesAwarded} ${order.entriesAwarded === 1 ? "entry" : "entries"}${order.campaignTitle ? ` in ${order.campaignTitle}` : ""}.`,
-          ...(order.entriesTotal !== null
-            ? [
-                `You now have ${order.entriesTotal} ${order.entriesTotal === 1 ? "entry" : "entries"} in total.`,
-              ]
-            : []),
-          `${ENTRY_CLAIM.link}: ${SITE_URL}/featured`,
+          `${order.spots.numbers.length === 1 ? "Spot" : "Spots"} ${order.spots.numbers.join(", ")} of ${order.spots.totalSpots}`,
+          `in ${order.spots.game}.`,
+          ``,
+          `The draw happens once the last spot sells. There is no end`,
+          `date — the game runs until it fills.`,
+          `${SITE_URL}/featured`,
         ]
       : []),
     ``,

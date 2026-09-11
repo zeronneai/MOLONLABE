@@ -14,6 +14,7 @@ import {
   type PricedLine,
   type RejectedLine,
 } from "./types";
+import { MAX_SPOTS_PER_ORDER } from "@/lib/games/types";
 
 /**
  * Owner-set commerce settings, in the same key/value table as the game
@@ -79,22 +80,6 @@ export function shippingFor(
     : settings.shippingStandardCents;
 }
 
-/**
- * Entries earned, floored to whole dollars of merchandise.
- *
- * Tax and shipping are excluded deliberately: nobody should earn
- * sweepstakes entries on sales tax, and a shipping charge is not spend on
- * the shop's goods. $47.60 at one per dollar is 47 entries, not 47.6 and
- * not 48.
- */
-export function entriesFor(
-  merchandiseCents: number,
-  entriesPerDollar: number,
-): number {
-  if (entriesPerDollar <= 0 || merchandiseCents <= 0) return 0;
-  return Math.floor(merchandiseCents / 100) * entriesPerDollar;
-}
-
 const REJECTION = {
   missing: "No longer listed.",
   unavailable: "No longer available.",
@@ -102,19 +87,18 @@ const REJECTION = {
   needsSize: "Pick a size for this one.",
   sizeGone: "That size has sold out.",
   noSizes: "No sizes are in stock.",
+  oneGame: "Spots in one game at a time — this cart already holds another.",
+  gameClosed: "That game has sold out. Nothing has been charged.",
+  spotCap: `${MAX_SPOTS_PER_ORDER} spots is the most in one order.`,
 } as const;
 
 /**
- * Resolves a browser cart into real items at real prices.
+ * Entries earned, floored to whole dollars of merchandise.
  *
- * Everything here is re-read from the database on every call. The cart
- * the browser sends is treated purely as a list of things it would like
- * to buy; whether those things exist, are still available, are sold
- * online at all, and what they cost are all decided here. A line that
- * fails any of those checks is moved to `rejected` with a reason rather
- * than silently dropped, so the cart page can tell the buyer what
- * changed instead of quietly showing a different total than they
- * remember.
+ * Tax and shipping are excluded deliberately: nobody should earn
+ * sweepstakes entries on sales tax, and a shipping charge is not spend on
+ * the shop's goods. $47.60 at one per dollar is 47 entries, not 47.6 and
+ * not 48.
  */
 export async function priceCart(
   lines: CartLine[],
@@ -132,11 +116,114 @@ export async function priceCart(
     totalCents: 0,
     hasShipment: false,
     hasPickup: false,
-    entriesEarned: 0,
-    entriesPerDollar: 0,
-    campaign: null,
+    spotGame: null,
+    spotCount: 0,
   };
   if (!sb || lines.length === 0) return empty;
+
+  // ------------------------------------------------------------- spots
+  //
+  // One game per cart, by construction. Spots in two games in one
+  // transaction would make the claim-then-charge dance span two pools,
+  // and a half-failed charge would leave one of them holding spots for a
+  // sale that never happened. The first game in the cart wins; the rest
+  // are refused out loud rather than silently dropped.
+  const rejectedSpots: RejectedLine[] = [];
+  let spotGame: PricedCart["spotGame"] = null;
+  let spotCount = 0;
+  const spotLines: PricedLine[] = [];
+
+  const gameWanted = new Map<string, number>();
+  for (const line of lines) {
+    if (!line.gameId) continue;
+    const qty = Math.floor(line.quantity);
+    if (!Number.isFinite(qty) || qty < 1) continue;
+    gameWanted.set(line.gameId, (gameWanted.get(line.gameId) ?? 0) + qty);
+  }
+
+  if (gameWanted.size > 0) {
+    const [firstGameId, requested] = [...gameWanted.entries()][0];
+    for (const extra of [...gameWanted.keys()].slice(1)) {
+      rejectedSpots.push({
+        key: lineKey({ gameId: extra }),
+        itemId: extra,
+        name: null,
+        reason: REJECTION.oneGame,
+      });
+    }
+
+    const { data: game, error: gameError } = await sb
+      .from("games")
+      .select("id, title, status, total_spots, spot_price_cents")
+      .eq("id", firstGameId)
+      .maybeSingle();
+    if (gameError) logDbError("priceCart game", gameError);
+
+    if (!game) {
+      rejectedSpots.push({
+        key: lineKey({ gameId: firstGameId }),
+        itemId: firstGameId,
+        name: null,
+        reason: REJECTION.missing,
+      });
+    } else {
+      // Read live rather than trusted from the page that rendered the
+      // button. Between someone opening the game and pressing buy, the
+      // last spot may have gone.
+      const { data: remainingRaw } = await sb.rpc("game_spots_remaining", {
+        p_game: game.id,
+      });
+      const remaining = Math.max(0, Math.min(game.total_spots, remainingRaw ?? 0));
+
+      if (game.status !== "open" || remaining === 0) {
+        rejectedSpots.push({
+          key: lineKey({ gameId: game.id }),
+          itemId: game.id,
+          name: game.title,
+          reason: REJECTION.gameClosed,
+        });
+      } else {
+        // Trimmed to what is actually left, and said out loud when it is
+        // less than was asked for — silently selling three of five spots
+        // is how somebody ends up surprised at the total.
+        const cap = Math.min(remaining, MAX_SPOTS_PER_ORDER);
+        spotCount = Math.max(1, Math.min(requested, cap));
+        if (spotCount < requested) {
+          rejectedSpots.push({
+            key: lineKey({ gameId: game.id }),
+            itemId: game.id,
+            name: game.title,
+            reason:
+              remaining < requested
+                ? `Only ${remaining} ${remaining === 1 ? "spot" : "spots"} left, so the cart holds ${spotCount}.`
+                : REJECTION.spotCap,
+          });
+        }
+        spotGame = {
+          id: game.id,
+          title: game.title,
+          spotPriceCents: game.spot_price_cents,
+          totalSpots: game.total_spots,
+          remaining,
+        };
+        spotLines.push({
+          gameId: game.id,
+          spotCount,
+          itemId: game.id,
+          variantId: null,
+          size: null,
+          slug: `game-${game.id}`,
+          name: `${game.title} — ${spotCount === 1 ? "1 spot" : `${spotCount} spots`}`,
+          image: null,
+          unitPriceCents: game.spot_price_cents,
+          quantity: spotCount,
+          // Not posted, not collected. See FulfillmentType.
+          fulfillment: "none",
+          lineTotalCents: game.spot_price_cents * spotCount,
+        });
+      }
+    }
+  }
 
   // Collapse duplicates before hitting the database. Keyed by item AND
   // size, so adding a medium twice is a quantity while adding a medium
@@ -151,13 +238,18 @@ export async function priceCart(
     if (existing) existing.quantity += qty;
     else wanted.set(key, { itemId: line.itemId, variantId, quantity: qty });
   }
-  if (wanted.size === 0) return empty;
+  if (wanted.size === 0 && spotLines.length === 0) {
+    return { ...empty, rejected: rejectedSpots };
+  }
 
   const itemIds = [...new Set([...wanted.values()].map((w) => w.itemId))];
-  const { data: rows, error } = await sb.from("items").select("*").in("id", itemIds);
+  const { data: rows, error } =
+    itemIds.length > 0
+      ? await sb.from("items").select("*").in("id", itemIds)
+      : { data: [], error: null };
   if (error) {
     logDbError("priceCart", error);
-    return empty;
+    return { ...empty, rejected: rejectedSpots };
   }
 
   const byId = new Map((rows ?? []).map((r) => [r.id, r]));
@@ -182,7 +274,7 @@ export async function priceCart(
   }
 
   const priced: PricedLine[] = [];
-  const rejected: RejectedLine[] = [];
+  const rejected: RejectedLine[] = [...rejectedSpots];
   // Kept beside the priced lines rather than on them: the tier is a
   // postage input, not something a buyer ever sees on a cart row.
   const oversizeItems = new Set<string>();
@@ -239,6 +331,8 @@ export async function priceCart(
     if (item.shipping_tier === "oversize") oversizeItems.add(itemId);
 
     priced.push({
+      gameId: null,
+      spotCount: 0,
       itemId,
       variantId: item.has_variants ? variantId : null,
       size,
@@ -251,6 +345,10 @@ export async function priceCart(
       lineTotalCents: item.price_cents * quantity,
     });
   }
+
+  // Spots first, so they read above the merchandise on the cart — they
+  // are the reason most of these carts exist.
+  priced.unshift(...spotLines);
 
   const shipLines = priced.filter((l) => l.fulfillment === "ship");
   const pickupLines = priced.filter((l) => l.fulfillment === "pickup");
@@ -271,18 +369,6 @@ export async function priceCart(
   // cannot overcharge.
   const taxCents = Math.round((subtotalCents * settings.taxRateBps) / 10_000);
 
-  const { data: campaign } = await sb
-    .from("campaigns")
-    .select("id, title, entries_per_dollar, closes_at")
-    .eq("status", "live")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const open =
-    campaign && (!campaign.closes_at || new Date(campaign.closes_at) > new Date());
-  const entriesPerDollar = open ? (campaign?.entries_per_dollar ?? 0) : 0;
-
   return {
     lines: priced,
     rejected,
@@ -294,8 +380,7 @@ export async function priceCart(
     totalCents: subtotalCents + taxCents + shippingCents,
     hasShipment,
     hasPickup: pickupLines.length > 0,
-    entriesEarned: entriesFor(subtotalCents, entriesPerDollar),
-    entriesPerDollar,
-    campaign: open && campaign ? { id: campaign.id, title: campaign.title } : null,
+    spotGame,
+    spotCount,
   };
 }

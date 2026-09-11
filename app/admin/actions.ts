@@ -13,7 +13,6 @@ import type { Database, Json } from "@/lib/database.types";
 import {
   ARCHIVED_STATUS,
   CATEGORIES,
-  CAMPAIGN_STATUSES,
   DEFAULT_EXCLUSION_NOTE,
   ITEM_STATUSES,
   PRODUCT_BUCKET,
@@ -490,40 +489,6 @@ export async function setInquiryStatus(id: string, status: string): Promise<void
   revalidatePath("/admin/inquiries");
 }
 
-export async function setCampaignStatus(id: string, status: string): Promise<void> {
-  const session = await requireSession();
-  if (!session || !CAMPAIGN_STATUSES.includes(status as (typeof CAMPAIGN_STATUSES)[number]))
-    return;
-  const { sb, user } = session;
-  const actor = displayName(user);
-  const { data: was } = await sb
-    .from("campaigns")
-    .select("title, status")
-    .eq("id", id)
-    .maybeSingle();
-  // One live campaign at a time: going live demotes any other live one.
-  if (status === "live") {
-    await sb
-      .from("campaigns")
-      .update({ status: "closed", updated_by_name: actor })
-      .eq("status", "live")
-      .neq("id", id);
-  }
-  const { error } = await sb
-    .from("campaigns")
-    .update({ status, updated_by_name: actor })
-    .eq("id", id);
-  if (error) console.error("setCampaignStatus:", error.message);
-  else if (was?.status !== status) {
-    await logActivity(sb, user, {
-      action: "status", entity: "campaign", entityId: id, entityLabel: was?.title ?? null,
-      field: "status", before: was?.status ?? null, after: status,
-    });
-  }
-  revalidatePublic();
-  revalidatePath("/admin/featured");
-}
-
 // --- Game & Offer ----------------------------------------------------------
 
 async function readSetting(
@@ -718,7 +683,19 @@ export async function saveCommerce(
   return { status: "idle", message: "Saved." };
 }
 
-export async function saveCampaign(
+/**
+ * Create or retitle a game.
+ *
+ * The two numbers that define it — how many spots and what each costs —
+ * are set directly rather than derived from the item's price, because
+ * only a person knows what a spot in *this* prize is worth.
+ *
+ * They are fixed at creation and cannot be edited afterwards. Changing
+ * the count would orphan or invent spots that people have already bought
+ * against; changing the price would mean two buyers paid differently for
+ * the same thing. The form says so rather than silently ignoring an edit.
+ */
+export async function saveGame(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -731,52 +708,97 @@ export async function saveCampaign(
   const title = String(formData.get("title") ?? "").trim();
   if (title.length < 2) return { status: "error", message: "Title is required." };
 
-  const toIso = (v: FormDataEntryValue | null) => {
-    const s = String(v ?? "").trim();
-    if (!s) return null;
-    const d = new Date(s);
-    return Number.isNaN(d.getTime()) ? null : d.toISOString();
-  };
+  const description = String(formData.get("description") ?? "").trim() || null;
+  const winnerNote = String(formData.get("winner_note") ?? "").trim() || null;
+  const itemId = String(formData.get("item_id") ?? "").trim() || null;
 
-  const row = {
-    title,
-    item_id: String(formData.get("item_id") ?? "").trim() || null,
-    description: String(formData.get("description") ?? "").trim() || null,
-    opens_at: toIso(formData.get("opens_at")),
-    closes_at: toIso(formData.get("closes_at")),
-    winner_note: String(formData.get("winner_note") ?? "").trim() || null,
-    // Clamped to the same range the database enforces, so a pasted value
-    // fails here with a usable form rather than as a constraint violation.
-    entries_per_dollar: Math.min(
-      1000,
-      Math.max(0, Math.round(Number(formData.get("entries_per_dollar") ?? 1) || 0)),
-    ),
-  };
+  // Editing: only the words. The numbers are settled.
+  if (id) {
+    const { error } = await sb
+      .from("games")
+      .update({
+        title,
+        description,
+        winner_note: winnerNote,
+        item_id: itemId,
+        updated_by_name: actor,
+      })
+      .eq("id", id);
+    if (error) {
+      console.error("saveGame update:", error.message);
+      return { status: "error", message: "Save failed — try again." };
+    }
+    await logActivity(sb, user, {
+      action: "update", entity: "game", entityId: id, entityLabel: title,
+    });
+    revalidatePublic();
+    revalidatePath("/admin/games");
+    redirect("/admin/games");
+  }
 
-  const { error } = id
-    ? await sb.from("campaigns").update({ ...row, updated_by_name: actor }).eq("id", id)
-    : await sb
-        .from("campaigns")
-        .insert({ ...row, status: "draft", created_by_name: actor, updated_by_name: actor });
+  const totalSpots = Math.round(Number(formData.get("total_spots") ?? 0) || 0);
+  const spotPriceCents = parseUsdToCents(String(formData.get("spot_price") ?? ""));
+  if (!Number.isFinite(totalSpots) || totalSpots < 1 || totalSpots > 10_000)
+    return { status: "error", message: "Spots must be a whole number between 1 and 10,000." };
+  if (spotPriceCents === null || spotPriceCents < 100)
+    return { status: "error", message: "Price per spot must be at least $1.00." };
 
-  if (error) {
-    console.error("saveCampaign:", error.message);
+  const { data: game, error } = await sb
+    .from("games")
+    .insert({
+      title,
+      description,
+      winner_note: winnerNote,
+      item_id: itemId,
+      total_spots: totalSpots,
+      spot_price_cents: spotPriceCents,
+      status: "open",
+      created_by_name: actor,
+      updated_by_name: actor,
+    })
+    .select("id")
+    .single();
+
+  if (error || !game) {
+    console.error("saveGame insert:", error?.message);
     return { status: "error", message: "Save failed — try again." };
   }
+
+  // Every spot exists from the moment the game does. See the migration
+  // for why this is rows rather than a counter.
+  const spots = Array.from({ length: totalSpots }, (_, i) => ({
+    game_id: game.id,
+    spot_number: i + 1,
+  }));
+  // Chunked: a 10,000-spot game is one statement too many for a single
+  // insert, and a half-created board is worse than a slow one.
+  for (let i = 0; i < spots.length; i += 500) {
+    const { error: spotError } = await sb
+      .from("game_spots")
+      .insert(spots.slice(i, i + 500));
+    if (spotError) {
+      logDbError("saveGame spots", spotError);
+      // The game exists but cannot be sold from. Remove it rather than
+      // leave a board with holes in it.
+      await sb.from("games").delete().eq("id", game.id);
+      return {
+        status: "error",
+        message: "Could not lay out the spots — nothing was created. Try again.",
+      };
+    }
+  }
+
+  await logActivity(sb, user, {
+    action: "create", entity: "game", entityId: game.id, entityLabel: title,
+    after: { spots: totalSpots, price_cents: spotPriceCents } as Json,
+  });
   revalidatePublic();
-  revalidatePath("/admin/featured");
-  redirect("/admin/featured");
+  revalidatePath("/admin/games");
+  redirect("/admin/games");
 }
 
 // --- The draw --------------------------------------------------------------
 
-/**
- * Pick a winner at random, weighted by entry_count, and record it. Every
- * entry is one ticket in the hat, which is what makes a free entry
- * genuinely equal to a purchased one. Refuses to draw twice for the same
- * campaign — a second winner would have to be a deliberate act, not a
- * double-tap.
- */
 /**
  * Commits the draw and returns the record of it.
  *
@@ -787,12 +809,18 @@ export async function saveCampaign(
  * can change the outcome; the worst a broken animation can do is fail to
  * display a winner who is already recorded.
  *
- * Idempotent by design: a campaign that already has a winner returns that
+ * The pool is one row per SOLD spot, each worth one ticket. Somebody
+ * holding five spots appears five times and has five chances, which is
+ * the whole model — and it means `selectWinner` needs no arithmetic about
+ * weights at all. The winning ticket number IS the winning spot number,
+ * which is a far better thing to read aloud than an abstract index.
+ *
+ * Idempotent by design: a game that already has a winner returns that
  * winner instead of drawing a second one. That is what lets the owner
  * re-run the presentation, or recover from a phone that locked mid-take,
  * without touching the result.
  */
-export async function commitDraw(campaignId: string): Promise<DrawRecord> {
+export async function commitDraw(gameId: string): Promise<DrawRecord> {
   const session = await requireSession();
   if (!session) return { ok: false, error: "Not signed in." };
   const { sb, user } = session;
@@ -800,7 +828,7 @@ export async function commitDraw(campaignId: string): Promise<DrawRecord> {
   const { data: already } = await sb
     .from("winners")
     .select("display_name, ticket, entry_total, seed, drawn_at")
-    .eq("campaign_id", campaignId)
+    .eq("game_id", gameId)
     .maybeSingle();
   if (already) {
     return {
@@ -814,37 +842,47 @@ export async function commitDraw(campaignId: string): Promise<DrawRecord> {
     };
   }
 
-  const { data: entrants, error } = await sb
-    .from("entrants")
-    .select("id, first_name, last_name, entry_count")
-    .eq("campaign_id", campaignId);
+  // Sold only. A held spot is a checkout in progress and is not in the
+  // draw — drawing one would hand the prize to somebody whose card may
+  // still decline.
+  const { data: spots, error } = await sb
+    .from("game_spots")
+    .select("id, spot_number, first_name, last_name")
+    .eq("game_id", gameId)
+    .eq("status", "sold")
+    .order("spot_number");
   if (error) {
     console.error("commitDraw:", error.message);
-    return { ok: false, error: "Could not read the entrants." };
+    return { ok: false, error: "Could not read the spots." };
   }
-  if (!entrants || entrants.length === 0) {
-    return { ok: false, error: "There are no entries to draw from." };
+  if (!spots || spots.length === 0) {
+    return { ok: false, error: "No spots have sold, so there is nothing to draw." };
   }
 
   const seed = newSeed();
+  // One ticket per spot. Ordered by spot number so the ticket the seed
+  // picks is the spot number itself.
   const result = selectWinner(
-    entrants.map((e) => ({ id: e.id, weight: e.entry_count })),
+    spots.map((sp) => ({ id: sp.id, weight: 1 })),
     seed,
   );
-  if (!result) return { ok: false, error: "There are no entries to draw from." };
+  if (!result) return { ok: false, error: "There is nothing to draw from." };
 
-  const winner = entrants.find((e) => e.id === result.entrantId);
+  const winner = spots.find((sp) => sp.id === result.entrantId);
   if (!winner) return { ok: false, error: "Could not resolve the winner." };
 
   // Redacted at write time: the surname never reaches the winners table,
   // so no future component can leak it by rendering the wrong column.
-  const displayNameOfWinner = redactName(winner.first_name, winner.last_name);
+  const displayNameOfWinner = redactName(
+    winner.first_name ?? "",
+    winner.last_name ?? "",
+  );
 
   const { data: written, error: insertError } = await sb
     .from("winners")
     .insert({
-      campaign_id: campaignId,
-      entrant_id: winner.id,
+      game_id: gameId,
+      spot_id: winner.id,
       display_name: displayNameOfWinner,
       seed: result.seed,
       ticket: result.ticket,
@@ -858,18 +896,18 @@ export async function commitDraw(campaignId: string): Promise<DrawRecord> {
   }
 
   await sb
-    .from("campaigns")
-    .update({ status: "awarded", updated_by_name: displayName(user) })
-    .eq("id", campaignId);
+    .from("games")
+    .update({ status: "drawn", updated_by_name: displayName(user) })
+    .eq("id", gameId);
   // The draw is the single least reversible thing anyone does in here.
   await logActivity(sb, user, {
-    action: "draw", entity: "campaign", entityId: campaignId,
+    action: "draw", entity: "game", entityId: gameId,
     entityLabel: null,
     field: "winner", before: null,
     after: { name: displayNameOfWinner, ticket: result.ticket, total: result.total, seed: result.seed } as Json,
   });
   revalidatePublic();
-  revalidatePath("/admin/featured");
+  revalidatePath("/admin/games");
 
   return {
     ok: true,

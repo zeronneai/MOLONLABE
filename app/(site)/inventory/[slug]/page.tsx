@@ -16,10 +16,9 @@ import ItemCtas from "@/components/inventory/ItemCtas";
 import { ProductJsonLd } from "@/components/seo/StructuredData";
 import TrackView from "@/components/analytics/TrackView";
 import PurchasePanel from "@/components/inventory/PurchasePanel";
-import { getLiveCampaign } from "@/lib/db/campaigns";
 import { getItemVariants } from "@/lib/db/items";
 import { needsFirearmDisclaimer } from "@/lib/admin/constants";
-import { entriesFor } from "@/lib/cart/pricing";
+
 
 // Rendered per request; inventory changes too often to cache.
 //
@@ -69,16 +68,11 @@ export default async function ItemPage({ params }: Params) {
   const status = itemStatus(item);
   const related = (await getRelatedItems(item.category, item.slug)).map(toIndexItem);
 
-  // What this one item would earn, shown before the decision rather than
-  // discovered in the cart. Zero when no campaign is running or its rate
-  // is zero, in which case the panel says nothing about entries at all.
+  // Merchandise earns nothing. Under the fixed-pool model a spot is
+  // bought in a game, not accumulated by spending — so a product page
+  // says nothing about the game at all, and that silence is correct
+  // rather than an omission.
   const variants = item.has_variants ? await getItemVariants(item.id) : [];
-  const campaign = await getLiveCampaign();
-  const open =
-    campaign &&
-    campaign.status === "live" &&
-    (!campaign.closes_at || new Date(campaign.closes_at) > new Date());
-  const rate = open ? (campaign?.entries_per_dollar ?? 0) : 0;
 
   return (
     <div className="lg:flex">
@@ -116,8 +110,6 @@ export default async function ItemPage({ params }: Params) {
           priceDisplay={item.price_display}
           fulfillment={item.fulfillment_type === "ship" ? "ship" : "pickup"}
           available={status === "available"}
-          entriesEarned={entriesFor(item.price_cents ?? 0, rate)}
-          campaignTitle={open ? (campaign?.title ?? null) : null}
           variants={variants}
           showDisclaimer={needsFirearmDisclaimer(item.category)}
         />

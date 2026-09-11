@@ -91,17 +91,16 @@ export interface Database {
         };
         Relationships: [];
       };
-      campaigns: {
+      games: {
         Row: {
           id: string;
           title: string;
           item_id: string | null;
           description: string | null;
-          opens_at: string | null;
-          closes_at: string | null;
           status: string;
           winner_note: string | null;
-          entries_per_dollar: number;
+          total_spots: number;
+          spot_price_cents: number;
           created_by: string | null;
           created_by_name: string | null;
           updated_by: string | null;
@@ -113,11 +112,10 @@ export interface Database {
           title: string;
           item_id?: string | null;
           description?: string | null;
-          opens_at?: string | null;
-          closes_at?: string | null;
           status?: string;
           winner_note?: string | null;
-          entries_per_dollar?: number;
+          total_spots: number;
+          spot_price_cents: number;
           created_by_name?: string | null;
           updated_by_name?: string | null;
           created_at?: string | null;
@@ -127,18 +125,17 @@ export interface Database {
           title?: string;
           item_id?: string | null;
           description?: string | null;
-          opens_at?: string | null;
-          closes_at?: string | null;
           status?: string;
           winner_note?: string | null;
-          entries_per_dollar?: number;
+          total_spots?: number;
+          spot_price_cents?: number;
           created_by_name?: string | null;
           updated_by_name?: string | null;
           created_at?: string | null;
         };
         Relationships: [
           {
-            foreignKeyName: "campaigns_item_id_fkey";
+            foreignKeyName: "games_item_id_fkey";
             columns: ["item_id"];
             isOneToOne: false;
             referencedRelation: "items";
@@ -146,51 +143,41 @@ export interface Database {
           },
         ];
       };
-      entrants: {
+      game_spots: {
         Row: {
           id: string;
-          campaign_id: string | null;
-          first_name: string;
-          last_name: string;
-          email: string;
+          game_id: string;
+          spot_number: number;
+          status: string;
+          order_id: string | null;
+          first_name: string | null;
+          last_name: string | null;
+          email: string | null;
           phone: string | null;
-          entry_count: number;
-          entry_method: string;
-          source: string | null;
-          created_at: string | null;
+          show_name: boolean;
+          held_at: string | null;
+          sold_at: string | null;
         };
         Insert: {
           id?: string;
-          campaign_id?: string | null;
-          first_name: string;
-          last_name: string;
-          email: string;
+          game_id: string;
+          spot_number: number;
+          status?: string;
+          order_id?: string | null;
+          first_name?: string | null;
+          last_name?: string | null;
+          email?: string | null;
           phone?: string | null;
-          entry_count?: number;
-          entry_method?: string;
-          source?: string | null;
-          created_at?: string | null;
+          show_name?: boolean;
+          held_at?: string | null;
+          sold_at?: string | null;
         };
         Update: {
-          id?: string;
-          campaign_id?: string | null;
-          first_name?: string;
-          last_name?: string;
-          email?: string;
-          phone?: string | null;
-          entry_count?: number;
-          source?: string | null;
-          created_at?: string | null;
+          status?: string;
+          order_id?: string | null;
+          show_name?: boolean;
         };
-        Relationships: [
-          {
-            foreignKeyName: "entrants_campaign_id_fkey";
-            columns: ["campaign_id"];
-            isOneToOne: false;
-            referencedRelation: "campaigns";
-            referencedColumns: ["id"];
-          },
-        ];
+        Relationships: [];
       };
       item_variants: {
         Row: {
@@ -227,8 +214,8 @@ export interface Database {
       winners: {
         Row: {
           id: string;
-          campaign_id: string;
-          entrant_id: string | null;
+          game_id: string;
+          spot_id: string | null;
           display_name: string;
           photo_url: string | null;
           note: string | null;
@@ -239,8 +226,8 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          campaign_id: string;
-          entrant_id?: string | null;
+          game_id: string;
+          spot_id?: string | null;
           display_name: string;
           photo_url?: string | null;
           note?: string | null;
@@ -251,7 +238,7 @@ export interface Database {
         };
         Update: {
           id?: string;
-          campaign_id?: string;
+          game_id?: string;
           entrant_id?: string | null;
           display_name?: string;
           photo_url?: string | null;
@@ -332,7 +319,7 @@ export interface Database {
           disclaimer_text: string;
           disclaimer_version: string | null;
           refund_policy_text: string;
-          campaign_id: string | null;
+          game_id: string | null;
           entries_per_dollar: number | null;
           entries_awarded: number;
           gateway: string;
@@ -343,6 +330,8 @@ export interface Database {
           card_last4: string | null;
           confirmation_token: string;
           confirmation_expires_at: string;
+          game_terms_accepted_at: string | null;
+          game_terms_text: string | null;
           confirmation_sent_at: string | null;
           created_at: string;
         };
@@ -370,7 +359,7 @@ export interface Database {
           disclaimer_text: string;
           disclaimer_version: string | null;
           refund_policy_text: string;
-          campaign_id?: string | null;
+          game_id?: string | null;
           entries_per_dollar?: number | null;
           entries_awarded?: number;
           gateway?: string;
@@ -382,6 +371,8 @@ export interface Database {
           confirmation_token: string;
           /** Defaulted by the database to a year out. */
           confirmation_expires_at?: string;
+          game_terms_accepted_at?: string | null;
+          game_terms_text?: string | null;
           confirmation_sent_at?: string | null;
           created_at?: string;
         };
@@ -398,6 +389,8 @@ export interface Database {
           line_type: string;
           item_id: string | null;
           pack_id: string | null;
+          game_id: string | null;
+          spot_numbers: number[] | null;
           name: string;
           unit_price_cents: number;
           quantity: number;
@@ -412,6 +405,8 @@ export interface Database {
           line_type: string;
           item_id?: string | null;
           pack_id?: string | null;
+          game_id?: string | null;
+          spot_numbers?: number[] | null;
           name: string;
           unit_price_cents: number;
           quantity: number;
@@ -507,16 +502,23 @@ export interface Database {
         Relationships: [];
       };
     };
-    Views: Record<string, never>;
+    Views: {
+      game_spot_board: {
+        Row: {
+          game_id: string;
+          spot_number: number;
+          status: string;
+          /**
+           * First name plus last initial, and only where the buyer opted
+           * in. There is no email column on this view at all — that is
+           * why the board reads it rather than the table.
+           */
+          display_name: string | null;
+        };
+        Relationships: [];
+      };
+    };
     Functions: {
-      entry_count: {
-        Args: { campaign: string };
-        Returns: number;
-      };
-      entrant_count: {
-        Args: { campaign: string };
-        Returns: number;
-      };
       claim_variant_stock: {
         Args: { p_variant: string; p_qty: number };
         Returns: boolean;
@@ -525,15 +527,30 @@ export interface Database {
         Args: { p_variant: string; p_qty: number };
         Returns: undefined;
       };
-      add_purchase_entries: {
+      /** The spot numbers claimed, or null when the game cannot supply them. */
+      claim_game_spots: {
+        Args: { p_game: string; p_qty: number };
+        Returns: number[] | null;
+      };
+      release_game_spots: {
+        Args: { p_game: string; p_spots: number[] };
+        Returns: undefined;
+      };
+      sell_game_spots: {
         Args: {
-          p_campaign: string;
-          p_email: string;
+          p_game: string;
+          p_spots: number[];
+          p_order: string;
           p_first_name: string;
           p_last_name: string;
+          p_email: string;
           p_phone: string | null;
-          p_entries: number;
+          p_show_name: boolean;
         };
+        Returns: undefined;
+      };
+      game_spots_remaining: {
+        Args: { p_game: string };
         Returns: number;
       };
     };
@@ -543,9 +560,8 @@ export interface Database {
 }
 
 export type ItemRow = Database["public"]["Tables"]["items"]["Row"];
-export type CampaignRow = Database["public"]["Tables"]["campaigns"]["Row"];
-export type EntrantRow = Database["public"]["Tables"]["entrants"]["Row"];
-export type EntrantInsert = Database["public"]["Tables"]["entrants"]["Insert"];
+export type GameRow = Database["public"]["Tables"]["games"]["Row"];
+export type GameSpotRow = Database["public"]["Tables"]["game_spots"]["Row"];
 export type WinnerRow = Database["public"]["Tables"]["winners"]["Row"];
 export type InquiryInsert = Database["public"]["Tables"]["inquiries"]["Insert"];
 export type OrderRow = Database["public"]["Tables"]["orders"]["Row"];

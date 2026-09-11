@@ -3,7 +3,7 @@ import type { Database } from "@/lib/database.types";
 
 export interface ItemReferences {
   inquiries: number;
-  campaigns: number;
+  games: number;
   orders: number;
   total: number;
   /** Human phrasing for the delete guard, e.g. "2 inquiries". */
@@ -22,23 +22,23 @@ export async function countItemReferences(
   sb: SupabaseClient<Database>,
   id: string,
 ): Promise<ItemReferences> {
-  const [inquiries, campaigns, orders] = await Promise.all([
+  const [inquiries, games, orders] = await Promise.all([
     sb.from("inquiries").select("id", { count: "exact", head: true }).eq("item_id", id),
-    sb.from("campaigns").select("id", { count: "exact", head: true }).eq("item_id", id),
+    sb.from("games").select("id", { count: "exact", head: true }).eq("item_id", id),
     sb.from("order_items").select("id", { count: "exact", head: true }).eq("item_id", id),
   ]);
   const i = inquiries.count ?? 0;
-  const c = campaigns.count ?? 0;
+  const c = games.count ?? 0;
   const o = orders.count ?? 0;
   const parts: string[] = [];
   if (i > 0) parts.push(plural(i, "inquiry", "inquiries"));
-  if (c > 0) parts.push(plural(c, "campaign", "campaigns"));
+  if (c > 0) parts.push(plural(c, "game", "games"));
   // An item that has been sold is part of the order record and can never
   // be deleted, only archived. The database enforces it too.
   if (o > 0) parts.push(plural(o, "order", "orders"));
   return {
     inquiries: i,
-    campaigns: c,
+    games: c,
     orders: o,
     total: i + c + o,
     label: parts.join(" and "),

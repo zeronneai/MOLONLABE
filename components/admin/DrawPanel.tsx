@@ -1,25 +1,29 @@
 "use client";
 
-// The draw. Weighted by entry_count, so every entry is one ticket and a
-// free entry is worth exactly what a purchased one is worth. Irreversible
-// in practice, so it sits behind a confirmation that names the campaign
-// and states the pool size.
+// The draw. One ticket per sold spot, so somebody holding five spots has
+// five chances and the winning ticket number is the winning spot number.
+// Irreversible in practice, so it sits behind a confirmation that names
+// the game and states the pool size.
 
 import { useState, useTransition } from "react";
 import { drawWinner } from "@/app/admin/actions";
 
 export default function DrawPanel({
-  campaignId,
-  campaignTitle,
-  entries,
-  entrants,
+  gameId,
+  gameTitle,
+  spotsSold,
+  totalSpots,
+  buyers,
   winnerName,
+  winningSpot,
 }: {
-  campaignId: string;
-  campaignTitle: string;
-  entries: number;
-  entrants: number;
+  gameId: string;
+  gameTitle: string;
+  spotsSold: number;
+  totalSpots: number;
+  buyers: number;
   winnerName: string | null;
+  winningSpot: number | null;
 }) {
   const [confirming, setConfirming] = useState(false);
   const [pending, start] = useTransition();
@@ -30,11 +34,12 @@ export default function DrawPanel({
         <h2 className="label text-acid">Winner drawn</h2>
         <p className="display mt-4 text-2xl">{winnerName.toUpperCase()}</p>
         <p className="mt-3 max-w-[56ch] text-sm text-muted">
-          Drawn from {entries} {entries === 1 ? "entry" : "entries"} across{" "}
-          {entrants} {entrants === 1 ? "entrant" : "entrants"}. They appear
-          under past winners on the featured page.
+          {winningSpot ? `Spot ${winningSpot}, drawn from ` : "Drawn from "}
+          {spotsSold} {spotsSold === 1 ? "spot" : "spots"} across {buyers}{" "}
+          {buyers === 1 ? "buyer" : "buyers"}. They appear under past
+          winners on the featured page.
         </p>
-        <a href={`/draw/${campaignId}`} className="control mt-6">
+        <a href={`/draw/${gameId}`} className="control mt-6">
           Open presentation
         </a>
       </section>
@@ -45,11 +50,19 @@ export default function DrawPanel({
     <section className="mt-20 border-t hairline pt-10">
       <h2 className="label text-amber">Draw a winner</h2>
       <p className="mt-3 max-w-[56ch] text-sm text-muted">
-        Picks one entry at random from all {entries}{" "}
-        {entries === 1 ? "entry" : "entries"} in the pot ({entrants}{" "}
-        {entrants === 1 ? "entrant" : "entrants"}). Entries are weighted, so
-        somebody with five entries has five tickets. This closes the
-        campaign and can only be done once.
+        Picks one spot at random from the {spotsSold}{" "}
+        {spotsSold === 1 ? "spot" : "spots"} sold, held by {buyers}{" "}
+        {buyers === 1 ? "buyer" : "buyers"}. Somebody holding five spots
+        has five chances. This can only be done once.
+        {spotsSold < totalSpots && (
+          <>
+            {" "}
+            <span className="text-amber">
+              {totalSpots - spotsSold} of {totalSpots} spots are still
+              unsold — drawing now draws from the {spotsSold} sold.
+            </span>
+          </>
+        )}
       </p>
 
       {/* Presentation mode is the intended route: it runs the same
@@ -57,19 +70,19 @@ export default function DrawPanel({
           for a draw nobody is filming. */}
       <div className="mt-6 flex flex-wrap gap-3">
         <a
-          href={`/draw/${campaignId}`}
+          href={`/draw/${gameId}`}
           className="control control-caution"
-          aria-disabled={entries === 0}
+          aria-disabled={spotsSold === 0}
         >
           Presentation mode
         </a>
         <button
           type="button"
-          disabled={entries === 0 || pending}
+          disabled={spotsSold === 0 || pending}
           onClick={() => setConfirming(true)}
           className="control"
         >
-          {entries === 0 ? "No entries yet" : "Draw without ceremony"}
+          {spotsSold === 0 ? "No spots sold yet" : "Draw without ceremony"}
         </button>
       </div>
 
@@ -82,11 +95,11 @@ export default function DrawPanel({
         >
           <div className="w-full max-w-md border hairline bg-surface p-6">
             <p className="display text-xl">
-              Draw the winner for {campaignTitle.toUpperCase()}?
+              Draw the winner for {gameTitle.toUpperCase()}?
             </p>
             <p className="mt-3 text-sm text-muted">
-              One entry is picked from {entries}. The campaign is marked
-              awarded and cannot be drawn again.
+              One spot is picked from the {spotsSold} sold. The game is
+              marked drawn and cannot be drawn again.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <button
@@ -94,7 +107,7 @@ export default function DrawPanel({
                 disabled={pending}
                 onClick={() =>
                   start(async () => {
-                    await drawWinner(campaignId);
+                    await drawWinner(gameId);
                     setConfirming(false);
                   })
                 }

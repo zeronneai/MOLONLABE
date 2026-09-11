@@ -42,12 +42,12 @@ export type OwnerNotification =
       message: string | null;
     }
   | {
-      kind: "entry";
-      name: string;
-      email: string;
-      phone: string | null;
-      campaign: string;
-      method: "free";
+      /** The last spot sold. Nothing else will happen until he draws. */
+      kind: "game_full";
+      game: string;
+      game_id: string;
+      total_spots: number;
+      item: string | null;
     }
   | {
       kind: "order";
@@ -67,21 +67,27 @@ export type OwnerNotification =
       /** The same lines with their detail, for the summary. */
       ship_lines: NotifyLine[];
       pickup_lines: NotifyLine[];
-      entries_awarded: number;
-      campaign: string | null;
+      /** Spots bought in this order, by number. Empty on a plain sale. */
+      spot_numbers: number[];
+      game: string | null;
       confirmation_emailed: boolean;
     }
   | {
       kind: "order_error";
       severity: "urgent";
       /** Which of the three failures. `charged_not_saved` is the bad one. */
-      failure: "charged_not_saved" | "lines_not_saved" | "entries_not_awarded";
+      failure:
+        | "charged_not_saved"
+        | "lines_not_saved"
+        | "spots_not_sold";
       message: string;
       order_number: string;
       transaction_id?: string;
       total_cents?: number;
       email?: string;
-      entries_awarded?: number;
+      /** Which spots, when the failure is about spots. */
+      spot_numbers?: number[];
+      game?: string;
       /**
        * What the checkout is still holding off the shelf.
        *
@@ -98,8 +104,12 @@ export type HeldItem = {
   name: string;
   size: string | null;
   quantity: number;
-  /** A single-unit row sits at "reserved"; a size has had stock taken. */
-  hold: "reserved" | "stock";
+  /**
+   * How it is being held. A single-unit row sits at "reserved"; a size
+   * has had stock taken; a "spot" is held in a game and — unlike the
+   * other two — puts itself back on sale after fifteen minutes.
+   */
+  hold: "reserved" | "stock" | "spot";
 };
 
 // ------------------------------------------------------------ summaries
@@ -163,10 +173,11 @@ export function summarize(n: OwnerNotification): string {
         "",
         money,
         paid,
-        ...(n.entries_awarded > 0
+        ...(n.spot_numbers.length
           ? [
               "",
-              `Earned ${n.entries_awarded} ${n.entries_awarded === 1 ? "entry" : "entries"}${n.campaign ? ` in ${n.campaign}` : ""}.`,
+              `SPOTS — ${n.game ?? "game"}`,
+              `  ${n.spot_numbers.length === 1 ? "Spot" : "Spots"} ${n.spot_numbers.join(", ")}`,
             ]
           : []),
         // The two things that decide what the shop does next.
@@ -192,12 +203,14 @@ export function summarize(n: OwnerNotification): string {
       ].join("\n");
     }
 
-    case "entry":
+    case "game_full":
       return [
-        `FREE ENTRY — ${n.campaign}`,
-        who(n),
+        `SOLD OUT — ${n.game}`,
+        `All ${n.total_spots} spots are gone.`,
+        ...(n.item ? ["", `Prize: ${n.item}`] : []),
         "",
-        "No purchase. One entry.",
+        "Nothing else happens until you draw it. The draw is under",
+        "Games in the admin, and it can be run on camera.",
       ].join("\n");
 
     case "order_error":
@@ -231,6 +244,8 @@ function orderErrorSummary(
     const heldLines = (n.held ?? []).map((h) => {
       const name = [h.name, h.size].filter(Boolean).join(", ");
       const qty = h.quantity > 1 ? ` ×${h.quantity}` : "";
+      if (h.hold === "spot")
+        return `  ${name} — HELD, and back on sale in 15 minutes unless you act`;
       return h.hold === "reserved"
         ? `  ${name}${qty} — marked RESERVED, off the website`
         : `  ${name}${qty} — taken out of that size's stock`;
@@ -356,22 +371,26 @@ function orderErrorSummary(
   }
 
   return [
-    "URGENT — A PURCHASE DID NOT GET ITS SWEEPSTAKES ENTRIES.",
+    "URGENT — SPOTS WERE PAID FOR AND NOT RECORDED AS SOLD.",
     "",
-    "The sale is fine and the money is fine. The entries the purchase",
-    "earned were not credited to the customer.",
+    "The card cleared and the order saved. The spots the customer paid",
+    "for are still sitting as held rather than sold, which means they",
+    "are not in the draw and the game cannot fill.",
     "",
     ...facts,
-    ...(n.entries_awarded != null
-      ? [`Entries owed: ${n.entries_awarded}`]
+    ...(n.game ? [`Game: ${n.game}`] : []),
+    ...(n.spot_numbers?.length
+      ? [`Spots: ${n.spot_numbers.join(", ")}`]
       : []),
     "",
     "WHAT TO DO",
     "",
-    "1. Add the entries by hand in the admin, under Entrants, against",
-    "   the email above.",
-    "2. It has to happen before the drawing. After the draw it cannot",
-    "   be put right.",
+    "1. Open the game in the admin and mark those spot numbers sold to",
+    "   the customer above.",
+    "2. Do it before the draw. A held spot is not in the pool, so",
+    "   drawing now would exclude somebody who paid.",
+    "3. Held spots are released automatically after 15 minutes, which",
+    "   would put them back on sale. This is the one to do first.",
     "",
     `${AGENCY_NAME}: ${AGENCY_CONTACT}`,
   ].join("\n");
@@ -389,8 +408,10 @@ export function subjectFor(n: OwnerNotification): string {
   switch (n.kind) {
     case "order":
       return `New order ${n.order_number} — ${formatUsd(n.total_cents)}${
-        n.collects.length ? " — COLLECT AT SHOP" : ""
-      }`;
+        n.spot_numbers.length
+          ? ` — ${n.spot_numbers.length} ${n.spot_numbers.length === 1 ? "spot" : "spots"}`
+          : ""
+      }${n.collects.length ? " — COLLECT AT SHOP" : ""}`;
     case "inquiry":
       return {
         item: `Item enquiry — ${n.name}`,
@@ -398,14 +419,14 @@ export function subjectFor(n: OwnerNotification): string {
         general: `Message from the website — ${n.name}`,
         service: `Service request — ${n.name}`,
       }[n.type];
-    case "entry":
-      return `Free entry — ${n.name}`;
+    case "game_full":
+      return `${n.game} has SOLD OUT — ready to draw`;
     case "order_error":
       return n.failure === "charged_not_saved"
         ? `URGENT: card charged, order NOT saved — ${n.order_number}`
         : n.failure === "lines_not_saved"
           ? `URGENT: order ${n.order_number} saved without its items`
-          : `URGENT: order ${n.order_number} did not get its entries`;
+          : `URGENT: order ${n.order_number} paid for spots that were not recorded`;
   }
 }
 

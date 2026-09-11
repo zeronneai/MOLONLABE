@@ -33,6 +33,8 @@ type CartContextValue = {
     fulfillment: FulfillmentType,
     variantId?: string | null,
   ) => void;
+  /** Spots in a game, by count. One game per cart — this replaces. */
+  addSpots: (gameId: string, quantity: number) => void;
   /** Keyed by lineKey(), because item alone does not identify a line. */
   setQuantity: (key: string, quantity: number) => void;
   remove: (key: string) => void;
@@ -49,12 +51,16 @@ function read(): CartLine[] {
     if (!Array.isArray(parsed)) return [];
     // Anything could be in here — another tab, an old build, a person with
     // devtools open. Only well-formed lines survive.
-    return parsed.flatMap((entry) => {
+    return parsed.flatMap((entry): CartLine[] => {
       if (!entry || typeof entry !== "object") return [];
-      const { itemId, quantity, variantId } = entry as Record<string, unknown>;
-      if (typeof itemId !== "string" || !itemId) return [];
+      const { itemId, gameId, quantity, variantId } = entry as Record<string, unknown>;
       const qty = Math.floor(Number(quantity));
       if (!Number.isFinite(qty) || qty < 1) return [];
+      // A spot line carries a game rather than an item.
+      if (typeof gameId === "string" && gameId) {
+        return [{ gameId, quantity: Math.min(qty, MAX_QUANTITY.none) }];
+      }
+      if (typeof itemId !== "string" || !itemId) return [];
       return [
         {
           itemId,
@@ -99,6 +105,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       // buyer has to read.
     }
   }, []);
+
+  /**
+   * Spots, by the count. Replaces rather than increments — the buy
+   * control is a number the customer chose, not a tally, and one game per
+   * cart means any existing spot line is being superseded.
+   */
+  const addSpots = useCallback(
+    (gameId: string, quantity: number) => {
+      const qty = Math.max(1, Math.min(Math.floor(quantity), MAX_QUANTITY.none));
+      const withoutSpots = read().filter((l) => !l.gameId);
+      persist([...withoutSpots, { gameId, quantity: qty }]);
+    },
+    [persist],
+  );
 
   const add = useCallback(
     (itemId: string, fulfillment: FulfillmentType, variantId?: string | null) => {
@@ -149,11 +169,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       ready,
       count: lines.reduce((sum, l) => sum + l.quantity, 0),
       add,
+      addSpots,
       setQuantity,
       remove,
       clear,
     }),
-    [lines, ready, add, setQuantity, remove, clear],
+    [lines, ready, add, addSpots, setQuantity, remove, clear],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

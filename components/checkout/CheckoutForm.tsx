@@ -24,6 +24,12 @@ import {
   SHIPPING_NOTICE,
 } from "@/lib/legal";
 import { lineKey, type PricedCart } from "@/lib/cart/types";
+import {
+  GAME_TERMS,
+  GAME_TERMS_CONSENT,
+  SHOW_NAME_HELP,
+  SHOW_NAME_LABEL,
+} from "@/lib/games/terms";
 import { receiptPath } from "@/lib/receipt";
 
 type AcceptResponse = {
@@ -66,6 +72,12 @@ export default function CheckoutForm({
   const [cart, setCart] = useState<PricedCart | null>(null);
   const [acceptReady, setAcceptReady] = useState(false);
   const [accepted, setAccepted] = useState(false);
+  // Both start false and neither is ever pre-ticked. The game terms gate
+  // payment; the board opt-in changes nothing about the sale and only
+  // decides whether a first name appears in public.
+  const [gameTerms, setGameTerms] = useState(false);
+  const [showName, setShowName] = useState(false);
+  const buyingSpots = Boolean(cart?.spotGame && cart.spotCount > 0);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [pending, start] = useTransition();
@@ -125,6 +137,10 @@ export default function CheckoutForm({
     setError(null);
     setFieldErrors({});
 
+    if (buyingSpots && !gameTerms) {
+      setError("Accept the game terms before we can take payment.");
+      return;
+    }
     if (!accepted) {
       setError("You have to accept the terms before we can take payment.");
       return;
@@ -184,6 +200,8 @@ export default function CheckoutForm({
               customer,
               shipping,
               disclaimerAccepted: true,
+              gameTermsAccepted: buyingSpots ? gameTerms : undefined,
+              showName: buyingSpots ? showName : undefined,
               opaqueData: response.opaqueData!,
             });
             if (!result.ok) {
@@ -349,6 +367,56 @@ export default function CheckoutForm({
           </label>
           {err("disclaimerAccepted")}
         </section>
+
+        {/* The game's own terms, next to the control that takes the
+            money rather than only on the rules page. Same shape as the
+            firearms disclaimer: required, blocking, and stored with a
+            timestamp on the order. */}
+        {buyingSpots && (
+          <section className="mt-12 border-t hairline pt-8">
+            <h2 className="label text-amber">
+              Terms of this game
+            </h2>
+            <ul className="mt-4 max-w-[62ch] space-y-2">
+              {GAME_TERMS.map((line) => (
+                <li key={line} className="text-sm leading-relaxed text-amber">
+                  {line}
+                </li>
+              ))}
+            </ul>
+            <label className="mt-6 flex max-w-[62ch] cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={gameTerms}
+                onChange={(e) => setGameTerms(e.target.checked)}
+                required
+                className="mt-1 h-5 w-5 shrink-0 accent-[var(--color-acid)]"
+              />
+              <span className="text-sm leading-relaxed">
+                {GAME_TERMS_CONSENT}
+              </span>
+            </label>
+            {err("gameTermsAccepted")}
+
+            {/* Opt-in, unchecked, and it stays that way unless somebody
+                deliberately ticks it. Publishing a name against a spot in
+                a firearms game without being asked is a real exposure. */}
+            <label className="mt-8 flex max-w-[62ch] cursor-pointer items-start gap-3 border-t hairline pt-8">
+              <input
+                type="checkbox"
+                checked={showName}
+                onChange={(e) => setShowName(e.target.checked)}
+                className="mt-1 h-5 w-5 shrink-0 accent-[var(--color-acid)]"
+              />
+              <span className="text-sm leading-relaxed">
+                {SHOW_NAME_LABEL}
+                <span className="label mt-2 block text-muted">
+                  {SHOW_NAME_HELP}
+                </span>
+              </span>
+            </label>
+          </section>
+        )}
       </div>
 
       <aside className="mt-14 lg:sticky lg:top-24 lg:mt-0 lg:self-start">
@@ -398,11 +466,13 @@ export default function CheckoutForm({
             </span>
           </div>
 
-          {cart.entriesEarned > 0 && (
+          {buyingSpots && (
             <p className="mt-5 border-t hairline pt-5 text-sm text-acid">
-              Earns {cart.entriesEarned}{" "}
-              {cart.entriesEarned === 1 ? "entry" : "entries"}
-              {cart.campaign ? ` in ${cart.campaign.title}` : ""}.
+              {cart.spotCount} {cart.spotCount === 1 ? "spot" : "spots"} in{" "}
+              {cart.spotGame!.title}.{" "}
+              <span className="text-muted">
+                Numbers are assigned when you pay.
+              </span>
             </p>
           )}
 
@@ -414,7 +484,7 @@ export default function CheckoutForm({
 
           <button
             type="submit"
-            disabled={!accepted || !acceptReady || pending}
+            disabled={!accepted || (buyingSpots && !gameTerms) || !acceptReady || pending}
             className="cta-primary control-go mt-7 w-full"
           >
             {pending
@@ -423,7 +493,7 @@ export default function CheckoutForm({
                 ? "Loading secure form…"
                 : `Pay ${formatUsd(cart.totalCents)}`}
           </button>
-          {!accepted && (
+          {(!accepted || (buyingSpots && !gameTerms)) && (
             <p className="label mt-3 text-center text-muted">
               Accept the terms to continue
             </p>

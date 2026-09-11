@@ -6,11 +6,24 @@
 // or a hand-crafted POST can change what someone is buying but never what
 // it costs. This is the single most important property in the checkout.
 
-export type FulfillmentType = "ship" | "pickup";
+/**
+ * "none" is a game spot. It is not posted and it is not collected — there
+ * is nothing to hand over — so it gets its own value rather than
+ * borrowing "pickup" and quietly attracting postage or a collection
+ * notice. Everything that branches on fulfillment has to answer for it.
+ */
+export type FulfillmentType = "ship" | "pickup" | "none";
 
-/** What the browser persists. Ids and counts only. */
+/**
+ * What the browser persists. Ids and counts only.
+ *
+ * A spot line carries `gameId` instead of `itemId` — it is a place in a
+ * game, not a thing on a shelf, and the price comes from the game rather
+ * than from any item.
+ */
 export type CartLine = {
-  itemId: string;
+  itemId?: string;
+  gameId?: string;
   quantity: number;
   /**
    * Which size, for items that come in sizes. Null for everything else —
@@ -24,12 +37,22 @@ export type CartLine = {
  * one in large are two lines, not one. Everything that adds, removes or
  * re-counts keys off this rather than the item id alone.
  */
-export function lineKey(line: { itemId: string; variantId?: string | null }): string {
-  return `${line.itemId}:${line.variantId ?? ""}`;
+export function lineKey(line: {
+  itemId?: string | null;
+  gameId?: string | null;
+  variantId?: string | null;
+}): string {
+  return line.gameId
+    ? `game:${line.gameId}`
+    : `${line.itemId}:${line.variantId ?? ""}`;
 }
 
 /** One line after the server has resolved and priced it. */
 export type PricedLine = {
+  /** The game, on a spot line. Null on merchandise. */
+  gameId: string | null;
+  /** How many spots, and which numbers once they are claimed. */
+  spotCount: number;
   itemId: string;
   variantId: string | null;
   /** The size as text, snapshotted for display. Null when not sized. */
@@ -63,10 +86,22 @@ export type PricedCart = {
   totalCents: number;
   hasShipment: boolean;
   hasPickup: boolean;
-  /** Entries this cart would earn, floored to whole dollars. */
-  entriesEarned: number;
-  entriesPerDollar: number;
-  campaign: { id: string; title: string } | null;
+  /**
+   * The game this cart is buying spots in, if any, and how many.
+   *
+   * One game per cart by construction: spots in two different games in
+   * one transaction would make the claim-then-charge dance span two
+   * pools, and a partial failure would leave one of them holding spots
+   * for a sale that never happened.
+   */
+  spotGame: {
+    id: string;
+    title: string;
+    spotPriceCents: number;
+    totalSpots: number;
+    remaining: number;
+  } | null;
+  spotCount: number;
 };
 
 /**
@@ -79,7 +114,7 @@ export type PricedCart = {
  * still have no stock figure at all, so a shipped one can be over-ordered
  * up to this number — see docs/content-needed.md.
  */
-export const MAX_QUANTITY = { pickup: 1, ship: 10 } as const;
+export const MAX_QUANTITY = { pickup: 1, ship: 10, none: 25 } as const;
 
 /** One size of one item, as the public pages need it. */
 export type VariantOption = {

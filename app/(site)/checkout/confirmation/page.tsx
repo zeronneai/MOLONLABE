@@ -8,7 +8,6 @@ import {
   PICKUP_NOTICE,
   REFUND_POLICY,
   SHIPPING_NOTICE,
-  ENTRY_CLAIM,
 } from "@/lib/legal";
 
 import {
@@ -66,32 +65,27 @@ export default async function ConfirmationPage({
     return <ExpiredReceipt orderNumber={order.order_number} />;
   }
 
-  // The running total, read now rather than stored on the order, so an
-  // old email opened today shows where the buyer actually stands.
-  //
-  // Only while the campaign is still open. Once it has closed the total
-  // is history, and a receipt still announcing a live-sounding count
-  // would be making a claim about a drawing that has already happened.
-  let entriesTotal: number | null = null;
-  let campaignTitle: string | null = null;
-  if (order.campaign_id && order.entries_awarded > 0) {
-    const { data: campaign } = await sb
-      .from("campaigns")
-      .select("title, status, closes_at")
-      .eq("id", order.campaign_id)
-      .maybeSingle();
-    const open =
-      campaign?.status === "live" &&
-      (!campaign.closes_at || new Date(campaign.closes_at) > new Date());
-    if (open) {
-      campaignTitle = campaign.title;
-      const { data: entrant } = await sb
-        .from("entrants")
-        .select("entry_count")
-        .eq("campaign_id", order.campaign_id)
-        .ilike("email", order.email)
-        .maybeSingle();
-      if (entrant && entrant.entry_count > 0) entriesTotal = entrant.entry_count;
+  // The spots this order bought, read from the order's own line rather
+  // than from the pool — the receipt has to keep saying what was bought
+  // even after the game is drawn and the spots have served their purpose.
+  let spots: { game: string; numbers: number[]; totalSpots: number } | null = null;
+  if (order.game_id) {
+    const [{ data: game }, { data: spotLine }] = await Promise.all([
+      sb.from("games").select("title, total_spots").eq("id", order.game_id).maybeSingle(),
+      sb
+        .from("order_items")
+        .select("spot_numbers")
+        .eq("order_id", order.id)
+        .eq("line_type", "game_spot")
+        .maybeSingle(),
+    ]);
+    const numbers = spotLine?.spot_numbers ?? [];
+    if (game && numbers.length > 0) {
+      spots = {
+        game: game.title,
+        numbers,
+        totalSpots: game.total_spots,
+      };
     }
   }
 
@@ -196,26 +190,27 @@ export default async function ConfirmationPage({
           </p>
         )}
 
-        {/* Two counts and a link to the free method. Nothing about how a
-            winner is picked, what an entry is worth, or anyone's odds —
-            that is the rules page's job, and the rules are not written
-            yet. */}
-        {order.entries_awarded > 0 && (
-          <p className="mt-8 border-l-2 border-acid pl-5 text-sm text-acid">
-            This order earned {order.entries_awarded}{" "}
-            {order.entries_awarded === 1 ? "entry" : "entries"}
-            {campaignTitle ? ` in ${campaignTitle}` : ""}.{" "}
-            {entriesTotal !== null && (
-              <>
-                You now have {entriesTotal}{" "}
-                {entriesTotal === 1 ? "entry" : "entries"} in total.{" "}
-              </>
-            )}
-            <Link href="/featured" className="underline hover:text-bone">
-              {ENTRY_CLAIM.link}
-            </Link>
-            .
-          </p>
+        {/* What was bought, by number, so it can be checked against the
+            board. Nothing about how a winner is picked or anyone's
+            chances — the rules are the attorney's to write. */}
+        {spots && (
+          <div className="mt-8 border-l-2 border-acid pl-5">
+            <p className="text-sm text-acid">
+              {spots.numbers.length === 1 ? "Spot" : "Spots"}{" "}
+              <span className="font-extrabold tracking-[-0.02em]">
+                {spots.numbers.join(", ")}
+              </span>{" "}
+              of {spots.totalSpots} in {spots.game}.
+            </p>
+            <p className="mt-2 max-w-[56ch] text-sm text-muted">
+              The draw happens once the last spot sells. There is no end
+              date — the game runs until it fills.{" "}
+              <Link href="/featured" className="underline hover:text-bone">
+                Watch the board
+              </Link>
+              .
+            </p>
+          </div>
         )}
 
         {/* Placement 3 of 3. Shown from the order's own stored copy, not
@@ -229,6 +224,11 @@ export default async function ConfirmationPage({
           <p className="mt-3 max-w-[62ch] text-sm leading-relaxed text-muted">
             {order.refund_policy_text || REFUND_POLICY}
           </p>
+          {order.game_terms_text && (
+            <p className="mt-3 max-w-[62ch] text-sm leading-relaxed text-muted">
+              {order.game_terms_text}
+            </p>
+          )}
           <p className="label mt-4 text-muted">
             Accepted{" "}
             {new Intl.DateTimeFormat("en-US", {
