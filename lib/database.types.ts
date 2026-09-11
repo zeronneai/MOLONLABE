@@ -223,6 +223,8 @@ export interface Database {
           seed: string | null;
           ticket: number | null;
           entry_total: number | null;
+          pool: Json | null;
+          ticket_index: number | null;
         };
         Insert: {
           id?: string;
@@ -235,11 +237,13 @@ export interface Database {
           seed?: string | null;
           ticket?: number | null;
           entry_total?: number | null;
+          pool?: Json | null;
+          ticket_index?: number | null;
         };
         Update: {
           id?: string;
           game_id?: string;
-          entrant_id?: string | null;
+          spot_id?: string | null;
           display_name?: string;
           photo_url?: string | null;
           note?: string | null;
@@ -247,6 +251,8 @@ export interface Database {
           seed?: string | null;
           ticket?: number | null;
           entry_total?: number | null;
+          pool?: Json | null;
+          ticket_index?: number | null;
         };
         Relationships: [];
       };
@@ -320,8 +326,6 @@ export interface Database {
           disclaimer_version: string | null;
           refund_policy_text: string;
           game_id: string | null;
-          entries_per_dollar: number | null;
-          entries_awarded: number;
           gateway: string;
           gateway_transaction_id: string | null;
           gateway_auth_code: string | null;
@@ -361,8 +365,6 @@ export interface Database {
           disclaimer_version: string | null;
           refund_policy_text: string;
           game_id?: string | null;
-          entries_per_dollar?: number | null;
-          entries_awarded?: number;
           gateway?: string;
           gateway_transaction_id?: string | null;
           gateway_auth_code?: string | null;

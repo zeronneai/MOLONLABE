@@ -27,7 +27,7 @@ import {
   logActivity,
 } from "@/lib/admin/audit";
 import { DIFFICULTY_RANGES } from "@/lib/game/settings";
-import { newSeed, redactName, selectWinner } from "@/lib/draw/select";
+import { newSeed, redactName, selectWinner, verifyDraw } from "@/lib/draw/select";
 import type { DrawRecord } from "@/lib/draw/presentation";
 
 export type { ActionState };
@@ -812,8 +812,18 @@ export async function saveGame(
  * The pool is one row per SOLD spot, each worth one ticket. Somebody
  * holding five spots appears five times and has five chances, which is
  * the whole model — and it means `selectWinner` needs no arithmetic about
- * weights at all. The winning ticket number IS the winning spot number,
- * which is a far better thing to read aloud than an abstract index.
+ * weights at all.
+ *
+ * Two different numbers come out of this and they must not be confused.
+ * `selectWinner` sorts the pool by spot id and returns an index into that
+ * sorted list. The number announced and stored as `ticket` is the WINNING
+ * SPOT NUMBER, which is a far better thing to read aloud than an abstract
+ * index — and which is only the same number by coincidence. The index is
+ * kept as `ticket_index` because reproducing the draw needs it.
+ *
+ * Everything needed to re-run the draw is written to the winners row: the
+ * seed, the frozen pool, the index and the spot. `verifyDraw` re-runs it
+ * from that row alone, and is called here before the row is stored.
  *
  * Idempotent by design: a game that already has a winner returns that
  * winner instead of drawing a second one. That is what lets the owner
@@ -825,11 +835,28 @@ export async function commitDraw(gameId: string): Promise<DrawRecord> {
   if (!session) return { ok: false, error: "Not signed in." };
   const { sb, user } = session;
 
-  const { data: already } = await sb
+  const { data: already, error: alreadyError } = await sb
     .from("winners")
     .select("display_name, ticket, entry_total, seed, drawn_at")
     .eq("game_id", gameId)
     .maybeSingle();
+  // This read is the only thing standing between a re-run and a second
+  // draw. If it fails we do not know whether this game already has a
+  // winner, and carrying on would risk overwriting one — so stop. This
+  // used to be ignored, which is how a winners table missing its audit
+  // columns turned into "couldn't save the winner" instead of naming the
+  // real problem.
+  if (alreadyError) {
+    console.error("commitDraw existing-winner check:", alreadyError.message);
+    return {
+      ok: false,
+      error:
+        "Couldn't check whether this game has already been drawn, so " +
+        "nothing has been drawn. This usually means the database is " +
+        "missing a column the draw needs. Nothing has changed — call " +
+        "Purple Roots rather than trying again.",
+    };
+  }
   if (already) {
     return {
       ok: true,
@@ -888,13 +915,27 @@ export async function commitDraw(gameId: string): Promise<DrawRecord> {
   }
 
   const seed = newSeed();
-  // One ticket per spot. Ordered by spot number so the ticket the seed
-  // picks is the spot number itself.
+  // One ticket per spot, so somebody holding five spots appears five
+  // times and has five chances — which is why selectWinner needs no
+  // arithmetic about weights at all.
+  //
+  // The selector sorts by spot id before walking, so the index it returns
+  // is an index into an id-sorted list and is NOT the spot number. They
+  // are mapped explicitly below. An earlier comment here claimed they
+  // were the same number; they are not, and the admin page was showing
+  // the index labelled as a spot.
   const result = selectWinner(
     spots.map((sp) => ({ id: sp.id, weight: 1 })),
     seed,
   );
   if (!result) return { ok: false, error: "There is nothing to draw from." };
+
+  // The pool, frozen in the order the selector walked it. Recorded on the
+  // winners row so a draw can be re-run from that row alone, without
+  // trusting that game_spots has not changed since.
+  const pool = [...spots]
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .map((sp) => ({ spot_id: sp.id, spot_number: sp.spot_number }));
 
   const winner = spots.find((sp) => sp.id === result.entrantId);
   if (!winner)
@@ -912,6 +953,29 @@ export async function commitDraw(gameId: string): Promise<DrawRecord> {
     winner.last_name ?? "",
   );
 
+  // Everything needed to reproduce this draw, written in one row. The
+  // audit trail is checked before it is stored rather than after: if the
+  // recorded numbers do not re-run to this winner, the record would be
+  // evidence of nothing and it is better to refuse than to file it.
+  const audit = {
+    seed: result.seed,
+    pool,
+    ticketIndex: result.ticket,
+    ticket: winner.spot_number,
+    total: result.total,
+  };
+  const proof = verifyDraw(audit);
+  if (!proof.ok) {
+    console.error("commitDraw self-check:", proof.reason);
+    return {
+      ok: false,
+      error:
+        "The draw ran but could not be verified, so nothing has been " +
+        "saved and the game is untouched. Do not draw on camera until " +
+        "this is looked at — call Purple Roots.",
+    };
+  }
+
   const { data: written, error: insertError } = await sb
     .from("winners")
     .insert({
@@ -919,7 +983,11 @@ export async function commitDraw(gameId: string): Promise<DrawRecord> {
       spot_id: winner.id,
       display_name: displayNameOfWinner,
       seed: result.seed,
-      ticket: result.ticket,
+      // The spot number, not the selector's index — this is the number
+      // that gets read aloud and printed under the winner.
+      ticket: winner.spot_number,
+      ticket_index: result.ticket,
+      pool,
       entry_total: result.total,
     })
     .select("drawn_at")
@@ -950,7 +1018,13 @@ export async function commitDraw(gameId: string): Promise<DrawRecord> {
     action: "draw", entity: "game", entityId: gameId,
     entityLabel: null,
     field: "winner", before: null,
-    after: { name: displayNameOfWinner, ticket: result.ticket, total: result.total, seed: result.seed } as Json,
+    after: {
+      name: displayNameOfWinner,
+      spot: winner.spot_number,
+      ticketIndex: result.ticket,
+      total: result.total,
+      seed: result.seed,
+    } as Json,
   });
   revalidatePublic();
   revalidatePath("/admin/games");
@@ -965,7 +1039,8 @@ export async function commitDraw(gameId: string): Promise<DrawRecord> {
     ok: true,
     replay: false,
     name: displayNameOfWinner,
-    ticket: result.ticket,
+    // The spot number, matching what is stored and what is announced.
+    ticket: winner.spot_number,
     total: result.total,
     seed: result.seed,
     drawnAt: written?.drawn_at ?? new Date().toISOString(),

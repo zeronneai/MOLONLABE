@@ -125,9 +125,6 @@ export default async function AdminOrders() {
                     to produce if a sale were ever questioned. */}
                 <p className="label mt-3 text-muted">
                   Terms accepted {stamp(order.disclaimer_accepted_at)}
-                  {order.entries_awarded > 0
-                    ? ` · ${order.entries_awarded} entries at ${order.entries_per_dollar}/$`
-                    : ""}
                   {order.confirmation_sent_at ? "" : " · email NOT sent"}
                 </p>
               </article>
