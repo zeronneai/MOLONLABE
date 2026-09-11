@@ -90,3 +90,70 @@ the fixed-pool model removed. They passed because that suite reads
 artifacts written by another script, and the files on disk predated the
 rebuild. The suite now refuses to run against artifacts older than the
 build rather than reporting a green run.
+
+## Repairing a drifted database
+
+### Do not re-run the chain
+
+Tested, not assumed: applying all fourteen migrations to a database that
+is already at HEAD, **nine of them abort**.
+
+| Result | Migrations |
+|---|---|
+| Re-runnable | `draw_audit`, `apparel_and_sizes`, `receipt_link`, `checkout_idempotency`, `restore_draw_audit` |
+| Aborts | the other nine |
+
+They abort for a reason that is not a bug: a migration transforms a known
+previous state into the next one. `alter table public.campaigns …` cannot
+work once `campaigns` has been renamed to `games`, and `alter table X drop
+constraint if exists Y` still requires `X` to exist — the `if exists`
+guards the constraint, not the table.
+
+On a database already at HEAD the failed run happened to destroy nothing —
+columns, constraints, indexes and policies all came out identical. That is
+worth knowing and worth not relying on. It held because each abort landed
+after the `drop constraint` / `add constraint` pair that preceded it, which
+is a property of where the errors happen to fall, not of the design. On a
+database in a **partially applied** state — which is the state you are in
+if you are reading this — statements like `drop table if exists
+public.entrants cascade` and `drop column if exists entries_awarded` will
+silently destroy whatever they find. The guards make them quiet, not safe.
+
+And the deeper problem: a run where nine of fourteen abort does not leave
+you in a known state. It leaves you in a different unknown one.
+
+### Do this instead
+
+1. **Find out what is actually wrong.** Run `scripts/check-schema.sql` in
+   the Supabase SQL editor. It needs no clone and nothing installed, and
+   it returns one row per problem — so an editor row cap cannot truncate
+   it into a wrong answer, which is exactly how a complete
+   `information_schema` dump misleads.
+2. **Apply `supabase/repair/2026-09-20-bring-to-head.sql`.** Idempotent:
+   every statement is `if not exists` / `if exists` / `create or replace`.
+   It adds and replaces; it never drops a column or a table and never
+   touches a row.
+3. **If step 1 reported a MISSING TABLE**, run that table's own migration
+   in full — the five listed above are safe whole.
+4. **Run `scripts/check-schema.sql` again** and confirm it returns nothing.
+
+Verified end to end: a database with the audit columns, the rebuild tail
+and `checkout_attempts` removed, repaired by this procedure, comes out
+**identical to one built from the chain** — 156 columns, 46 constraints,
+37 indexes, 30 policies, all matching. The repair script was then run
+twice more with no effect.
+
+### Reading an `information_schema` dump: don't
+
+The drift that started this was diagnosed from a pasted column inventory
+that stopped at exactly 100 rows. Row 100 was `order_items.size`; rows 101
+and 102 were `order_items.game_id` and `order_items.spot_numbers`, and
+`orders`, `settings` and `winners` were absent entirely. Read literally it
+says two columns are missing from `order_items` and three tables do not
+exist. All of that is the row cap.
+
+Columns come back in `ordinal_position` order, so the newest columns —
+the ones a missed migration would have added — sort last and are the first
+casualties of a cap. A truncated dump therefore fails in the most
+misleading possible direction: it manufactures exactly the symptom you are
+looking for. Use `scripts/check-schema.sql`.
