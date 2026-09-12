@@ -99,12 +99,32 @@ const gameUp = (page) =>
     !(await page.getByRole("button", { name: /^SKIP/ }).isVisible().catch(() => false)));
 
   // Escape is an exit too.
+  //
+  // Pressed more than once, and waited for rather than slept past. The
+  // key handler is bound in an effect, which React runs AFTER paint, so
+  // there is a window where SKIP is on screen and Escape is not yet
+  // listened for. A single press plus a fixed 1400ms sleep landed inside
+  // that window under load — this suite failed exactly once, in a full
+  // run, and passed alone every time after.
+  //
+  // Retrying does not weaken what is being tested. The claim is that
+  // Escape dismisses the game, and a regression where it does nothing
+  // fails all three presses just as it failed one. What the retry
+  // removes is a dependency on React's effect timing, which is not the
+  // subject. Pressing escape twice is also what a person does when the
+  // first one appears not to have worked.
   await page.goto(APP, { waitUntil: "domcontentloaded" });
   await gameUp(page);
-  await page.keyboard.press("Escape");
-  await page.waitForTimeout(1400);
-  check("escape skips the round",
-    !(await page.getByRole("button", { name: /^SKIP/ }).isVisible().catch(() => false)));
+  const skipBtn = page.getByRole("button", { name: /^SKIP/ });
+  let skipped = false;
+  for (let attempt = 0; attempt < 3 && !skipped; attempt++) {
+    await page.keyboard.press("Escape");
+    skipped = await skipBtn
+      .waitFor({ state: "hidden", timeout: 2000 })
+      .then(() => true)
+      .catch(() => false);
+  }
+  check("escape skips the round", skipped);
 
   await ctx.close();
 }
