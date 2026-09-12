@@ -320,6 +320,54 @@ The fix is asserted against the double and against stock PostgreSQL.
 Nobody has loaded the real home page since. `test` should read 5 of 5 and
 `PRUEBA` 12 of 100.
 
+## An intermittent hydration mismatch, seen only under load (2026-09-12)
+
+**Open. Not diagnosed. Pre-existing — not caused by any change this
+round, and worth someone's time before launch.**
+
+On a full `npm test` run, exactly one browser suite fails with:
+
+```
+PAGE ERROR Minified React error #418
+```
+
+React 418 is a hydration mismatch: the HTML the server sent did not match
+what the client produced on hydration, so React throws the server markup
+away and re-renders. In production that is a visible flash, and on a slow
+phone a real delay on a page that had already painted.
+
+What is known, from three full runs:
+
+- It lands on a **different suite each time** — `tax`, then `intro`, then
+  `receipt`. Never the same one twice.
+- Every affected suite passes **3/3 in isolation**. It only appears when
+  twenty-odd suites are competing for the CPU.
+- It is almost certainly present in more suites than it is reported in.
+  Only eight register a `pageerror` handler, so the others could hit the
+  same thing silently. That the failure moves between exactly those eight
+  is the strongest evidence it is one shared cause, not three.
+
+What has been ruled out:
+
+- `components/home/Countdown.tsx` — correct (renders `--` on the server,
+  starts ticking after hydration) and **completely unused**; no call
+  sites. A dead component, worth deleting on its own merits.
+- `components/admin/AdminLogin.tsx` — seeds state from `Date.now()`, but
+  only compares it against a lock that starts at zero, so the first
+  render matches on both sides.
+
+Where to look next: something in the shared layout, since the error moves
+across unrelated pages. A `Date`-dependent or `localStorage`-dependent
+render that is normally fast enough to hydrate before it matters would
+fit every observation.
+
+**Why it was invisible until now.** Eight suites report an uncaught
+browser exception by pushing `PAGE ERROR …` onto the same list as their
+assertions, so it counted toward the failure total — but the runner only
+printed lines starting with `FAIL `. The tally said something broke and
+the output said nothing did. Fixed in `40ec7cc`; this is the first
+finding it surfaced.
+
 ## Still carried in the top three
 
 1. **A genuinely declined card.** In progress.
@@ -327,3 +375,8 @@ Nobody has loaded the real home page since. `test` should read 5 of 5 and
    largest untested claim in the repo by a distance.
 3. **The double has no row level security**, so no browser suite can see
    an RLS mistake. New, and it has already cost one production bug.
+
+Close behind: the intermittent hydration mismatch above. It is not a
+launch blocker on its own, but it is a real defect that shipped without
+anyone noticing, and it is the kind that gets worse on the cheap phones
+this shop's customers actually use.
