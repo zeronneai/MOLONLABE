@@ -210,10 +210,21 @@ where e.table_name in (select table_name from present)
 
 union all
 
--- Reported, but not something to act on: a column the application has
--- stopped declaring. Listed so the list does not grow unnoticed.
+-- A column the application does not declare. Two very different things
+-- arrive here and the wording used to call both harmless:
+--
+--   a column a migration SUPERSEDED — left behind on purpose, because
+--   the repair script only ever adds. Nothing to do.
+--
+--   a column somebody ADDED BY HAND that was never in the schema. That
+--   one is worth removing, and "no action needed" is the wrong advice:
+--   a stored column nothing reads is a lever somebody will eventually
+--   pull, expecting the site to change.
+--
+-- This cannot tell them apart — it only knows the app does not declare
+-- the column — so it says so and leaves the judgement where it belongs.
 select 'EXTRA COLUMN', a.table_name, a.column_name,
-       'Harmless — the app no longer declares this. No action needed.'
+       'The app does not declare this. Fine if a migration superseded it; remove it if it was added by hand.'
 from actual a
 where a.table_name in (select distinct table_name from expected)
   and not exists (
