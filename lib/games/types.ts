@@ -46,5 +46,40 @@ export function isBuyable(game: Game, counts: SpotCounts): boolean {
   return game.status === "open" && counts.remaining > 0;
 }
 
+/**
+ * The three states a game can be in, as a visitor experiences them.
+ *
+ * Not the same as `status`, and deliberately so. `status` has three
+ * values too, but a game that has sold its last spot and not yet had the
+ * status write land is `open` in the database and finished selling in
+ * fact — and a listing that calls it "Open now" wastes the visit of
+ * somebody who arrived ready to buy.
+ *
+ * So the count is consulted as well as the status, the same reasoning as
+ * `isBuyable` above and for the same reason: the two can disagree for a
+ * moment, and where they disagree the honest answer is the one that
+ * refuses a sale rather than the one that offers a spot that is gone.
+ *
+ *   open      spots are available now
+ *   awaiting  every spot is taken, the draw has not happened
+ *   finished  drawn, with a winner
+ *
+ * `awaiting` is a real state rather than a flavour of open because
+ * nothing can be bought in it. It stays visible — a pool that filled is
+ * the best evidence there is that these games actually run — but it
+ * carries no buy control at all.
+ */
+export type GameState = "open" | "awaiting" | "finished";
+
+export function gameState(game: {
+  status: GameStatus;
+  sold: number;
+  totalSpots: number;
+}): GameState {
+  if (game.status === "drawn") return "finished";
+  if (game.status === "full" || game.sold >= game.totalSpots) return "awaiting";
+  return "open";
+}
+
 /** How many spots one person may take in a single transaction. */
 export const MAX_SPOTS_PER_ORDER = 25;

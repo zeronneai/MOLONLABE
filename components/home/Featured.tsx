@@ -2,6 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import Reveal from "@/components/motion/Reveal";
 import { getCurrentGame, getSpotCounts } from "@/lib/games/queries";
+import { gameState } from "@/lib/games/types";
+import type { GameStatus } from "@/lib/games/types";
 import { itemImages } from "@/lib/db/items";
 
 export default async function Featured() {
@@ -27,6 +29,14 @@ export default async function Featured() {
   const counts = await getSpotCounts(game.id, game.total_spots);
   const image = game.item ? itemImages(game.item)[0] : undefined;
   const name = game.item?.name ?? game.title;
+  // Same rule as the games list, from the same place, so the home page
+  // and /games cannot describe one game two different ways.
+  const state = gameState({
+    status: game.status as GameStatus,
+    sold: counts.sold,
+    totalSpots: counts.total,
+  });
+  const awaiting = state === "awaiting";
 
   return (
     /* The green ground. This is the one section on the page where acid
@@ -37,7 +47,9 @@ export default async function Featured() {
       {/* Left 60%: the pitch */}
       <div className="pl-page order-2 flex flex-col justify-center py-16 pr-8 lg:order-1 lg:py-24">
         <Reveal>
-          <p className="label">Open game</p>
+          <p className="label">
+            {awaiting ? "Sold out — awaiting the draw" : "Open game"}
+          </p>
           <h2 className="display mt-6 text-[clamp(2.25rem,4.5vw,4.5rem)]">
             {name.toUpperCase()}
           </h2>
@@ -57,7 +69,7 @@ export default async function Featured() {
                 <span className="text-muted">/{counts.total}</span>
               </div>
               <div className="label mt-2 text-muted">
-                {counts.remaining === 0 ? "Sold out" : "Spots left"}
+                {awaiting ? "Every spot taken" : "Spots left"}
               </div>
             </div>
           </div>
@@ -65,9 +77,24 @@ export default async function Featured() {
 
         <Reveal delay={120}>
           <div className="mt-12">
-            <Link href="/featured" className="cta-primary">
-              {counts.remaining === 0 ? "See the board" : "Take a spot"}
-            </Link>
+            {/* The primary call to action is a buy control, so a game
+                with nothing to sell does not get one. It keeps a way
+                through to the board, at secondary weight. */}
+            {awaiting ? (
+              <>
+                <p className="max-w-md text-muted">
+                  Nothing left to buy. The draw happens next — the winner
+                  is posted on the game and announced on Instagram.
+                </p>
+                <Link href="/featured" className="cta-secondary mt-6">
+                  See the board →
+                </Link>
+              </>
+            ) : (
+              <Link href="/featured" className="cta-primary">
+                Take a spot
+              </Link>
+            )}
           </div>
         </Reveal>
       </div>

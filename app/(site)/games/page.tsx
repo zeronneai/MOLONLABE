@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 export default async function GamesPage() {
-  const { live, finished } = await getAllGames();
+  const { open, awaiting, finished } = await getAllGames();
 
   return (
     <div className="px-page pb-24 pt-[calc(72px+4rem)]">
@@ -30,28 +30,61 @@ export default async function GamesPage() {
         runs until it fills.
       </p>
 
-      {/* ------------------------------------------------- live */}
+      {/* ------------------------------------------------- open */}
       <section className="mt-16" aria-labelledby="open-games">
         <h2 id="open-games" className="label text-acid">
           Open now
         </h2>
-        {live.length > 0 ? (
+        {open.length > 0 ? (
           <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {live.map((g) => (
-              <GameCard key={g.id} game={g} />
+            {open.map((g) => (
+              <GameCard key={g.id} game={g} state="open" />
             ))}
           </div>
         ) : (
-          <div className="mt-6">
-            <EmptyState
-              label="Nothing running"
-              headline="NO GAME IS OPEN."
-              body="Nothing is running right now. The next one goes up here the moment it opens — and it sells until the last spot goes, so there is no date to miss."
-              action={{ href: "/in-the-case", text: "See what's in the case" }}
-            />
-          </div>
+          /* The empty state is suppressed when something is awaiting its
+             draw. "Nothing is running right now" would be false with a
+             full pool sitting directly underneath, and the section below
+             says what is actually happening. */
+          awaiting.length === 0 && (
+            <div className="mt-6">
+              <EmptyState
+                label="Nothing running"
+                headline="NO GAME IS OPEN."
+                body="Nothing is running right now. The next one goes up here the moment it opens — and it sells until the last spot goes, so there is no date to miss."
+                action={{ href: "/in-the-case", text: "See what's in the case" }}
+              />
+            </div>
+          )
+        )}
+        {open.length === 0 && awaiting.length > 0 && (
+          <p className="mt-6 max-w-[52ch] text-muted">
+            Nothing is open for spots at the moment. The game below filled
+            and is waiting on its draw.
+          </p>
         )}
       </section>
+
+      {/* -------------------------------------- awaiting the draw */}
+      {awaiting.length > 0 && (
+        <section
+          className="mt-20 border-t hairline pt-12"
+          aria-labelledby="awaiting-games"
+        >
+          <h2 id="awaiting-games" className="label text-amber">
+            Awaiting the draw
+          </h2>
+          <p className="mt-3 max-w-[52ch] text-sm text-muted">
+            Every spot is taken. Nothing here can be bought — the draw is
+            what happens next, and the winner is posted on the game.
+          </p>
+          <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {awaiting.map((g) => (
+              <GameCard key={g.id} game={g} state="awaiting" />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ---------------------------------------------- history */}
       {finished.length > 0 && (
@@ -65,7 +98,7 @@ export default async function GamesPage() {
           </p>
           <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {finished.map((g) => (
-              <GameCard key={g.id} game={g} finished />
+              <GameCard key={g.id} game={g} state="finished" />
             ))}
           </div>
         </section>

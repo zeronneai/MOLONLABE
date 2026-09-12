@@ -1,6 +1,7 @@
 import { getSupabase } from "@/lib/supabase/server";
 import { logDbError } from "@/lib/db/log";
 import type { GameRow, ItemRow } from "@/lib/database.types";
+import { gameState } from "./types";
 import type { BoardSpot, Game, SpotCounts } from "./types";
 
 export type GameWithItem = GameRow & { item: ItemRow | null };
@@ -150,18 +151,25 @@ export type GameSummary = {
 };
 
 /**
- * Every game with its sold count, newest first, split into live and done.
+ * Every game with its sold count, newest first, in its three states.
  *
  * One query per table rather than per game: a games page with twenty
  * games would otherwise make forty-one round trips, and the counts are
  * cheap to group in memory.
+ *
+ * Three groups rather than live-and-done. A game that has sold out but
+ * not yet been drawn is neither: putting it under "Open now" wastes the
+ * visit of someone who came to buy, and hiding it throws away the best
+ * evidence on the site that these games fill. See `gameState`.
  */
 export async function getAllGames(): Promise<{
-  live: GameSummary[];
+  open: GameSummary[];
+  awaiting: GameSummary[];
   finished: GameSummary[];
 }> {
+  const empty = { open: [], awaiting: [], finished: [] };
   const sb = getSupabase();
-  if (!sb) return { live: [], finished: [] };
+  if (!sb) return empty;
 
   // The counts come from game_scoreboard, never from game_spots.
   //
@@ -181,7 +189,7 @@ export async function getAllGames(): Promise<{
     ]);
   if (error) {
     logDbError("getAllGames", error);
-    return { live: [], finished: [] };
+    return empty;
   }
 
   const scoreBy = new Map(
@@ -213,8 +221,9 @@ export async function getAllGames(): Promise<{
   });
 
   return {
-    live: all.filter((g) => g.status !== "drawn"),
-    finished: all.filter((g) => g.status === "drawn"),
+    open: all.filter((g) => gameState(g) === "open"),
+    awaiting: all.filter((g) => gameState(g) === "awaiting"),
+    finished: all.filter((g) => gameState(g) === "finished"),
   };
 }
 

@@ -3,6 +3,7 @@ import Image from "next/image";
 import { formatUsd } from "@/lib/money";
 import { itemImages } from "@/lib/db/items";
 import type { GameSummary } from "@/lib/games/queries";
+import type { GameState } from "@/lib/games/types";
 import { demoStrippedTitle, isDemoGame } from "@/lib/surfaces";
 
 const stamp = (iso: string | null) => {
@@ -18,25 +19,32 @@ const stamp = (iso: string | null) => {
 };
 
 /**
- * One game, live or finished.
+ * One game, in whichever of the three states it is in.
  *
  * The count is the loudest thing on the card. It is the whole tension of
  * a fixed-pool game — "31 of 100 gone" tells a visitor more about whether
  * to act than any sentence we could write — so it is set in the display
  * face rather than tucked into a caption.
+ *
+ * A game awaiting its draw gets NO buy control, not a disabled one. A
+ * disabled button is still a button: it reads as something that might
+ * work if you tried harder, and on a phone it is a thing to tap at. The
+ * absence is the message.
  */
 export default function GameCard({
   game,
-  finished = false,
+  state,
 }: {
   game: GameSummary;
-  finished?: boolean;
+  state: GameState;
 }) {
   const image = game.item ? itemImages(game.item)[0] ?? null : null;
   const remaining = Math.max(0, game.totalSpots - game.sold);
   const pct = game.totalSpots > 0 ? (game.sold / game.totalSpots) * 100 : 0;
   const drawnOn = stamp(game.drawnAt);
   const demo = isDemoGame(game.title);
+  const finished = state === "finished";
+  const awaiting = state === "awaiting";
 
   return (
     <article className="border hairline bg-surface">
@@ -64,8 +72,19 @@ export default function GameCard({
       </div>
 
       <div className="p-6">
-        <p className={`label ${finished ? "text-muted" : "text-acid"}`}>
-          {finished ? `Drawn${drawnOn ? ` ${drawnOn}` : ""}` : "Open now"}
+        {/* The eyebrow carries the state, and it is the first thing read.
+            "Open now" on a sold-out game is the whole problem this card
+            was changed to fix. */}
+        <p
+          className={`label ${
+            finished ? "text-muted" : awaiting ? "text-amber" : "text-acid"
+          }`}
+        >
+          {finished
+            ? `Drawn${drawnOn ? ` ${drawnOn}` : ""}`
+            : awaiting
+              ? "Sold out — awaiting the draw"
+              : "Open now"}
         </p>
         <h3 className="display mt-3 text-xl">
           {demoStrippedTitle(game.title).toUpperCase()}
@@ -80,11 +99,11 @@ export default function GameCard({
           {game.sold}
           <span className="text-muted"> / {game.totalSpots}</span>
         </p>
-        <p className="label mt-1 text-muted">
+        <p className={`label mt-1 ${awaiting ? "text-amber" : "text-muted"}`}>
           {finished
             ? `${game.sold} ${game.sold === 1 ? "spot" : "spots"} sold`
-            : remaining === 0
-              ? "Sold out — drawing soon"
+            : awaiting
+              ? "Every spot taken"
               : `${remaining} left`}
         </p>
 
@@ -115,13 +134,30 @@ export default function GameCard({
               </p>
             ) : null}
           </>
+        ) : awaiting ? (
+          /* No price and no buy control. The price of a spot is a thing
+             you act on, and there is no action here — showing it invites
+             a visitor to work out what it would have cost, which is not
+             the message. What is left is what happens next. */
+          <>
+            <p className="mt-5 max-w-[34ch] text-sm text-muted">
+              Nothing left to buy. The draw happens next and the winner is
+              posted here.
+            </p>
+            <Link
+              href="/featured"
+              className="cta-secondary mt-5 inline-block"
+            >
+              See the board →
+            </Link>
+          </>
         ) : (
           <>
             <p className="mt-5 text-sm text-muted">
               {formatUsd(game.spotPriceCents)} a spot
             </p>
             <Link href="/featured" className="control mt-5 w-full justify-center">
-              {remaining === 0 ? "See the board" : "Take a spot"}
+              Take a spot
             </Link>
           </>
         )}
