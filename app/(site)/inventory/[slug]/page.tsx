@@ -86,7 +86,7 @@ export default async function ItemPage({ params }: Params) {
       {/* Right half: everything else, scrolling */}
       <div className="px-page pb-28 pt-8 lg:w-1/2 lg:px-12 lg:pb-0 lg:pt-28">
         <nav aria-label="Breadcrumb" className="label text-muted">
-          <Link href="/inventory" className="transition-colors hover:text-bone">
+          <Link href="/in-the-case" className="transition-colors hover:text-bone">
             Inventory
           </Link>
           <span className="mx-2" aria-hidden="true">

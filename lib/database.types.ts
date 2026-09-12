@@ -28,6 +28,7 @@ export interface Database {
           price_cents: number | null;
           fulfillment_type: string;
           shipping_tier: string;
+          shipping_override_cents: number | null;
           has_variants: boolean;
           status: string;
           created_by: string | null;
@@ -54,6 +55,7 @@ export interface Database {
           price_cents?: number | null;
           fulfillment_type?: string;
           shipping_tier?: string;
+          shipping_override_cents?: number | null;
           has_variants?: boolean;
           status?: string;
           created_by_name?: string | null;
@@ -78,6 +80,7 @@ export interface Database {
           price_cents?: number | null;
           fulfillment_type?: string;
           shipping_tier?: string;
+          shipping_override_cents?: number | null;
           has_variants?: boolean;
           status?: string;
           created_by_name?: string | null;
@@ -225,6 +228,8 @@ export interface Database {
           entry_total: number | null;
           pool: Json | null;
           ticket_index: number | null;
+          drawn_early: boolean;
+          unsold_spots: number | null;
         };
         Insert: {
           id?: string;
@@ -239,6 +244,8 @@ export interface Database {
           entry_total?: number | null;
           pool?: Json | null;
           ticket_index?: number | null;
+          drawn_early?: boolean;
+          unsold_spots?: number | null;
         };
         Update: {
           id?: string;
@@ -253,6 +260,8 @@ export interface Database {
           entry_total?: number | null;
           pool?: Json | null;
           ticket_index?: number | null;
+          drawn_early?: boolean;
+          unsold_spots?: number | null;
         };
         Relationships: [];
       };

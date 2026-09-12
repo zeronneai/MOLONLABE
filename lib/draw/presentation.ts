@@ -16,7 +16,18 @@ export type PoolMember = {
 
 /** What `commitDraw` hands back once the result exists in the database. */
 export type DrawRecord =
-  | { ok: false; error: string }
+  | {
+      ok: false;
+      error: string;
+      /**
+       * Set when the refusal is "there are unsold spots, are you sure".
+       * That is not a failure — it is a question, and the caller has to
+       * tell the two apart to know whether to offer a way through.
+       */
+      needsEarlyConfirmation?: boolean;
+      unsold?: number;
+      totalSpots?: number;
+    }
   | {
       ok: true;
       /** True when the campaign already had a winner and this is a re-run. */

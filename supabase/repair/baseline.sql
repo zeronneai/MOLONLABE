@@ -591,7 +591,8 @@ create table if not exists public.items (
   created_by_name text,
   updated_by uuid,
   updated_by_name text,
-  shipping_tier text default 'standard'::text not null
+  shipping_tier text default 'standard'::text not null,
+  shipping_override_cents integer
 );
 alter table public.items add column if not exists id uuid default gen_random_uuid();
 do $$ begin
@@ -721,6 +722,7 @@ do $$ begin
     end if;
   end if;
 end $$;
+alter table public.items add column if not exists shipping_override_cents integer;
 
 create table if not exists public.order_items (
   id uuid default gen_random_uuid() not null,
@@ -1232,7 +1234,9 @@ create table if not exists public.winners (
   ticket integer,
   entry_total integer,
   pool jsonb,
-  ticket_index integer
+  ticket_index integer,
+  drawn_early boolean default false not null,
+  unsold_spots integer
 );
 alter table public.winners add column if not exists id uuid default gen_random_uuid();
 do $$ begin
@@ -1298,6 +1302,21 @@ alter table public.winners add column if not exists ticket integer;
 alter table public.winners add column if not exists entry_total integer;
 alter table public.winners add column if not exists pool jsonb;
 alter table public.winners add column if not exists ticket_index integer;
+alter table public.winners add column if not exists drawn_early boolean default false;
+do $$ begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'winners'
+      and column_name = 'drawn_early' and is_nullable = 'YES'
+  ) then
+    if exists (select 1 from public.winners where drawn_early is null) then
+      raise notice 'public.winners.drawn_early holds nulls; left nullable. Fill them, then: alter table public.winners alter column drawn_early set not null;';
+    else
+      alter table public.winners alter column drawn_early set not null;
+    end if;
+  end if;
+end $$;
+alter table public.winners add column if not exists unsold_spots integer;
 
 -- ---------------------------------------------------------------------
 -- Views
@@ -1516,6 +1535,15 @@ end $$;
 do $$ begin
   if not exists (
     select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+    where n.nspname = 'public' and c.conname = 'items_firearms_have_no_online_price'
+      and c.conrelid = 'items'::regclass
+  ) then
+    alter table items add constraint items_firearms_have_no_online_price CHECK (((category <> ALL (ARRAY['pistol'::text, 'revolver'::text, 'rifle'::text, 'shotgun'::text, 'pcc'::text])) OR (price_cents IS NULL)));
+  end if;
+end $$;
+do $$ begin
+  if not exists (
+    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
     where n.nspname = 'public' and c.conname = 'items_fulfillment_type_valid'
       and c.conrelid = 'items'::regclass
   ) then
@@ -1529,6 +1557,15 @@ do $$ begin
       and c.conrelid = 'items'::regclass
   ) then
     alter table items add constraint items_price_cents_positive CHECK (((price_cents IS NULL) OR (price_cents > 0)));
+  end if;
+end $$;
+do $$ begin
+  if not exists (
+    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+    where n.nspname = 'public' and c.conname = 'items_shipping_override_sane'
+      and c.conrelid = 'items'::regclass
+  ) then
+    alter table items add constraint items_shipping_override_sane CHECK (((shipping_override_cents IS NULL) OR ((shipping_override_cents >= 0) AND (shipping_override_cents <= 100000))));
   end if;
 end $$;
 do $$ begin

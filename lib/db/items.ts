@@ -1,12 +1,19 @@
 import { getSupabase } from "@/lib/supabase/server";
 import { logDbError } from "@/lib/db/log";
-import { SHOP_CATEGORIES } from "@/lib/admin/constants";
+import { FIREARM_CATEGORIES } from "@/lib/surfaces";
 import type { ItemRow, ItemStatus } from "@/lib/database.types";
 import type { IndexItem } from "@/components/inventory/EditorialIndex";
 import type { VariantOption } from "@/lib/cart/types";
 
-/** Postgrest list literal for the categories that live at /shop. */
-const SHOP_LIST = `(${SHOP_CATEGORIES.join(",")})`;
+/**
+ * PostgREST list literal for the firearm categories.
+ *
+ * These are the dividing line between the three public surfaces: a
+ * firearm goes in the case, everything else is shop stock, and a game
+ * overrides both. See lib/surfaces.ts for why the split is by category
+ * and not by whether the thing has a price.
+ */
+const FIREARM_LIST = `(${FIREARM_CATEGORIES.join(",")})`;
 
 // All reads go through the anon client; RLS already hides status='hidden',
 // and the explicit filter here keeps intent obvious.
@@ -28,29 +35,40 @@ export async function getVisibleItems(): Promise<ItemRow[]> {
 }
 
 /**
- * The case: firearms, ammunition, glass. What /inventory lists.
+ * In the case: firearms physically on the shelf at the shop.
  *
- * Apparel and accessories are excluded because they are shopped for
- * differently — see getShopItems.
+ * No price and no cart — these generate an enquiry. A firearm currently
+ * attached to a game is excluded, because while it is in a game it
+ * belongs on the Games surface; the caller passes those ids in.
  */
-export async function getInventoryItems(): Promise<ItemRow[]> {
+export async function getCaseItems(excludeIds: string[] = []): Promise<ItemRow[]> {
   const sb = getSupabase();
   if (!sb) return [];
-  const { data, error } = await sb
+  let q = sb
     .from("items")
     .select("*")
     .neq("status", "hidden")
-    .not("category", "in", SHOP_LIST)
+    .in("category", [...FIREARM_CATEGORIES]);
+  if (excludeIds.length) q = q.not("id", "in", `(${excludeIds.join(",")})`);
+  const { data, error } = await q
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });
   if (error) {
-    logDbError("getInventoryItems", error);
+    logDbError("getCaseItems", error);
     return [];
   }
   return data;
 }
 
-/** Apparel and accessories: the part of the catalogue that just ships. */
+/**
+ * The Shop: everything a customer can put in a cart.
+ *
+ * Not a category allow-list any more — it is "not a firearm, and priced".
+ * The price filter is the part worth explaining: an item with no price
+ * cannot be bought, and an unbuyable row in a shop is a dead end that
+ * makes the shop look broken. The owner is told why it is missing, in the
+ * admin, against the item. See lib/surfaces.ts.
+ */
 export async function getShopItems(): Promise<ItemRow[]> {
   const sb = getSupabase();
   if (!sb) return [];
@@ -58,7 +76,8 @@ export async function getShopItems(): Promise<ItemRow[]> {
     .from("items")
     .select("*")
     .neq("status", "hidden")
-    .in("category", [...SHOP_CATEGORIES])
+    .not("category", "in", FIREARM_LIST)
+    .not("price_cents", "is", null)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });
   if (error) {
@@ -109,13 +128,24 @@ export async function getSoldOutItemIds(itemIds: string[]): Promise<Set<string>>
   return new Set([...total.entries()].filter(([, n]) => n <= 0).map(([id]) => id));
 }
 
-export async function getFreshArrivals(limit = 6): Promise<ItemRow[]> {
+/**
+ * The newest things a customer can actually buy.
+ *
+ * Purchasable only — not a firearm, and priced. The home page is a taste
+ * of the shop, and a taste that leads to "call for price" is a worse
+ * first impression than showing one fewer item. Ordered by when the row
+ * was created, which is the only honest reading of "newest": sort_order
+ * is the owner's arrangement, not an arrival time.
+ */
+export async function getFreshArrivals(limit = 2): Promise<ItemRow[]> {
   const sb = getSupabase();
   if (!sb) return [];
   const { data, error } = await sb
     .from("items")
     .select("*")
     .neq("status", "hidden")
+    .not("category", "in", FIREARM_LIST)
+    .not("price_cents", "is", null)
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) {

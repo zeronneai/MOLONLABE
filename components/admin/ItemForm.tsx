@@ -8,6 +8,7 @@ import {
   defaultFulfillment,
 } from "@/lib/admin/constants";
 import type { ItemRow } from "@/lib/database.types";
+import { SURFACE_BLURB, SURFACE_LABEL, isFirearmCategory, surfaceFor } from "@/lib/surfaces";
 import ImageUploader from "./ImageUploader";
 import VariantEditor, { type VariantDraft } from "./VariantEditor";
 
@@ -111,26 +112,44 @@ export default function ItemForm({
             className="field-input"
           />
         </div>
-        <div>
-          <label className="field-label" htmlFor="f-price-cents">
-            Online price{" "}
-            <span className="normal-case tracking-normal">(blank = not sold online)</span>
-          </label>
-          <input
-            id="f-price-cents"
-            name="price_online"
-            inputMode="decimal"
-            placeholder="1299.00"
-            defaultValue={
-              item?.price_cents != null ? (item.price_cents / 100).toFixed(2) : ""
-            }
-            className="field-input"
-          />
-          <p className="label mt-2 text-muted">
-            Leave blank and the item shows its display price and cannot be
-            added to a cart.
-          </p>
-        </div>
+        {/* A firearm has no online price, and is not offered one.
+            The surface an item appears on is derived from its category,
+            so a priced firearm would not reach the Shop anyway — but
+            `price_cents` is what the cart reads to decide whether a thing
+            can be bought, and a field that accepts a number is a field
+            somebody fills in. The database refuses it too. */}
+        {isFirearmCategory(category) ? (
+          <div>
+            <p className="field-label">Online price</p>
+            <p className="mt-2 max-w-[46ch] text-sm text-muted">
+              Firearms are not sold through the cart. This one goes in the
+              case with an enquiry button, or becomes the prize in a game.
+              Use the display price above if you want a figure on the page.
+            </p>
+          </div>
+        ) : (
+          <div>
+            <label className="field-label" htmlFor="f-price-cents">
+              Online price{" "}
+              <span className="normal-case tracking-normal">(blank = not in the Shop)</span>
+            </label>
+            <input
+              id="f-price-cents"
+              name="price_online"
+              inputMode="decimal"
+              placeholder="32.00"
+              defaultValue={
+                item?.price_cents != null ? (item.price_cents / 100).toFixed(2) : ""
+              }
+              className="field-input"
+            />
+            <p className="label mt-2 text-muted">
+              Without a price it stays out of the Shop — there is nothing a
+              customer could do with it. Tax is added automatically at
+              checkout; you do not set it here.
+            </p>
+          </div>
+        )}
 
         {/* Legal, not cosmetic: this decides whether the item can be put
             in the post. It defaults to collect-in-store so a forgotten
@@ -206,6 +225,31 @@ export default function ItemForm({
               gear — cases, safes, anything that needs its own box. Rates are
               set under Tax &amp; Shipping.
             </p>
+
+            <div className="mt-6">
+              <label className="field-label" htmlFor="f-postage">
+                Postage for this item{" "}
+                <span className="normal-case tracking-normal">(blank = use the tier)</span>
+              </label>
+              <input
+                id="f-postage"
+                name="shipping_override"
+                inputMode="decimal"
+                placeholder="leave blank"
+                defaultValue={
+                  item?.shipping_override_cents != null
+                    ? (item.shipping_override_cents / 100).toFixed(2)
+                    : ""
+                }
+                className="field-input"
+              />
+              <p className="label mt-2 max-w-[52ch] text-muted">
+                Only for the item the tiers get wrong. An order pays the
+                dearest rate it contains, so adding something cheap never
+                lowers the postage. Enter 0 for free postage — that is
+                different from leaving it blank.
+              </p>
+            </div>
           </div>
         )}
 

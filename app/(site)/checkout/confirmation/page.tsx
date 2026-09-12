@@ -240,7 +240,7 @@ export default async function ConfirmationPage({
           </p>
         </div>
 
-        <Link href="/inventory" className="cta-secondary mt-12">
+        <Link href="/shop" className="cta-secondary mt-12">
           Back to the inventory
         </Link>
       </div>

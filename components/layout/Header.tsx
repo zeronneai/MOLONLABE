@@ -8,9 +8,12 @@ import { SHOP_PHONE_HREF } from "@/lib/brand";
 import CartLink from "@/components/cart/CartLink";
 
 const nav = [
-  { href: "/inventory", label: "Inventory" },
+  // The three surfaces, in the order the home page introduces them.
+  // "Featured" is gone from the top level: it is one game, and Games is
+  // the page that holds all of them.
   { href: "/shop", label: "Shop" },
-  { href: "/featured", label: "Featured" },
+  { href: "/games", label: "Games" },
+  { href: "/in-the-case", label: "In the case" },
   { href: "/transfers", label: "Transfers" },
   { href: "/services", label: "Services" },
 ];

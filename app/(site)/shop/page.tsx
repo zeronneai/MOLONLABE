@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import ShopGrid, { type ShopItem } from "@/components/shop/ShopGrid";
+import type { ShopItem } from "@/components/shop/ShopGrid";
+import ShopBrowser from "@/components/shop/ShopBrowser";
 import EmptyState from "@/components/ui/EmptyState";
 import Reveal from "@/components/motion/Reveal";
 import { getShopItems, getSoldOutItemIds, itemImages } from "@/lib/db/items";
@@ -8,7 +9,7 @@ import { SHOP_NAME } from "@/lib/brand";
 export const metadata: Metadata = {
   title: "Shop",
   description:
-    `Apparel and accessories from ${SHOP_NAME}. Everything here ships — no transfer, no paperwork.`,
+    `Apparel, accessories, ammunition and optics from ${SHOP_NAME}. Priced, in stock, ready to buy.`,
   alternates: { canonical: "/shop" },
 };
 
@@ -22,9 +23,10 @@ export default async function ShopPage() {
     rows.filter((r) => r.has_variants).map((r) => r.id),
   );
 
-  const items: ShopItem[] = rows.map((row) => ({
+  const items: (ShopItem & { category: string })[] = rows.map((row) => ({
     id: row.id,
     slug: row.slug,
+    category: row.category,
     name: row.name,
     brand: row.brand,
     priceCents: row.price_cents,
@@ -37,14 +39,17 @@ export default async function ShopPage() {
     <div className="px-page pb-24 pt-[calc(72px+4rem)]">
       <p className="label text-acid">Shop</p>
       <h1 className="display mt-6 text-[clamp(2.5rem,6vw,5.5rem)]">
-        WEAR IT
+        PICK IT
         <br />
-        OUT.
+        UP.
       </h1>
       <p className="mt-8 max-w-[56ch] text-muted">
-        Shirts, hats and the small stuff. This is the part of the catalogue
-        that just ships — no transfer, no paperwork, no trip to the counter
-        unless you want one.
+        Apparel, accessories, ammunition and glass. Everything here has a
+        price and goes in the basket — firearms do not, and are{" "}
+        <a href="/in-the-case" className="underline hover:text-acid">
+          in the case
+        </a>{" "}
+        instead.
       </p>
 
       {items.length === 0 ? (
@@ -52,13 +57,13 @@ export default async function ShopPage() {
           <EmptyState
             label="Shop"
             headline="Nothing here yet"
-            body="Apparel is on its way. In the meantime, the case is worth a look."
-            action={{ href: "/inventory", text: "View inventory" }}
+            body="Nothing is priced for sale yet. In the meantime, the case is worth a look."
+            action={{ href: "/in-the-case", text: "See the case" }}
           />
         </div>
       ) : (
         <Reveal>
-          <ShopGrid items={items} />
+          <ShopBrowser items={items} />
         </Reveal>
       )}
     </div>

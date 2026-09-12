@@ -112,3 +112,103 @@ export async function getBoard(gameId: string): Promise<BoardSpot[]> {
     displayName: r.display_name,
   }));
 }
+
+// ---------------------------------------------------------------------
+// The Games surface
+// ---------------------------------------------------------------------
+
+export type GameSummary = {
+  id: string;
+  title: string;
+  status: Game["status"];
+  totalSpots: number;
+  spotPriceCents: number;
+  sold: number;
+  item: ItemRow | null;
+  /** Set once drawn. First name plus last initial, never more. */
+  winnerName: string | null;
+  drawnAt: string | null;
+  drawnEarly: boolean;
+  unsoldAtDraw: number | null;
+  createdAt: string | null;
+};
+
+/**
+ * Every game with its sold count, newest first, split into live and done.
+ *
+ * One query per table rather than per game: a games page with twenty
+ * games would otherwise make forty-one round trips, and the counts are
+ * cheap to group in memory.
+ */
+export async function getAllGames(): Promise<{
+  live: GameSummary[];
+  finished: GameSummary[];
+}> {
+  const sb = getSupabase();
+  if (!sb) return { live: [], finished: [] };
+
+  const [{ data: games, error }, { data: spots }, { data: winners }] =
+    await Promise.all([
+      sb.from("games").select("*, item:items(*)").order("created_at", { ascending: false }),
+      sb.from("game_spots").select("game_id, status").eq("status", "sold"),
+      sb
+        .from("winners")
+        .select("game_id, display_name, drawn_at, drawn_early, unsold_spots"),
+    ]);
+  if (error) {
+    logDbError("getAllGames", error);
+    return { live: [], finished: [] };
+  }
+
+  const soldBy = new Map<string, number>();
+  for (const s of spots ?? []) {
+    soldBy.set(s.game_id, (soldBy.get(s.game_id) ?? 0) + 1);
+  }
+  const winnerBy = new Map(
+    (winners ?? []).map((w) => [w.game_id, w] as const),
+  );
+
+  const all: GameSummary[] = ((games ?? []) as GameWithItem[]).map((g) => {
+    const w = winnerBy.get(g.id);
+    return {
+      id: g.id,
+      title: g.title,
+      status: g.status as Game["status"],
+      totalSpots: g.total_spots,
+      spotPriceCents: g.spot_price_cents,
+      sold: soldBy.get(g.id) ?? 0,
+      item: g.item,
+      winnerName: w?.display_name ?? null,
+      drawnAt: w?.drawn_at ?? null,
+      drawnEarly: w?.drawn_early ?? false,
+      unsoldAtDraw: w?.unsold_spots ?? null,
+      createdAt: g.created_at,
+    };
+  });
+
+  return {
+    live: all.filter((g) => g.status !== "drawn"),
+    finished: all.filter((g) => g.status === "drawn"),
+  };
+}
+
+/**
+ * Item ids currently attached to a game, so the case can exclude them.
+ *
+ * Includes drawn games. A rifle that was raffled stays on the Games
+ * surface as history rather than reappearing in the case, which is the
+ * client's instruction — and is also true: it has an owner now.
+ */
+export async function getGameItemIds(): Promise<string[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from("games")
+    .select("item_id")
+    .not("item_id", "is", null);
+  if (error) {
+    logDbError("getGameItemIds", error);
+    return [];
+  }
+  return (data ?? []).map((r) => r.item_id).filter((id): id is string => Boolean(id));
+}

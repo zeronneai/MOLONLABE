@@ -211,6 +211,43 @@ they looked:
 | Stale `campaign` names | 2026-09-12 | nine objects, not one |
 | Order-dependent db tests | 2026-09-12 | a database per suite, plus a template fingerprint |
 
+---
+
+## Added by the three-surface restructure (2026-09-12)
+
+### ☐ The surface split, seen by a person
+
+`tests/browser/surfaces.mjs` asserts the rules — a firearm never reaches
+the Shop even carrying a price, an unpriced t-shirt never reaches the
+case, a game's prize leaves the case. What no test can tell you is
+whether a visitor understands the three grounds as three contexts. That
+needs eyes, on a phone, scrolling.
+
+### ☐ The early-draw guard, used for real
+
+Covered by `tests/browser/earlydraw.mjs` in both routes, including that
+it is recorded and shown publicly. What is untested: whether the owner,
+on the day, reads the shortfall or taps through it. The second dialog is
+deliberately amber rather than red and names a number rather than asking
+"are you sure" — that is a judgement about how people read dialogs under
+time pressure, and it is a guess until watched.
+
+**The terms do not yet permit an early draw at all.** See
+`docs/content-needed.md` §10. Until the attorney adds it, this is a
+capability the shop has without permission to use.
+
+### ☐ The per-item postage override, against a real order
+
+The arithmetic is covered. What is not: an actual order where a
+tier-priced item and an override-priced item sit in the same basket and
+somebody checks the postage against what the Post Office charged.
+
+### ☐ The demo game, removed before launch
+
+It is marked `[DEMO]` in the title, badged on every public card, and has
+a one-click removal. The failure it guards against is nobody removing it.
+That is a calendar problem, not a code one.
+
 ## Still carried in the top three
 
 1. **A genuinely declined card.** In progress.

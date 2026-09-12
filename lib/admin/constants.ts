@@ -99,7 +99,17 @@ export function defaultFulfillment(category: string): "ship" | "pickup" {
   return category === "apparel" ? "ship" : "pickup";
 }
 
-export type ActionState = { status: "idle" | "error"; message?: string };
+/**
+ * What a form action hands back.
+ *
+ * "success" was added for actions that finish in place rather than
+ * redirecting — the demo game seed is one. Everything that redirects
+ * never returns at all, which is why the type went this long without it.
+ */
+export type ActionState = {
+  status: "idle" | "error" | "success";
+  message?: string;
+};
 
 // Never let the exclusions note go empty: a discount with no stated
 // limits is a discount on everything.

@@ -74,6 +74,13 @@ a delay, because tokenisation is a network round trip. Every checkout
 test used to stub it synchronously, which left no window to click into —
 so the double-charge bug was structurally impossible to reproduce.
 
+**A fixture that trips a new guard is the guard working.** Adding the
+early-draw confirmation broke `drawaudit` and `winnernumber` — both have
+deliberately short games, because a partly-sold pool is what makes the
+winning spot number differ from the selector's index. The fix was to
+click through the confirmation, not to sell out the fixture, which would
+have destroyed what those tests exist to catch.
+
 **Assert the property, not the schedule.** `race` used to assert that
 exactly two of ten simultaneous buyers won a pair from five spots. It
 passed for weeks and then produced one winner — correctly, because

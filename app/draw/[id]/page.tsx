@@ -88,6 +88,7 @@ export default async function DrawPresentation({
       entries={pool.length}
       entrants={new Set((spots ?? []).map((sp) => sp.spot_number)).size}
       alreadyDrawn={Boolean(winner)}
+      unsoldSpots={Math.max(0, game.total_spots - pool.length)}
     />
   );
 }

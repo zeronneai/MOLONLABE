@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { getSessionSupabase } from "@/lib/supabase/session";
 import { ARCHIVED_STATUS, ITEM_LIVE_STATUSES } from "@/lib/admin/constants";
+import { isFirearmCategory } from "@/lib/surfaces";
+import { formatUsd } from "@/lib/money";
 import ItemAdminCard from "@/components/admin/ItemAdminCard";
+import SurfaceSection from "@/components/admin/SurfaceSection";
 import EmptyState from "@/components/ui/EmptyState";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +19,15 @@ const FILTERS = [
   { key: ARCHIVED_STATUS, label: "Archived" },
 ];
 
+/**
+ * Three sections, not one list with a filter.
+ *
+ * The owner is managing three different kinds of thing — stock he sells,
+ * games he runs, and firearms people ask about — and a category filter
+ * makes them look like one kind of thing viewed three ways. The grounds
+ * are the same ones the home page uses for the same surfaces, so the two
+ * screens mirror each other.
+ */
 export default async function AdminInventory({
   searchParams,
 }: {
@@ -33,16 +45,36 @@ export default async function AdminInventory({
   if (q) query = query.ilike("name", `%${q}%`);
   if (status) query = query.eq("status", status);
   else query = query.neq("status", ARCHIVED_STATUS);
-  const { data: items, error } = await query;
+
+  const [{ data: items, error }, { data: games }, { data: sold }] = await Promise.all([
+    query,
+    sb
+      .from("games")
+      .select("id, title, status, total_spots, spot_price_cents, item_id")
+      .order("created_at", { ascending: false }),
+    sb.from("game_spots").select("game_id").eq("status", "sold"),
+  ]);
+
+  const soldBy = new Map<string, number>();
+  for (const s of sold ?? []) soldBy.set(s.game_id, (soldBy.get(s.game_id) ?? 0) + 1);
+
+  // The item attached to a game is managed from the game, not from here.
+  const inGames = new Set(
+    (games ?? []).map((g) => g.item_id).filter((id): id is string => Boolean(id)),
+  );
+  const rows = items ?? [];
+  const forSale = rows.filter((i) => !isFirearmCategory(i.category) && !inGames.has(i.id));
+  const inCase = rows.filter((i) => isFirearmCategory(i.category) && !inGames.has(i.id));
+
+  const filtering = Boolean(q || status);
 
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="display text-2xl">INVENTORY</h1>
-        <Link href="/admin/inventory/new" className="cta-primary control-go !h-11 !px-5">
-          + Add
-        </Link>
-      </div>
+      <h1 className="display text-2xl">WHAT YOU SELL</h1>
+      <p className="mt-3 max-w-[56ch] text-sm text-muted">
+        Three kinds of thing, three places they show up for customers. The
+        colours match the ones on the home page.
+      </p>
 
       <form className="mt-6" action="/admin/inventory" method="get">
         <input
@@ -50,7 +82,7 @@ export default async function AdminInventory({
           name="q"
           defaultValue={q}
           placeholder="Search by name…"
-          aria-label="Search inventory"
+          aria-label="Search everything"
           className="field-input"
         />
         {status && <input type="hidden" name="status" value={status} />}
@@ -78,27 +110,97 @@ export default async function AdminInventory({
           Item deleted.
         </p>
       )}
+      {error && (
+        <p className="mt-6 text-[11px] uppercase tracking-[0.18em] text-danger">
+          Couldn&apos;t load items: {error.message}
+        </p>
+      )}
 
-      <div className="mt-6 border-t hairline">
-        {error && (
-          <p className="py-8 text-[11px] uppercase tracking-[0.18em] text-danger">
-            Couldn&apos;t load items: {error.message}
-          </p>
-        )}
-        {items?.map((item) => <ItemAdminCard key={item.id} item={item} />)}
-        {items?.length === 0 && (
-          <EmptyState
-            label={q || status ? "No match" : "Empty case"}
-            headline={q || status ? "NOTHING FITS THAT." : "NOTHING IN THE CASE YET."}
-            body={
-              q || status
-                ? "Clear the search or pick another filter. Archived items live behind their own filter."
-                : "Add the first piece and it goes live the moment you save it."
-            }
-            action={q || status ? undefined : { href: "/admin/inventory/new", text: "Add an item" }}
-          />
-        )}
+      <div className="mt-8 space-y-2">
+        {/* ------------------------------------------------ for sale */}
+        <SurfaceSection
+          surface="shop"
+          count={forSale.length}
+          add={{ href: "/admin/inventory/new", label: "+ Add" }}
+        >
+          {forSale.length > 0 ? (
+            forSale.map((item) => <ItemAdminCard key={item.id} item={item} />)
+          ) : (
+            <p className="py-8 text-sm text-muted">
+              {filtering
+                ? "Nothing here matches that search."
+                : "Nothing for sale yet. Add a shirt, a patch, a box of ammunition — anything with a price."}
+            </p>
+          )}
+        </SurfaceSection>
+
+        {/* --------------------------------------------------- games */}
+        <SurfaceSection
+          surface="games"
+          count={games?.length ?? 0}
+          add={{ href: "/admin/games/new", label: "+ New game" }}
+        >
+          {games && games.length > 0 ? (
+            <ul>
+              {games.map((g) => {
+                const n = soldBy.get(g.id) ?? 0;
+                return (
+                  <li key={g.id} className="border-b hairline">
+                    <Link
+                      href={`/admin/games/${g.id}`}
+                      className="flex min-h-[56px] items-center justify-between gap-4 py-4"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm">{g.title}</span>
+                        <span className="label mt-1 block">
+                          {g.status} · {formatUsd(g.spot_price_cents)} a spot
+                        </span>
+                      </span>
+                      <span className="display shrink-0 text-lg">
+                        {n}
+                        <span className="opacity-50"> / {g.total_spots}</span>
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="py-8 text-sm text-muted">
+              No games yet. A game needs a prize, how many spots, and what a
+              spot costs.
+            </p>
+          )}
+        </SurfaceSection>
+
+        {/* --------------------------------------------- in the case */}
+        <SurfaceSection
+          surface="case"
+          count={inCase.length}
+          add={{ href: "/admin/inventory/new", label: "+ Add" }}
+        >
+          {inCase.length > 0 ? (
+            inCase.map((item) => <ItemAdminCard key={item.id} item={item} />)
+          ) : (
+            <p className="py-8 text-sm text-muted">
+              {filtering
+                ? "Nothing here matches that search."
+                : "No firearms listed. Add one and it appears in the case with an enquiry button."}
+            </p>
+          )}
+        </SurfaceSection>
       </div>
+
+      {rows.length === 0 && !filtering && (
+        <div className="mt-10">
+          <EmptyState
+            label="Nothing yet"
+            headline="NOTHING IS LISTED."
+            body="Add the first product and it goes live the moment you save it."
+            action={{ href: "/admin/inventory/new", text: "Add an item" }}
+          />
+        </div>
+      )}
     </div>
   );
 }

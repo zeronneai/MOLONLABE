@@ -144,16 +144,20 @@ const banned = ["odds", "chance", "chances", "winner will", "you could win",
 const offenders = banned.filter((w) => has(text, w) || has(html, w));
 check("the email promises nothing and explains no mechanics",
   offenders.length === 0, offenders.join(", "));
-// Read from the single source of truth rather than restating it, so this
-// tracks lib/legal.ts instead of quietly diverging from it.
+// The no-purchase route is gone. The client confirmed nothing will be
+// free, so the claim is not centralised any more — it does not exist.
+// These two assertions used to check it was centralised; inverted rather
+// than deleted, because "the claim is nowhere" is the thing now worth
+// guarding, and a suite that simply stops checking would not notice it
+// creeping back.
 const legal = readFileSync(join(ROOT, "lib/legal.ts"), "utf8");
-const claim = legal.match(/link: "([^"]+)"/)?.[1];
-check("the no-purchase claim is centralised", Boolean(claim), claim ?? "not found");
-// The no-purchase claim now appears only where lib/legal.ts still puts
-// it — the rules page and /featured. It is no longer on a plain receipt,
-// because a plain purchase has nothing to do with the game.
-check("the claim is still centralised, pending the attorney",
-  Boolean(claim), claim);
+check("lib/legal.ts no longer exports an entry claim",
+  !/export const ENTRY_CLAIM/.test(legal) && !/export function freeEntryStep/.test(legal),
+  (legal.match(/export (const ENTRY_CLAIM|function freeEntryStep)/) ?? ["clean"])[0]);
+check("the receipt makes no no-purchase claim",
+  !/no purchase|free entry|without buying/i.test(text) &&
+    !/no purchase|free entry|without buying/i.test(html),
+  (text.match(/[^\n]*no purchase[^\n]*/i) ?? ["clean"])[0].slice(0, 70));
 
 await browser.close();
 for (const l of ok) console.log(l);

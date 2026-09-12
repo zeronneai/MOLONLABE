@@ -93,6 +93,7 @@ export const WATCHED_ITEM_FIELDS = [
   "status",
   "fulfillment_type",
   "shipping_tier",
+  "shipping_override_cents",
   "is_featured",
 ] as const;
 

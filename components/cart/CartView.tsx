@@ -42,7 +42,7 @@ export default function CartView() {
         label="Your cart"
         headline="Nothing in the cart"
         body="Everything on hand is in the case. Have a look and come back."
-        action={{ href: "/inventory", text: "View inventory" }}
+        action={{ href: "/shop", text: "Go to the shop" }}
       />
     );
   }
@@ -146,7 +146,7 @@ export default function CartView() {
           >
             Checkout
           </Link>
-          <Link href="/inventory" className="cta-secondary mt-3 w-full justify-center">
+          <Link href="/shop" className="cta-secondary mt-3 w-full justify-center">
             Keep looking
           </Link>
         </div>

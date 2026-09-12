@@ -66,9 +66,9 @@ function stableOrder(entrants: PoolEntrant[]): PoolEntrant[] {
 }
 
 /**
- * Picks one ticket from the weighted pot. Someone with ten entries owns
- * ten of the numbers, so a free entry is worth exactly what a purchased
- * one is worth — which is the whole legal basis of the program.
+ * Picks one ticket from the pot. Someone holding ten spots owns ten of
+ * the numbers, which is the whole model: a spot is a spot, and the only
+ * way to hold one is to buy it.
  */
 export function selectWinner(
   entrants: PoolEntrant[],

@@ -150,3 +150,57 @@ carries across drawings, the schema would need to change to match.
 | **Which categories belong at /shop** | Currently apparel and accessories, per the brief's own logic that this is the part of the catalogue that ships without a legal conversation. Ammunition and magazines were deliberately left in `/inventory`: ammunition cannot go to every state, and magazines carry capacity limits in several. If the client wants them in the grid, it is one line — `SHOP_CATEGORIES` in `lib/admin/constants.ts`. |
 | **The new categories** | `shotgun`, `ammunition`, `magazine` and `apparel` were added. Suppressors and other NFA items were deliberately left out: they need an SOT and a different transfer process, and listing them would imply the shop can sell them. Confirm that is right. |
 | **Sizes are free text** | No fixed S–XXL list, so a one-size hat, a 34 waist and a 9.5 boot all fit. The cost is that "Med" and "Medium" are different sizes to the database; the form warns on an exact repeat but cannot catch a near-miss. |
+
+## 10. The terms must allow an early draw
+
+**This is the most consequential open item on this page.**
+
+The terms buyers accept at checkout say the game runs until every spot
+sells — that is the point of a fixed pool and it is why there is no end
+date. The owner can now draw before that happens, because in practice a
+game that stalls at 12 of 100 cannot sit open forever.
+
+**The rules do not currently permit this.** As written, drawing early is
+the shop doing something the buyer was told would not happen. What the
+attorney needs to add, in substance:
+
+- That the sponsor may draw before every spot sells, at its discretion.
+- What happens to the odds when it does — a buyer who took one of 12 sold
+  spots has a one-in-twelve chance, not one-in-a-hundred, which is better
+  for them and should be said rather than left to be worked out.
+- Whether there is any floor: a minimum number sold, or a minimum time
+  open, before an early draw is allowed at all.
+- Whether buyers are told in advance, and how.
+
+**What the build already does**, so the attorney is writing rules for
+behaviour that exists rather than in the abstract:
+
+- The owner cannot draw early by accident. A second confirmation names
+  the shortfall — "This game has 88 of 100 spots unsold. Drawing now goes
+  against the terms buyers agreed to. Continue?" — and on the filmed
+  presentation screen the acknowledgement is a checkbox on the setup
+  page, before recording starts, rather than a dialog mid-take.
+- Every early draw is recorded: `winners.drawn_early` and
+  `winners.unsold_spots`. It is not a matter of memory.
+- It is shown publicly. A game drawn short carries "Drawn with N unsold"
+  on its card, so the history does not quietly present it as a game that
+  filled.
+
+Until the rules change, the honest position is that this is a capability
+the shop has and has not yet been given permission to use.
+
+## 11. Copy for the three surfaces
+
+The site is now Shop, Games and In the case. The headings and standfirsts
+on those three pages are mine, not the client's, and they set the tone for
+the whole site:
+
+| Page | Current heading | What it needs to do |
+| --- | --- | --- |
+| `/shop` | PICK IT UP. | Say this is the part you can just buy. |
+| `/games` | A FIXED NUMBER. | Say a game runs until it fills, with no date. |
+| `/in-the-case` | (the hero's payoff line) | Say these are real firearms you ask about in person. |
+
+Worth ten minutes with the client. They are the first thing a visitor
+reads on each surface and they are currently a developer's guess at his
+voice.

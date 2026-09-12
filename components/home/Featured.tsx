@@ -9,9 +9,9 @@ export default async function Featured() {
 
   if (!game) {
     return (
-      <section className="px-page flex min-h-[40vh] flex-col justify-center py-20">
+      <section className="ground-acid px-page flex min-h-[40vh] flex-col justify-center py-20">
         <Reveal>
-          <p className="label text-acid">Currently Featured</p>
+          <p className="label">Games</p>
           <h2 className="display mt-6 max-w-2xl text-[clamp(2rem,4vw,3.5rem)]">
             NOTHING ON THE BLOCK RIGHT NOW.
           </h2>
@@ -29,11 +29,15 @@ export default async function Featured() {
   const name = game.item?.name ?? game.title;
 
   return (
-    <section className="grid min-h-[85vh] lg:grid-cols-[3fr_2fr]">
+    /* The green ground. This is the one section on the page where acid
+       is a field rather than an accent, and it is the game — the thing
+       the client most wants a visitor to notice they have wandered into.
+       Controls inside it stay bone on ink; see globals.css. */
+    <section className="ground-acid grid min-h-[85vh] lg:grid-cols-[3fr_2fr]">
       {/* Left 60%: the pitch */}
       <div className="pl-page order-2 flex flex-col justify-center py-16 pr-8 lg:order-1 lg:py-24">
         <Reveal>
-          <p className="label text-acid">Currently Featured</p>
+          <p className="label">Open game</p>
           <h2 className="display mt-6 text-[clamp(2.25rem,4.5vw,4.5rem)]">
             {name.toUpperCase()}
           </h2>

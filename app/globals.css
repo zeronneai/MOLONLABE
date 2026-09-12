@@ -808,6 +808,81 @@ textarea.field-input {
   color: var(--color-danger);
 }
 
+/* The early-draw acknowledgement. Amber rather than red: drawing short is
+   a decision the owner is allowed to make, not an error — it just has to
+   be made deliberately and on purpose. */
+.draw-note-caution {
+  max-width: 48ch;
+  border-left: 2px solid var(--color-amber);
+  padding-left: calc(2 * var(--u));
+  color: var(--color-bone);
+  text-align: left;
+}
+.draw-note-ack {
+  display: flex;
+  align-items: center;
+  gap: calc(1.2 * var(--u));
+  margin-top: calc(1.6 * var(--u));
+  cursor: pointer;
+  color: var(--color-amber);
+}
+/* ---------------------------------------------------------------------
+   Surface grounds
+   ---------------------------------------------------------------------
+   Three grounds, so a visitor scrolling the home page registers a change
+   of context rather than reading one long page. Buying a shirt, taking a
+   spot in a game and asking about a rifle are three different actions,
+   and the page should say so before the copy does.
+
+   Acid as a FIELD is a deliberate exception to the accent-only rule, and
+   it is scoped here: the home page section grounds and the admin sections
+   that mirror them. It does not reach controls. A button is still bone on
+   ink everywhere, including inside the green band — acid stays a pointer,
+   and a page where everything is acid points at nothing.
+
+   The type system and the hairlines are untouched. Only the ground moves.
+*/
+.ground-ink {
+  background: var(--color-ink);
+  color: var(--color-bone);
+}
+.ground-neutral {
+  background: var(--color-surface-2);
+  color: var(--color-bone);
+}
+.ground-acid {
+  background: var(--color-acid-deep);
+  color: var(--color-bone);
+}
+/* On the green ground acid text would vanish, so the eyebrow borrows bone
+   at reduced weight instead of dropping to muted, which is tuned for dark
+   grounds and goes muddy here. */
+.ground-acid .label {
+  color: color-mix(in srgb, var(--color-bone) 78%, transparent);
+}
+.ground-acid .hairline,
+.ground-neutral .hairline {
+  border-color: color-mix(in srgb, var(--color-bone) 18%, transparent);
+}
+/* An admin section bleeds to the window edge so the ground reads as a
+   band rather than a card. The negative margin matches the shell's own
+   page padding, which is why it is a rule here and not a utility guess. */
+.admin-surface {
+  margin-inline: calc(-1 * var(--pad-x));
+  padding-inline: var(--pad-x);
+  padding-block: calc(5 * var(--u));
+}
+
+.ground-acid .text-muted {
+  color: color-mix(in srgb, var(--color-bone) 72%, transparent);
+}
+
+.draw-note-ack input {
+  width: calc(2 * var(--u));
+  height: calc(2 * var(--u));
+  accent-color: var(--color-amber);
+}
+
 .draw-controls {
   display: flex;
   flex-direction: column;

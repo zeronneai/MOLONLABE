@@ -2,6 +2,8 @@ import Link from "next/link";
 import { getSessionSupabase } from "@/lib/supabase/session";
 import GameCard from "@/components/admin/GameCard";
 import EmptyState from "@/components/ui/EmptyState";
+import { isDemoGame } from "@/lib/surfaces";
+import DemoGamePanel from "@/components/admin/DemoGamePanel";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +59,7 @@ export default async function AdminGames() {
           />
         )}
       </div>
+      <DemoGamePanel exists={(games ?? []).some((g) => isDemoGame(g.title))} />
     </div>
   );
 }

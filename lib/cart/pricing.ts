@@ -60,24 +60,40 @@ export async function getCommerceSettings(
 }
 
 /**
- * Postage for a whole order, charged once at the highest tier present.
+ * Postage for a whole order, charged once at the dearest rate present.
  *
  * Not per line: two t-shirts go in one envelope, and billing twice for
  * that is the kind of thing people notice and resent. A cart holding a
  * shirt and a gun safe pays the safe's rate, because that is what the
  * shipment actually costs.
  *
+ * An item may override the tier with its own figure. The override wins
+ * for that item, then the whole order pays the highest rate any shipped
+ * line asks for — so adding a cheap patch to an expensive order never
+ * raises the postage, and adding an awkward item never hides its cost
+ * behind a cheaper one.
+ *
+ * `override` of 0 is free postage and is honoured as such; only null
+ * falls back to the tier. That distinction is the whole reason the column
+ * is nullable rather than defaulting to zero.
+ *
  * Collected items contribute nothing — they are not being posted.
  */
 export function shippingFor(
-  lines: { fulfillment: FulfillmentType; oversize: boolean }[],
+  lines: {
+    fulfillment: FulfillmentType;
+    oversize: boolean;
+    override?: number | null;
+  }[],
   settings: CommerceSettings,
 ): number {
   const shipped = lines.filter((l) => l.fulfillment === "ship");
   if (shipped.length === 0) return 0;
-  return shipped.some((l) => l.oversize)
-    ? settings.shippingOversizeCents
-    : settings.shippingStandardCents;
+  const rateFor = (l: { oversize: boolean; override?: number | null }) =>
+    l.override ?? (l.oversize
+      ? settings.shippingOversizeCents
+      : settings.shippingStandardCents);
+  return Math.max(...shipped.map(rateFor));
 }
 
 const REJECTION = {
@@ -93,12 +109,11 @@ const REJECTION = {
 } as const;
 
 /**
- * Entries earned, floored to whole dollars of merchandise.
+ * Prices a cart: lines, subtotal, tax, postage, and what was rejected.
  *
- * Tax and shipping are excluded deliberately: nobody should earn
- * sweepstakes entries on sales tax, and a shipping charge is not spend on
- * the shop's goods. $47.60 at one per dollar is 47 entries, not 47.6 and
- * not 48.
+ * The heading above this used to describe entries earned per dollar, a
+ * model the fixed-pool rebuild removed. It survived because a doc comment
+ * cannot fail a build.
  */
 export async function priceCart(
   lines: CartLine[],
@@ -275,9 +290,10 @@ export async function priceCart(
 
   const priced: PricedLine[] = [];
   const rejected: RejectedLine[] = [...rejectedSpots];
-  // Kept beside the priced lines rather than on them: the tier is a
-  // postage input, not something a buyer ever sees on a cart row.
+  // Kept beside the priced lines rather than on them: postage is an
+  // input, not something a buyer ever sees on a cart row.
   const oversizeItems = new Set<string>();
+  const postageOverride = new Map<string, number>();
 
   for (const [key, { itemId, variantId, quantity: requested }] of wanted) {
     const item = byId.get(itemId);
@@ -329,6 +345,9 @@ export async function priceCart(
 
     const quantity = Math.max(1, Math.min(requested, cap));
     if (item.shipping_tier === "oversize") oversizeItems.add(itemId);
+    if (item.shipping_override_cents != null) {
+      postageOverride.set(itemId, item.shipping_override_cents);
+    }
 
     priced.push({
       gameId: null,
@@ -360,6 +379,7 @@ export async function priceCart(
     priced.map((l) => ({
       fulfillment: l.fulfillment,
       oversize: oversizeItems.has(l.itemId),
+      override: l.itemId ? postageOverride.get(l.itemId) ?? null : null,
     })),
     settings,
   );

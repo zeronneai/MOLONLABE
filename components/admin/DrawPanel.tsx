@@ -31,6 +31,11 @@ export default function DrawPanel({
   // A refusal has to land on screen. It used to go to the server log,
   // which meant the dialog closed and nothing visibly happened.
   const [refusal, setRefusal] = useState<string | null>(null);
+  // The second confirmation, shown only when spots remain. Separate from
+  // `confirming` on purpose: it names a number the owner has to read, and
+  // reusing the first dialog would let a double-tap carry straight
+  // through both.
+  const [early, setEarly] = useState<{ unsold: number; total: number } | null>(null);
   const router = useRouter();
 
   if (winnerName) {
@@ -127,6 +132,14 @@ export default function DrawPanel({
                     const result = await drawWinner(gameId);
                     setConfirming(false);
                     if (!result.ok) {
+                      // Unsold spots is a question, not a refusal.
+                      if (result.needsEarlyConfirmation) {
+                        setEarly({
+                          unsold: result.unsold ?? 0,
+                          total: result.totalSpots ?? 0,
+                        });
+                        return;
+                      }
                       setRefusal(result.error);
                       return;
                     }
@@ -146,6 +159,59 @@ export default function DrawPanel({
                 className="control flex-1"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* The second confirmation. It names the shortfall rather than
+          asking a general "are you sure", because the number is the whole
+          point: 88 of 100 unsold is a different decision from 2 of 100,
+          and a generic dialog makes them look the same. */}
+      {early && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirm an early draw"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-ink/85 p-5 sm:items-center"
+        >
+          <div className="w-full max-w-md border border-amber bg-surface p-6">
+            <p className="label text-amber">This game has not sold out</p>
+            <p className="display mt-3 text-xl">
+              {early.unsold} OF {early.total} SPOTS UNSOLD.
+            </p>
+            <p className="mt-4 text-sm leading-relaxed text-bone">
+              Drawing now goes against the terms buyers agreed to, which say
+              the game runs until every spot sells. It will be recorded on
+              the result that the draw was early and by how much.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() =>
+                  start(async () => {
+                    const result = await drawWinner(gameId, true);
+                    setEarly(null);
+                    if (!result.ok) {
+                      setRefusal(result.error);
+                      return;
+                    }
+                    setRefusal(null);
+                    router.refresh();
+                  })
+                }
+                className="control control-caution flex-1"
+              >
+                {pending ? "Drawing…" : "Draw anyway"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEarly(null)}
+                className="control flex-1"
+              >
+                Wait for the rest
               </button>
             </div>
           </div>

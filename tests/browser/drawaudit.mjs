@@ -84,6 +84,14 @@ await page.goto(`${APP}/admin/games/${GAME}`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: /draw without ceremony/i }).click();
 await page.waitForTimeout(400);
 await page.locator('[role="dialog"] button').first().click();
+await page.waitForTimeout(1200);
+// This fixture is short on purpose — spot 2 is unsold so the selector's
+// index and the spot number cannot coincide — which means it is an early
+// draw and the second confirmation applies.
+const early = page.getByRole("button", { name: /draw anyway/i });
+if (await early.count()) {
+  await early.click();
+}
 await page.waitForTimeout(2500);
 
 const screen = await page.locator("body").innerText();

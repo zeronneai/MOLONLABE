@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SHOP_PHONE_DISPLAY, SHOP_PHONE_HREF } from "@/lib/brand";
-import { ENTRY_CLAIM } from "@/lib/legal";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/sweepstakes-rules" },
   title: "Sweepstakes Rules",
   description:
-    `Official rules for the Molon Labe Firearms x SunCity Outdoors sweepstakes. ${ENTRY_CLAIM.short}`,
+    "Official rules for the Molon Labe Firearms x SunCity Outdoors sweepstakes.",
   // Placeholder copy must never be indexed as if it were the real terms.
   robots: { index: false, follow: false },
 };
@@ -26,12 +25,8 @@ export const metadata: Metadata = {
 const SECTIONS = [
   ["Eligibility", "Who may enter: minimum age, residency, exclusions for employees and their households, and any state-level restrictions on firearm sweepstakes."],
   ["Entry period", "Exact open and close date and time, including time zone, and how the clock is determined."],
-  ["How to enter", "The paid entry method and the free method, stated as equivalent. The free method must be described in the same detail and with the same prominence as the paid one."],
-  // Deliberately not read from ENTRY_CLAIM: this is a note to the
-  // attorney describing what section 4 must contain, not a claim being
-  // made to a customer. It should survive even if the claims do not.
-  ["Free entry (no purchase necessary)", "The complete no-purchase method, including any mail-in alternative, entry limits per person per period, and confirmation that free entries carry the same weight as purchased entries."],
-  ["Odds of winning", "How odds are determined by the total number of entries received, and a statement that a purchase does not improve chances of winning."],
+  ["How to enter", "Entry is by purchasing a spot in the game; there is no free or alternative method of entry. The client has confirmed this. The attorney should advise on whether a no-purchase route is required for this promotion in Texas and in any state entrants may be in, and if it is, this is the section that changes."],
+  ["Odds of winning", "How odds are determined: a game sells a fixed number of spots and one is drawn, so a buyer's chance is their spots over the pool. State whether the draw may happen before every spot sells and what that does to the odds."],
   ["Prize", "Description and approximate retail value of the prize, and a statement that it may not be substituted or transferred except as the sponsor allows."],
   ["Drawing and notification", "How and when the winner is drawn, how they are contacted, the deadline to respond, and what happens if they do not."],
   ["Firearm transfer conditions", "That the prize is transferred through a licensed dealer, subject to a background check and all federal, state and local law, and what happens if the winner cannot lawfully take possession."],
@@ -62,9 +57,8 @@ export default function SweepstakesRulesPage() {
       </div>
 
       <p className="mt-10 max-w-[60ch] text-sm leading-relaxed text-muted">
-        {ENTRY_CLAIM.statement} Open only to legal residents who may
-        lawfully take possession of a firearm under federal, state and
-        local law.
+        Open only to legal residents who may lawfully take possession of a
+        firearm under federal, state and local law. Void where prohibited.
       </p>
 
       <div className="mt-14 border-t hairline">

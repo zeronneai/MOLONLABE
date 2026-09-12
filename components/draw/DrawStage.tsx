@@ -59,6 +59,7 @@ export default function DrawStage({
   entries,
   entrants,
   alreadyDrawn,
+  unsoldSpots = 0,
 }: {
   gameId: string;
   prizeName: string;
@@ -68,12 +69,19 @@ export default function DrawStage({
   entries: number;
   entrants: number;
   alreadyDrawn: boolean;
+  /** Spots still unsold. Drawing with any left goes against the terms. */
+  unsoldSpots?: number;
 }) {
   const [orientation, setOrientation] = useState<Orientation>("vertical");
   const [rehearsal, setRehearsal] = useState(false);
   const [phase, setPhase] = useState<Phase>("setup");
   const [reveal, setReveal] = useState<Reveal | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // An early draw is acknowledged HERE, on the setup screen, before
+  // anything is recorded. The admin asks in a modal; doing that on this
+  // screen would put a dialog in the middle of the take, and the owner
+  // would be reading terms on camera.
+  const [earlyAccepted, setEarlyAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [controlsOn, setControlsOn] = useState(false);
@@ -196,7 +204,7 @@ export default function DrawStage({
       };
     } else {
       setBusy(true);
-      const result = await commitDraw(gameId);
+      const result = await commitDraw(gameId, earlyAccepted);
       setBusy(false);
       if (!result.ok) {
         setError(result.error);
@@ -222,7 +230,12 @@ export default function DrawStage({
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     setPhase(still ? "lock" : "pool");
-  }, [busy, rehearsal, activePool, gameId]);
+    // `earlyAccepted` MUST be in here. Without it this callback closes
+    // over the value from the render in which it was created — false —
+    // and commitDraw is called unacknowledged however many times the box
+    // is ticked. The server then refuses, and its refusal appears as an
+    // error on the filmed screen with no way past it.
+  }, [busy, rehearsal, activePool, gameId, earlyAccepted]);
 
   // Pool holds, then hands off to the spin.
   useEffect(() => {
@@ -393,13 +406,37 @@ export default function DrawStage({
               </p>
             )}
 
+            {!alreadyDrawn && !rehearsal && unsoldSpots > 0 && (
+              <div className="draw-note draw-note-caution">
+                <p>
+                  <strong>{unsoldSpots}</strong> of{" "}
+                  <strong>{unsoldSpots + activeEntries}</strong> spots are
+                  unsold. The terms buyers agreed to say the game runs until
+                  every spot sells, so drawing now goes against them. It will
+                  be recorded on the result.
+                </p>
+                <label className="draw-note-ack">
+                  <input
+                    type="checkbox"
+                    checked={earlyAccepted}
+                    onChange={(e) => setEarlyAccepted(e.target.checked)}
+                  />
+                  <span>I understand — draw this game short.</span>
+                </label>
+              </div>
+            )}
+
             {error && <p className="draw-error label">{error}</p>}
 
             <div className="draw-controls">
               <button
                 type="button"
                 onClick={start}
-                disabled={busy || activeEntries === 0}
+                disabled={
+                  busy ||
+                  activeEntries === 0 ||
+                  (!alreadyDrawn && !rehearsal && unsoldSpots > 0 && !earlyAccepted)
+                }
                 className="control control-caution draw-start"
               >
                 {busy
@@ -410,7 +447,9 @@ export default function DrawStage({
                       ? "Start rehearsal"
                       : alreadyDrawn
                         ? "Replay the draw"
-                        : "Start the draw"}
+                        : unsoldSpots > 0 && !earlyAccepted
+                          ? "Tick the box to draw short"
+                          : "Start the draw"}
               </button>
 
               <div className="seg draw-seg">
@@ -448,7 +487,10 @@ export default function DrawStage({
                 >
                   Fullscreen
                 </button>
-                <a href="/admin/featured" className="control control-sm">
+                {/* Was /admin/featured, which does not exist — so the
+                    only control that claimed to leave this screen 404'd.
+                    It goes back to the game it belongs to. */}
+                <a href={`/admin/games/${gameId}`} className="control control-sm">
                   Exit
                 </a>
               </div>
@@ -536,6 +578,12 @@ export default function DrawStage({
             <button type="button" onClick={reset} className="control control-sm">
               Done
             </button>
+            {/* The draw is over and the recording has stopped. Before
+                this there was no way off the screen once a winner was up
+                except the browser's own back button. */}
+            <a href={`/admin/games/${gameId}`} className="control control-sm">
+              Back to the game
+            </a>
           </div>
         )}
       </div>

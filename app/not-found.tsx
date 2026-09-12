@@ -18,7 +18,7 @@ export default function NotFound() {
         </>
       }
       body="Whatever was here is gone, sold, or never existed. Inventory moves fast around here — the case is the best place to start again."
-      primary={{ href: "/inventory", text: "View inventory" }}
+      primary={{ href: "/shop", text: "Go to the shop" }}
     />
   );
 }

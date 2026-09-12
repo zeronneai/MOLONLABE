@@ -27,6 +27,7 @@ import {
   logActivity,
 } from "@/lib/admin/audit";
 import { DIFFICULTY_RANGES } from "@/lib/game/settings";
+import { DEMO_GAME_PREFIX, isFirearmCategory } from "@/lib/surfaces";
 import { newSeed, redactName, selectWinner, verifyDraw } from "@/lib/draw/select";
 import type { DrawRecord } from "@/lib/draw/presentation";
 
@@ -55,8 +56,11 @@ async function requireSession(): Promise<
 
 function revalidatePublic(slug?: string) {
   revalidatePath("/");
-  revalidatePath("/inventory");
+  revalidatePath("/shop");
+  revalidatePath("/games");
+  revalidatePath("/in-the-case");
   revalidatePath("/featured");
+  // The product page lives at one path whichever surface links to it.
   if (slug) revalidatePath(`/inventory/${slug}`);
 }
 
@@ -389,11 +393,26 @@ export async function saveItem(
     // Blank, or anything that is not a clean amount, becomes "not sold
     // online" rather than a guessed number. A typo here would charge a
     // real card the wrong figure.
-    price_cents: parseUsdToCents(String(formData.get("price_online") ?? "")),
+    //
+    // Forced null for a firearm. The form does not render the field for
+    // those categories and the database rejects the row anyway, but a
+    // form field is only absent until somebody posts the form by hand,
+    // and this is the one place where the consequence is a firearm with
+    // a Buy button.
+    price_cents: isFirearmCategory(category)
+      ? null
+      : parseUsdToCents(String(formData.get("price_online") ?? "")),
     fulfillment_type:
       String(formData.get("fulfillment_type") ?? "") === "ship" ? "ship" : "pickup",
     shipping_tier:
       String(formData.get("shipping_tier") ?? "") === "oversize" ? "oversize" : "standard",
+    // Null and zero mean different things: null falls back to the tier,
+    // zero is free postage the owner chose. parseUsdToCents returns null
+    // for a blank string and 0 for "0", which is exactly the distinction
+    // wanted, so it is passed straight through.
+    shipping_override_cents: parseUsdToCents(
+      String(formData.get("shipping_override") ?? ""),
+    ),
     has_variants: hasVariants,
     video_url: String(formData.get("video_url") ?? "").trim() || null,
     status,
@@ -830,7 +849,17 @@ export async function saveGame(
  * re-run the presentation, or recover from a phone that locked mid-take,
  * without touching the result.
  */
-export async function commitDraw(gameId: string): Promise<DrawRecord> {
+/**
+ * `acknowledgedEarly` is the owner having read the shortfall and said to
+ * go anyway. It is not a convenience flag: the terms buyers accepted say
+ * the game runs until the last spot sells, so drawing at 12 of 100 goes
+ * against what they agreed to. The count is named back to him before he
+ * confirms, and recorded on the winner afterwards.
+ */
+export async function commitDraw(
+  gameId: string,
+  acknowledgedEarly = false,
+): Promise<DrawRecord> {
   const session = await requireSession();
   if (!session) return { ok: false, error: "Not signed in." };
   const { sb, user } = session;
@@ -914,6 +943,28 @@ export async function commitDraw(gameId: string): Promise<DrawRecord> {
     };
   }
 
+  // How short the game is. Read from the game rather than counting rows,
+  // because total_spots is fixed at creation and cannot drift.
+  const { data: gameRow } = await sb
+    .from("games")
+    .select("total_spots")
+    .eq("id", gameId)
+    .maybeSingle();
+  const totalSpots = gameRow?.total_spots ?? spots.length;
+  const unsold = Math.max(0, totalSpots - spots.length);
+
+  if (unsold > 0 && !acknowledgedEarly) {
+    return {
+      ok: false,
+      needsEarlyConfirmation: true,
+      unsold,
+      totalSpots,
+      error:
+        `This game has ${unsold} of ${totalSpots} spots unsold. Drawing now ` +
+        "goes against the terms buyers agreed to. Continue?",
+    };
+  }
+
   const seed = newSeed();
   // One ticket per spot, so somebody holding five spots appears five
   // times and has five chances — which is why selectWinner needs no
@@ -989,6 +1040,8 @@ export async function commitDraw(gameId: string): Promise<DrawRecord> {
       ticket_index: result.ticket,
       pool,
       entry_total: result.total,
+      drawn_early: unsold > 0,
+      unsold_spots: unsold,
     })
     .select("drawn_at")
     .maybeSingle();
@@ -1024,6 +1077,7 @@ export async function commitDraw(gameId: string): Promise<DrawRecord> {
       ticketIndex: result.ticket,
       total: result.total,
       seed: result.seed,
+      ...(unsold > 0 ? { drawnEarly: true, unsoldSpots: unsold } : {}),
     } as Json,
   });
   revalidatePublic();
@@ -1056,8 +1110,163 @@ export async function commitDraw(gameId: string): Promise<DrawRecord> {
  * quietly closing and nothing happening — on the one day he is about to
  * go live, that is the worst possible failure mode.
  */
-export async function drawWinner(gameId: string): Promise<DrawRecord> {
-  const record = await commitDraw(gameId);
+export async function drawWinner(
+  gameId: string,
+  acknowledgedEarly = false,
+): Promise<DrawRecord> {
+  const record = await commitDraw(gameId, acknowledgedEarly);
   if (!record.ok) console.error("drawWinner:", record.error);
   return record;
+}
+
+// ---------------------------------------------------------------------
+// The demo game
+// ---------------------------------------------------------------------
+
+/**
+ * Creates one completed game so the client can see a populated Past
+ * games section before a real one exists.
+ *
+ * Deliberately conspicuous. It is titled `[DEMO] …`, every spot is sold
+ * to "Demo Buyer", and the public cards carry a DEMO badge — because the
+ * failure this has to avoid is not "the demo looks unconvincing", it is
+ * "the demo is still there six months later and a customer believes a
+ * draw happened that did not".
+ *
+ * It writes a winners row like any other draw, including a seed and a
+ * frozen pool that genuinely reproduce, so the presentation and the
+ * verification page both work against it. A fake that is inconsistent
+ * with the real audit trail would teach the owner the wrong thing about
+ * what he is looking at.
+ */
+export async function seedDemoGame(): Promise<ActionState> {
+  const session = await requireSession();
+  if (!session) return { status: "error", message: "Not signed in." };
+  const { sb, user } = session;
+  const actor = displayName(user);
+
+  const { data: existing } = await sb
+    .from("games")
+    .select("id")
+    .ilike("title", `${DEMO_GAME_PREFIX}%`)
+    .limit(1);
+  if (existing?.length) {
+    return {
+      status: "error",
+      message: "A demo game already exists. Delete that one first.",
+    };
+  }
+
+  const TOTAL = 25;
+  const { data: game, error } = await sb
+    .from("games")
+    .insert({
+      title: `${DEMO_GAME_PREFIX} Example Rifle Game`,
+      description:
+        "A demonstration, not a real game. Nothing was sold and nobody won. Delete it from the Games list whenever you like.",
+      total_spots: TOTAL,
+      spot_price_cents: 2500,
+      status: "drawn",
+      created_by_name: actor,
+      updated_by_name: actor,
+    })
+    .select("id")
+    .single();
+  if (error || !game) {
+    logDbError("seedDemoGame", error);
+    return { status: "error", message: "Could not create the demo game." };
+  }
+
+  const spots = Array.from({ length: TOTAL }, (_, i) => ({
+    game_id: game.id,
+    spot_number: i + 1,
+    status: "sold",
+    first_name: "Demo",
+    last_name: "Buyer",
+    email: "demo@example.invalid",
+    show_name: false,
+    sold_at: new Date().toISOString(),
+  }));
+  const { data: written, error: spotError } = await sb
+    .from("game_spots")
+    .insert(spots)
+    .select("id, spot_number");
+  if (spotError || !written) {
+    logDbError("seedDemoGame spots", spotError);
+    await sb.from("games").delete().eq("id", game.id);
+    return { status: "error", message: "Could not create the demo spots." };
+  }
+
+  // A real seed over the real pool, so the recorded result verifies the
+  // same way a genuine draw does.
+  const seed = newSeed();
+  const pool = [...written]
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .map((s) => ({ spot_id: s.id, spot_number: s.spot_number }));
+  const result = selectWinner(pool.map((s) => ({ id: s.spot_id, weight: 1 })), seed);
+  const winningSpot = pool.find((s) => s.spot_id === result?.entrantId);
+  if (!result || !winningSpot) {
+    await sb.from("games").delete().eq("id", game.id);
+    return { status: "error", message: "Could not draw the demo game." };
+  }
+
+  const { error: winnerError } = await sb.from("winners").insert({
+    game_id: game.id,
+    spot_id: winningSpot.spot_id,
+    display_name: "Demo B.",
+    seed,
+    ticket: winningSpot.spot_number,
+    ticket_index: result.ticket,
+    pool: pool as unknown as Json,
+    entry_total: result.total,
+    drawn_early: false,
+    unsold_spots: 0,
+  });
+  if (winnerError) {
+    logDbError("seedDemoGame winner", winnerError);
+    await sb.from("games").delete().eq("id", game.id);
+    return { status: "error", message: "Could not record the demo winner." };
+  }
+
+  await logActivity(sb, user, {
+    action: "create", entity: "game", entityId: game.id,
+    entityLabel: `${DEMO_GAME_PREFIX} Example Rifle Game`,
+  });
+  revalidatePublic();
+  revalidatePath("/admin/games");
+  return {
+    status: "success",
+    message: "Demo game created. It is marked DEMO everywhere it appears.",
+  };
+}
+
+/** Removes the demo game and everything hanging off it. */
+export async function deleteDemoGame(): Promise<ActionState> {
+  const session = await requireSession();
+  if (!session) return { status: "error", message: "Not signed in." };
+  const { sb, user } = session;
+
+  const { data: games } = await sb
+    .from("games")
+    .select("id, title")
+    .ilike("title", `${DEMO_GAME_PREFIX}%`);
+  if (!games?.length) {
+    return { status: "error", message: "There is no demo game to remove." };
+  }
+  for (const g of games) {
+    // Order matters: winners and spots both point at the game.
+    await sb.from("winners").delete().eq("game_id", g.id);
+    await sb.from("game_spots").delete().eq("game_id", g.id);
+    const { error } = await sb.from("games").delete().eq("id", g.id);
+    if (error) {
+      logDbError("deleteDemoGame", error);
+      return { status: "error", message: "Could not remove the demo game." };
+    }
+    await logActivity(sb, user, {
+      action: "delete", entity: "game", entityId: g.id, entityLabel: g.title,
+    });
+  }
+  revalidatePublic();
+  revalidatePath("/admin/games");
+  return { status: "success", message: "Demo game removed." };
 }

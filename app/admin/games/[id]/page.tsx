@@ -3,6 +3,7 @@ import { getSessionSupabase } from "@/lib/supabase/session";
 import GameForm from "@/components/admin/GameForm";
 import DrawPanel from "@/components/admin/DrawPanel";
 import SpotLedger from "@/components/admin/SpotLedger";
+import BackLink from "@/components/admin/BackLink";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ export default async function EditGamePage({
 
   return (
     <div className="mx-auto max-w-2xl">
+      <BackLink href="/admin/inventory" label="All games" />
       <h1 className="display text-2xl">{game.title.toUpperCase()}</h1>
       <div className="mt-8">
         <GameForm game={game} items={items ?? []} />

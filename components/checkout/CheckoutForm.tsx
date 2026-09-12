@@ -164,7 +164,7 @@ export default function CheckoutForm({
     return (
       <p className="mt-10 text-muted">
         Your cart is empty.{" "}
-        <Link href="/inventory" className="underline hover:text-bone">
+        <Link href="/shop" className="underline hover:text-bone">
           Back to the inventory
         </Link>
         .

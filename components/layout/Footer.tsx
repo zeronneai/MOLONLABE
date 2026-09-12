@@ -8,9 +8,9 @@ import {
 } from "@/lib/brand";
 
 const navLinks = [
-  { href: "/inventory", label: "Inventory" },
   { href: "/shop", label: "Shop" },
-  { href: "/featured", label: "Featured" },
+  { href: "/games", label: "Games" },
+  { href: "/in-the-case", label: "In the case" },
   { href: "/transfers", label: "Transfers" },
   { href: "/services", label: "Services" },
   { href: "/visit", label: "Visit" },

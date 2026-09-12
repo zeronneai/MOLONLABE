@@ -641,7 +641,9 @@ export async function submitCheckout(
     });
   }
 
-  revalidatePath("/inventory");
+  revalidatePath("/shop");
+  revalidatePath("/games");
+  revalidatePath("/in-the-case");
   revalidatePath("/featured");
   return { ok: true, orderNumber: number, token };
 }

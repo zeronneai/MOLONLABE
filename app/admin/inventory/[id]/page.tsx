@@ -3,6 +3,7 @@ import { getSessionSupabase } from "@/lib/supabase/session";
 import { countItemReferences } from "@/lib/db/itemRefs";
 import ItemForm from "@/components/admin/ItemForm";
 import DeleteItem from "@/components/admin/DeleteItem";
+import BackLink from "@/components/admin/BackLink";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,7 @@ export default async function EditItemPage({
 
   return (
     <div className="mx-auto max-w-2xl">
+      <BackLink href="/admin/inventory" label="What you sell" />
       <h1 className="display text-2xl">EDIT ITEM</h1>
       <div className="mt-8">
         <ItemForm item={item} variants={variants ?? []} />

@@ -9,12 +9,11 @@ import { getCurrentGame, getBoard, getSpotCounts } from "@/lib/games/queries";
 import { getWinners } from "@/lib/db/entries";
 import { itemImages } from "@/lib/db/items";
 import { formatUsd } from "@/lib/money";
-import { ENTRY_CLAIM } from "@/lib/legal";
 
 export const metadata: Metadata = {
   title: "The game",
   description:
-    `The current game at Molon Labe Firearms x SunCity Outdoors, El Paso, TX. ${ENTRY_CLAIM.short}`,
+    "The current game at Molon Labe Firearms x SunCity Outdoors, El Paso, TX.",
 };
 
 // Never cached: the spot count is the whole point of the page and a
@@ -145,7 +144,8 @@ export default async function FeaturedPage() {
           Official rules
         </Link>
         <p className="mt-2 max-w-[60ch] text-xs text-muted">
-          {ENTRY_CLAIM.statement}
+          Open only to legal residents who may lawfully take possession of a
+          firearm under federal, state and local law. Void where prohibited.
         </p>
       </div>
     </div>

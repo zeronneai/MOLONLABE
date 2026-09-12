@@ -73,6 +73,12 @@ await page.goto(`${APP}/admin/games/${GAME}`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: /draw without ceremony/i }).click();
 await page.waitForTimeout(400);
 await page.locator('[role="dialog"] button').first().click();
+await page.waitForTimeout(1200);
+// Twelve of twenty sold, deliberately — that is what makes the winning
+// spot number exceed the pool size and exposes "Entry 16 of 12". It is
+// therefore an early draw, and the second confirmation applies.
+const early = page.getByRole("button", { name: /draw anyway/i });
+if (await early.count()) await early.click();
 await page.waitForTimeout(2500);
 
 const row = (await (await fetch(`${DOUBLE}/__dump`)).json()).winners[0];

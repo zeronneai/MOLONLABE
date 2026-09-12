@@ -2,10 +2,11 @@
 
 import { chromium } from "playwright";
 import { APP, DOUBLE, CHROMIUM } from "../lib/config.mjs";
+import { artifacts } from "../lib/harness.mjs";
 
 
 
-const SHOT = "/tmp/claude-0/-home-user-MOLONLABE/b4fc1675-b424-56e3-b391-8d89c8865437/scratchpad/shots";
+const SHOT = artifacts();
 
 const ok = [], bad = [];
 const check = (label, pass, detail = "") =>
@@ -39,11 +40,19 @@ check("shop lists the accessory", has(shopText, "Skull Patch"));
 check("shop does NOT list firearms", !has(shopText, "SIG MPX"));
 await page.screenshot({ path: `${SHOT}/a1-shop.png`, fullPage: true });
 
-await page.goto(`${APP}/inventory`, { waitUntil: "networkidle" });
+// The firearms surface is /in-the-case now, and the seeded rifle is the
+// prize in the seeded game — so it is on the Games surface, not in the
+// case. That exclusion is the point: while a firearm is in a game it
+// is not stock anyone can ask to buy.
+await page.goto(`${APP}/in-the-case`, { waitUntil: "networkidle" });
 const invText = await page.locator("body").innerText();
-check("inventory still lists firearms", has(invText, "SIG MPX"));
-check("inventory does NOT list apparel", !has(invText, "Molon Labe Tee"));
-check("inventory does NOT list accessories", !has(invText, "Skull Patch"));
+check("the case does not list a firearm that is in a game",
+  !has(invText, "SIG MPX"), (invText.match(/[^\n]*MPX[^\n]*/) ?? ["correctly absent"])[0]);
+check("the case lists firearms that are not in a game",
+  has(invText, "Holosun") || /the case is empty/i.test(invText),
+  invText.slice(0, 60).replace(/\n/g, " "));
+check("the case does NOT list apparel", !has(invText, "Molon Labe Tee"));
+check("the case does NOT list accessories", !has(invText, "Skull Patch"));
 
 check("Shop is in the navigation", has(invText, "Shop"));
 

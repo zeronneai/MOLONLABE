@@ -195,3 +195,33 @@ second empty Supabase project, or temporarily archive everything.
    and a coloured status chip.
 4. Run Lighthouse — see `docs/lighthouse.md` for how, and which failures
    are expected rather than defects.
+
+---
+
+## Update — the three surfaces (2026-09-12)
+
+The site is now three public surfaces, and any step in this script that
+says `/inventory` means `/in-the-case`. The old URL redirects, so nothing
+below is broken, but the names have moved:
+
+| Was | Is | What lives there |
+| --- | --- | --- |
+| `/inventory` | `/in-the-case` | Firearms on the shelf. No price, no cart, enquiry only. |
+| `/shop` | `/shop` | Everything purchasable — apparel, accessories, ammunition, optics. Now filtered by category. |
+| — | `/games` | Open games at the top, finished ones below as history. |
+
+**Which surface an item lands on is derived, not chosen.** It follows
+from the category — firearm categories go in the case, everything else is
+shop stock — with one override: an item attached to a game is on the
+Games surface for as long as the game exists, and stays there once drawn.
+There is no flag for the owner to set and none for you to check.
+
+Two things worth adding to your pass:
+
+**Try to make a firearm buyable.** Open a rifle in the admin. The online
+price field is not offered at all, and if you post one anyway the
+database refuses the row. Then confirm the rifle is not in `/shop`.
+
+**Try an early draw.** A game with spots left now asks a second time and
+names the shortfall. Back out of it once and confirm nothing was drawn,
+then go through and confirm the game's card says "Drawn with N unsold".
