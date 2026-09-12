@@ -6,6 +6,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import BuySpots from "@/components/games/BuySpots";
 import SpotBoard from "@/components/games/SpotBoard";
 import { getCurrentGame, getBoard, getSpotCounts } from "@/lib/games/queries";
+import { ELIGIBILITY_SUMMARY } from "@/lib/games/rules";
 import { getWinners } from "@/lib/db/entries";
 import { itemImages } from "@/lib/db/items";
 import { formatUsd } from "@/lib/money";
@@ -144,8 +145,7 @@ export default async function FeaturedPage() {
           Official rules
         </Link>
         <p className="mt-2 max-w-[60ch] text-xs text-muted">
-          Open only to legal residents who may lawfully take possession of a
-          firearm under federal, state and local law. Void where prohibited.
+          {ELIGIBILITY_SUMMARY}
         </p>
       </div>
     </div>

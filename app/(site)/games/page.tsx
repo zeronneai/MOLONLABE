@@ -4,6 +4,7 @@ import { getAllGames } from "@/lib/games/queries";
 import GameCard from "@/components/games/GameCard";
 import EmptyState from "@/components/ui/EmptyState";
 import { SHOP_NAME } from "@/lib/brand";
+import { ELIGIBILITY_SUMMARY } from "@/lib/games/rules";
 
 export const dynamic = "force-dynamic";
 
@@ -109,8 +110,7 @@ export default async function GamesPage() {
           Official rules
         </Link>
         <p className="mt-2 max-w-[60ch] text-xs text-muted">
-          Open only to legal residents who may lawfully take possession of a
-          firearm under federal, state and local law. Void where prohibited.
+          {ELIGIBILITY_SUMMARY}
         </p>
       </div>
     </div>

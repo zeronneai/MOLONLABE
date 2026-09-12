@@ -74,11 +74,12 @@ export const SHIPPING_NOTICE =
 // already taken most of them out, so the compiler named four usages
 // across two files rather than the twelve it would have named in August.
 //
-// What this does NOT do, and must not: the official rules page still
-// carries a checklist item for the attorney. It has been rewritten to
-// describe the entry method as purchase-only rather than deleted, because
-// a rules document that simply omits the question reads as an oversight.
-// The attorney needs to see that the decision was made.
+// The official rules page used to carry a checklist item about this for
+// the attorney. That page is now finished copy rather than a checklist,
+// and it states the position as fact where it belongs — a spot is bought,
+// and that is the only way to get one. The decision is therefore visible
+// in the terms themselves rather than flagged as an open question.
 //
 // If a free route ever returns, it does not come back as scattered
-// sentences. It comes back here first.
+// sentences. It comes back here first, and lib/games/rules.ts changes
+// with it.

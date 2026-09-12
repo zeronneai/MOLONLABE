@@ -246,7 +246,7 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
          } of ${order.spots.totalSpots}.
          <div style="height:10px;line-height:10px">&nbsp;</div>
          <span style="${SMALL};color:${C.muted}">The draw happens once the last
-         spot sells. There is no end date — the game runs until it fills.
+         spot sells, or earlier if the shop decides. There is no end date.
          <a href="${SITE_URL}/featured" style="color:${C.acid};text-decoration:underline">Watch the board</a>.</span>`,
       )
     : "";
@@ -468,8 +468,8 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
           `${order.spots.numbers.length === 1 ? "Spot" : "Spots"} ${order.spots.numbers.join(", ")} of ${order.spots.totalSpots}`,
           `in ${order.spots.game}.`,
           ``,
-          `The draw happens once the last spot sells. There is no end`,
-          `date — the game runs until it fills.`,
+          `The draw happens once the last spot sells, or earlier if the`,
+          `shop decides. There is no end date.`,
           `${SITE_URL}/featured`,
         ]
       : []),

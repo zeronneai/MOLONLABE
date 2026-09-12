@@ -1,43 +1,34 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { SHOP_PHONE_DISPLAY, SHOP_PHONE_HREF } from "@/lib/brand";
+import { RULES } from "@/lib/games/rules";
+import { SHOP_NAME, SHOP_PHONE_DISPLAY, SHOP_PHONE_HREF } from "@/lib/brand";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/sweepstakes-rules" },
   title: "Sweepstakes Rules",
-  description:
-    "Official rules for the Molon Labe Firearms x SunCity Outdoors sweepstakes.",
-  // Placeholder copy must never be indexed as if it were the real terms.
+  description: `Official sweepstakes rules for ${SHOP_NAME}, El Paso, TX.`,
+  // Stays noindex until the shop launches. Nothing about the copy is
+  // provisional; this is a launch switch, not a disclaimer.
   robots: { index: false, follow: false },
 };
 
-// ---------------------------------------------------------------------------
-// PLACEHOLDER — NOT LEGAL COPY.
-//
-// Everything below is scaffolding so the route, the layout and the link
-// from the featured page are real. It must be replaced wholesale by the
-// client's attorney before the sweepstakes opens to the public. The
-// headings are the sections such rules normally carry, as a checklist for
-// whoever drafts them; the body text under each is deliberately not
-// written as operative terms.
-// ---------------------------------------------------------------------------
-
-const SECTIONS = [
-  ["Eligibility", "Who may enter: minimum age, residency, exclusions for employees and their households, and any state-level restrictions on firearm sweepstakes."],
-  ["Entry period", "Exact open and close date and time, including time zone, and how the clock is determined."],
-  ["How to enter", "Entry is by purchasing a spot in the game; there is no free or alternative method of entry. The client has confirmed this. The attorney should advise on whether a no-purchase route is required for this promotion in Texas and in any state entrants may be in, and if it is, this is the section that changes."],
-  ["Odds of winning", "How odds are determined: a game sells a fixed number of spots and one is drawn, so a buyer's chance is their spots over the pool. State whether the draw may happen before every spot sells and what that does to the odds."],
-  ["Prize", "Description and approximate retail value of the prize, and a statement that it may not be substituted or transferred except as the sponsor allows."],
-  ["Drawing and notification", "How and when the winner is drawn, how they are contacted, the deadline to respond, and what happens if they do not."],
-  ["Firearm transfer conditions", "That the prize is transferred through a licensed dealer, subject to a background check and all federal, state and local law, and what happens if the winner cannot lawfully take possession."],
-  ["Taxes", "Who is responsible for taxes on the prize and any reporting obligations."],
-  ["Publicity", "Whether accepting the prize permits use of the winner's name or likeness, and any state carve-outs."],
-  ["Limitation of liability", "Standard limitations, and the sponsor's remedies for tampering, fraud, or technical failure."],
-  ["Disputes and governing law", "Governing law, venue, and any arbitration or class-action terms."],
-  ["Sponsor", "Full legal entity name and address of the sponsor, and a contact route for questions about these rules."],
-];
-
+/**
+ * The rules, set like any other page on the site.
+ *
+ * Deliberately not a wall of small print. Legal copy nobody reads
+ * protects nobody, and this shop's whole pitch is that the draws are
+ * real and checkable — so the terms are set at reading size in the same
+ * type system as the rest of the site, numbered so a clause can be
+ * pointed at over the phone.
+ *
+ * The content is in lib/games/rules.ts, with every clause traced to the
+ * behaviour it describes.
+ */
 export default function SweepstakesRulesPage() {
+  // Numbered continuously across sections, so "clause 12" is unambiguous
+  // without anyone needing to say which section it is in.
+  let n = 0;
+
   return (
     <div className="px-page pb-24 pt-[calc(72px+4rem)]">
       <p className="label text-acid">Legal</p>
@@ -45,45 +36,88 @@ export default function SweepstakesRulesPage() {
         OFFICIAL SWEEPSTAKES RULES.
       </h1>
 
-      <div className="mt-10 max-w-[68ch] border border-amber p-6">
-        <p className="label text-amber">Placeholder — for the client&apos;s attorney</p>
-        <p className="mt-4 text-sm leading-relaxed">
-          This page is scaffolding, not legal copy. The sections below are a
-          checklist of what these rules normally have to cover; none of it
-          is drafted as operative terms and none of it has been reviewed by
-          a lawyer. It must be replaced in full before the sweepstakes
-          opens to the public. The page is set to noindex until it is.
-        </p>
-      </div>
-
-      <p className="mt-10 max-w-[60ch] text-sm leading-relaxed text-muted">
-        Open only to legal residents who may lawfully take possession of a
-        firearm under federal, state and local law. Void where prohibited.
+      <p className="mt-8 max-w-[58ch] leading-relaxed text-muted">
+        These rules apply to every game run by {SHOP_NAME} in El Paso,
+        Texas. They describe exactly how a game works, how the winner is
+        picked, and what happens next. Read them before you buy a spot.
       </p>
 
       <div className="mt-14 border-t hairline">
-        {SECTIONS.map(([heading, note], i) => (
-          <section key={heading} className="border-b hairline py-8">
-            <div className="flex flex-col gap-2 sm:flex-row sm:gap-10">
-              <span className="label shrink-0 text-muted sm:w-12">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <div>
-                <h2 className="display text-xl">{heading.toUpperCase()}</h2>
-                <p className="mt-3 max-w-[60ch] text-sm leading-relaxed text-muted">
-                  {note}
-                </p>
-              </div>
-            </div>
+        {RULES.map((section) => (
+          <section key={section.heading} className="border-b hairline py-10">
+            <h2 className="display text-xl">
+              {section.heading.toUpperCase()}
+            </h2>
+
+            <ol className="mt-6 space-y-5">
+              {section.clauses.map((clause, i) => {
+                n += 1;
+                return (
+                  <li
+                    key={i}
+                    className="flex flex-col gap-2 sm:flex-row sm:gap-6"
+                  >
+                    <span className="label shrink-0 tabular-nums text-muted sm:w-10 sm:pt-[2px]">
+                      {String(n).padStart(2, "0")}
+                    </span>
+
+                    <div className="max-w-[62ch]">
+                      {clause.text && (
+                        <p
+                          className={
+                            clause.verbatim
+                              ? // The attorney's wording. Given its own
+                                // rule so it reads as quoted rather than
+                                // paraphrased, and never reflowed.
+                                "border-l-2 border-acid pl-5 leading-relaxed"
+                              : "leading-relaxed"
+                          }
+                        >
+                          {clause.text}
+                        </p>
+                      )}
+
+                      {clause.pending && (
+                        /* An answer only the shop can give. Marked in
+                           place rather than as a banner at the top: the
+                           rest of the page is finished, and a reader
+                           should meet the gap in the clause it belongs
+                           to rather than be warned about the whole
+                           document. */
+                        <p
+                          className={`text-amber ${clause.text ? "mt-3" : ""}`}
+                        >
+                          <span className="label">To be confirmed · </span>
+                          <span className="leading-relaxed">
+                            {clause.pending}
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
           </section>
         ))}
       </div>
 
+      <div className="mt-12 max-w-[62ch]">
+        <h2 className="display text-xl">QUESTIONS</h2>
+        <p className="mt-4 leading-relaxed text-muted">
+          Ask before you buy, not after. Call the shop on{" "}
+          <a href={SHOP_PHONE_HREF} className="text-bone underline">
+            {SHOP_PHONE_DISPLAY}
+          </a>{" "}
+          and someone will talk you through any clause on this page.
+        </p>
+      </div>
+
       <div className="mt-12 flex flex-wrap items-center gap-4">
-        <Link href="/featured" className="cta-primary">
-          Back to the feature
+        <Link href="/games" className="cta-primary">
+          See the games
         </Link>
-        <a href={SHOP_PHONE_HREF} className="cta-primary">
+        <a href={SHOP_PHONE_HREF} className="cta-secondary">
           Call {SHOP_PHONE_DISPLAY}
         </a>
       </div>

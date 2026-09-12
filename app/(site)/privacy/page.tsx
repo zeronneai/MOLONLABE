@@ -19,9 +19,11 @@ export const metadata: Metadata = {
 // ---------------------------------------------------------------------------
 // DRAFT — NOT REVIEWED BY A LAWYER.
 //
-// Unlike the sweepstakes rules, this is written as real operative copy
-// rather than a checklist, because it describes things the site actually
-// does and those facts are ours to state accurately. It still needs an
+// Written as real operative copy, because it describes things the site
+// actually does and those facts are ours to state accurately. The
+// sweepstakes rules are now written the same way, on the same basis —
+// this note used to contrast the two, back when that page was a
+// checklist. It still needs an
 // attorney to check it against Texas law and the client's own practices —
 // particularly retention periods and anything the shop does with the data
 // offline, which I cannot know. The page is noindex until it is signed off.

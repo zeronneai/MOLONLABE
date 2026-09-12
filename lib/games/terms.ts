@@ -8,11 +8,19 @@
 // Mine, not the attorney's. Three facts the buyer has to have seen before
 // paying, and nothing else: there is no end date, the game ends when it
 // sells out, and the money does not come back.
+//
+// The third line used to stop at "The winner is drawn once the last spot
+// sells." That was a promise the admin can break — the owner can draw a
+// short game, deliberately, and the winner row records that it happened.
+// Every buyer who ticked the old consent was told something the system
+// does not guarantee. The clause now says both halves, and the full rules
+// say it again at greater length. If the early-draw control is ever taken
+// away, this is one of the sentences that changes back.
 
 export const GAME_TERMS = [
   "This game runs until all spots are sold. There is no end date and no countdown.",
   "All spot purchases are final. No refunds, no exchanges, no transfers.",
-  "The winner is drawn once the last spot sells.",
+  "The winner is drawn once the last spot sells. The shop may draw earlier at its discretion; if it does, the game says so.",
 ] as const;
 
 /**
@@ -26,11 +34,11 @@ export const GAME_TERMS_TEXT = GAME_TERMS.join(" ");
  * Bumped whenever GAME_TERMS changes, so a stack of orders can be grouped
  * by which wording was in force without diffing strings.
  */
-export const GAME_TERMS_VERSION = "2026-09-agency-1";
+export const GAME_TERMS_VERSION = "2026-09-agency-2";
 
 /** The checkbox label. Says what is being agreed to, not "I agree". */
 export const GAME_TERMS_CONSENT =
-  "I understand this game runs until all spots sell, that there is no end date, and that my purchase is final.";
+  "I understand this game has no end date, that the shop may draw before every spot sells, and that my purchase is final.";
 
 /** The opt-in that puts a first name on the public board. */
 export const SHOW_NAME_LABEL = "Show my first name on the spot board";

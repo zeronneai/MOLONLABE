@@ -16,7 +16,7 @@ sections 1 and 2 below.
 
 | What | Where | Status |
 | --- | --- | --- |
-| Sweepstakes rules, full text | `app/(site)/sweepstakes-rules/page.tsx` | **Attorney.** A 13-section checklist stands in for the terms. The page is `noindex` and says plainly that it is not legal copy. The entry program must not open to the public until this is replaced. |
+| Sweepstakes rules, full text | `lib/games/rules.ts`, rendered at `app/(site)/sweepstakes-rules/page.tsx` | **Written as finished copy, pending the shop's three answers (§13) and an attorney read.** No longer a checklist. Every clause describes behaviour that exists and is traced to its implementation in the file header. Deliberately contains no limitation of liability, arbitration, publicity or prize-substitution clause — none of those is a behaviour of this system, and inventing them would be writing law rather than describing a service. If the attorney wants them they are additions, not corrections. Page stays `noindex` until launch. |
 | Privacy policy | `app/(site)/privacy/page.tsx` | **Drafted and live at `/privacy`, linked from the footer, marked for attorney review and `noindex`.** Written as real operative copy, because it describes what the site actually does. One explicit gap left for the lawyer: the retention period. |
 
 ## 2. Money — no longer visible, still undecided
@@ -110,7 +110,27 @@ are known gaps with stated consequences.
 | **Transfers to a buyer's own FFL** | not built | Out of scope for launch by decision: it needs licence collection, verification and per-order tracking. The order model can carry it; the flow is not built. Separate from `/transfers`, which handles inbound transfers into the shop. |
 
 
-## 8. The entry program — one thing for the attorney, not for the code
+## 8. ~~The entry program — the two-addresses problem~~ — **obsolete**
+
+**This section briefed the attorney on a model that no longer exists.**
+It described `entrants` keyed on `(campaign_id, lower(email))`, a running
+count per address, and somebody entering free with one address and buying
+with another. The per-dollar model and the free entry route were both
+removed in the fixed-pool rebuild: there is no `entrants` row, no running
+count, and no free route to enter by. A spot is bought, and the spot is
+the entry.
+
+The identity question it raised does not survive the change. Two
+addresses held by one person now means two sets of spots, which is the
+same as two sets of spots held by two people — the drawing is over spots,
+not over entrants, so nothing needs merging and nothing is double-counted.
+
+Left in place rather than deleted because it was raised with the client
+and the answer is "the rebuild removed the question", which is worth
+being able to point at. Nothing here should reach the attorney.
+
+<details>
+<summary>The original text, for the record</summary>
 
 **A person is identified by their email address, and one person can have
 two.** `entrants` is keyed on `(campaign_id, lower(email))`, so entries
@@ -143,6 +163,8 @@ count is per campaign and not lifetime, "your entries" always means "in
 this drawing". If the rules are ever written to promise anything that
 carries across drawings, the schema would need to change to match.
 
+</details>
+
 ## 9. Apparel — decisions to confirm
 
 | What | Why it needs a person |
@@ -151,18 +173,22 @@ carries across drawings, the schema would need to change to match.
 | **The new categories** | `shotgun`, `ammunition`, `magazine` and `apparel` were added. Suppressors and other NFA items were deliberately left out: they need an SOT and a different transfer process, and listing them would imply the shop can sell them. Confirm that is right. |
 | **Sizes are free text** | No fixed S–XXL list, so a one-size hat, a 34 waist and a 9.5 boot all fit. The cost is that "Med" and "Medium" are different sizes to the database; the form warns on an exact repeat but cannot catch a near-miss. |
 
-## 10. The terms must allow an early draw
+## 10. Early draw — permitted in the rules, refinements still open
 
-**This is the most consequential open item on this page.**
+**Closed in the rules. Still worth the attorney's eye.**
 
-The terms buyers accept at checkout say the game runs until every spot
-sells — that is the point of a fixed pool and it is why there is no end
-date. The owner can now draw before that happens, because in practice a
-game that stalls at 12 of 100 cannot sit open forever.
+The rules now say, in the section on when a game closes, that the shop
+may hold the drawing before every spot is sold, at its sole discretion,
+and that the shortfall is recorded and shown. The checkout terms say it
+too — `GAME_TERMS` used to promise "the winner is drawn once the last
+spot sells" full stop, which was a promise the admin could break, and
+every buyer who ticked the old consent had been told something the system
+does not guarantee. Both now say both halves, and `GAME_TERMS_VERSION`
+moved to `2026-09-agency-2` so orders can be grouped by which wording
+they accepted.
 
-**The rules do not currently permit this.** As written, drawing early is
-the shop doing something the buyer was told would not happen. What the
-attorney needs to add, in substance:
+What is written is the bare permission. These are the refinements only
+the shop or its attorney can decide, and none of them is in the rules:
 
 - That the sponsor may draw before every spot sells, at its discretion.
 - What happens to the odds when it does — a buyer who took one of 12 sold
@@ -186,8 +212,10 @@ behaviour that exists rather than in the abstract:
   on its card, so the history does not quietly present it as a game that
   filled.
 
-Until the rules change, the honest position is that this is a capability
-the shop has and has not yet been given permission to use.
+The honest position now is that the shop has the capability and has
+given itself permission, with no floor and no advance notice. That is
+defensible because it is disclosed before purchase rather than after,
+but a floor would be better than none.
 
 **Going to the attorney at the same time:** §12, where magazines and
 ammunition may lawfully be shipped. They are the two open legal items and
@@ -266,3 +294,36 @@ A destination rule is genuinely new machinery, not a flag:
 the buyer to know their own state's law.** That may be an acceptable
 position — plenty of retailers take it, with a notice — but it should be
 a decision somebody made, and right now it is a decision nobody has made.
+
+## 13. The three answers the shop owes the rules
+
+The sweepstakes rules are written as finished copy. Three clauses cannot
+be: they are decisions only the shop can make, and inventing them would
+be putting words in the shop's mouth about how it will treat a winner.
+
+They are marked in amber **in place, inside the clause they belong to**,
+rather than behind a banner at the top of the page — the rest of the
+document is finished, and a reader should meet each gap where it matters
+rather than be warned about the whole thing.
+
+| # | What | Where it appears |
+| --- | --- | --- |
+| 1 | **How long the winner has to respond.** A number of days from first contact. | Rules → Claiming a prize |
+| 2 | **What happens to an unclaimed prize.** Redrawn from the remaining sold spots, kept by the shop, or something else. If it is redrawn, say from what pool. | Rules → Claiming a prize |
+| 3 | **Any limit by state or residency beyond the age requirement.** The rules already require that a winner can lawfully receive a firearm; this is about whether the shop will refuse entrants from particular states outright. | Rules → Who can take part |
+
+All three live in `RULES_NEEDS_SHOP` in `lib/games/rules.ts`. Answering
+one means replacing its entry with a clause; the amber marker disappears
+with it and nothing else needs touching.
+
+**What the shop should know before answering 2:** the drawing is
+reproducible from the recorded seed, but a *redraw* is a new drawing and
+would need its own seed and its own record. The build does not currently
+do redraws — a game that has a winner cannot be drawn again, deliberately
+— so an answer of "redrawn" is a feature request as well as a clause.
+
+**Not on this list, and deliberately:** the rules carry no limitation of
+liability, arbitration, publicity-rights or prize-substitution clause.
+Those are not behaviours of this system, so I did not write them. They
+are the attorney's to add if the shop wants them, and their absence is a
+choice rather than an oversight.
