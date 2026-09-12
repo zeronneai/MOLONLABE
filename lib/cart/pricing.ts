@@ -14,7 +14,6 @@ import {
   type PricedLine,
   type RejectedLine,
 } from "./types";
-import { MAX_SPOTS_PER_ORDER } from "@/lib/games/types";
 
 /**
  * Owner-set commerce settings, in the same key/value table as the game
@@ -105,7 +104,6 @@ const REJECTION = {
   noSizes: "No sizes are in stock.",
   oneGame: "Spots in one game at a time — this cart already holds another.",
   gameClosed: "That game has sold out. Nothing has been charged.",
-  spotCap: `${MAX_SPOTS_PER_ORDER} spots is the most in one order.`,
 } as const;
 
 /**
@@ -201,17 +199,18 @@ export async function priceCart(
         // Trimmed to what is actually left, and said out loud when it is
         // less than was asked for — silently selling three of five spots
         // is how somebody ends up surprised at the total.
-        const cap = Math.min(remaining, MAX_SPOTS_PER_ORDER);
-        spotCount = Math.max(1, Math.min(requested, cap));
+        //
+        // What is left is now the ONLY bound. There used to be a second,
+        // MAX_SPOTS_PER_ORDER, which was 25 and which nobody had decided;
+        // it is gone. This one is real, comes from the database, and is
+        // re-checked here rather than trusted from the browser.
+        spotCount = Math.max(1, Math.min(requested, remaining));
         if (spotCount < requested) {
           rejectedSpots.push({
             key: lineKey({ gameId: game.id }),
             itemId: game.id,
             name: game.title,
-            reason:
-              remaining < requested
-                ? `Only ${remaining} ${remaining === 1 ? "spot" : "spots"} left, so the cart holds ${spotCount}.`
-                : REJECTION.spotCap,
+            reason: `Only ${remaining} ${remaining === 1 ? "spot" : "spots"} left, so the cart holds ${spotCount}.`,
           });
         }
         spotGame = {

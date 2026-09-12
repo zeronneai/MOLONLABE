@@ -114,7 +114,15 @@ export type PricedCart = {
  * still have no stock figure at all, so a shipped one can be over-ordered
  * up to this number — see docs/content-needed.md.
  */
-export const MAX_QUANTITY = { pickup: 1, ship: 10, none: 25 } as const;
+/**
+ * `none` is spots, and it is a SANITY BOUND on untrusted input, not a
+ * purchase limit. It used to be 25 and was enforced as policy; that
+ * number was invented and is gone. A game may hold at most 10,000 spots
+ * (`games_spots_sane`), so nothing beyond that can be real, and anything
+ * within it is bounded for real by how many spots are actually left —
+ * checked against the database at checkout, not against this.
+ */
+export const MAX_QUANTITY = { pickup: 1, ship: 10, none: 10_000 } as const;
 
 /** One size of one item, as the public pages need it. */
 export type VariantOption = {

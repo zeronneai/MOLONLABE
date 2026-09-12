@@ -15,7 +15,8 @@
 //   fixed spots, fixed price   games.total_spots, games.spot_price_cents
 //   sales tax                  lib/cart/pricing.ts, settings.commerce
 //   final sale                 lib/games/terms.ts, lib/legal.ts
-//   25 per order               MAX_SPOTS_PER_ORDER in lib/games/types.ts
+//   no per-order limit         removed; the bound is what is left
+//   numbers assigned           claim_game_spots, lowest open first
 //   spots held then released   claim_game_spots / release_game_spots
 //   runs until it fills        games.status open -> full
 //   early drawing              winners.drawn_early, winners.unsold_spots
@@ -35,7 +36,6 @@
 // the repository and no way for this page to carry a reworded variant.
 
 import { FIREARM_DISCLAIMER, PICKUP_NOTICE } from "@/lib/legal";
-import { MAX_SPOTS_PER_ORDER } from "./types";
 
 /**
  * Three things only the shop can decide. They are rendered in place,
@@ -114,7 +114,18 @@ export const RULES: RuleSection[] = [
         text: "Spot purchases are final. No refunds, no exchanges, no transfers. This applies whether or not you win.",
       },
       {
-        text: `You may buy as many spots as you like while spots remain, up to ${MAX_SPOTS_PER_ORDER} in a single order. To take more than that, place another order.`,
+        // No number here, because there is no limit to state. There used
+        // to be one — 25 an order — and it was in these rules as though
+        // it were policy while being something I picked while building
+        // the quantity control. The only real limit is how many spots
+        // are left, so that is what the clause says.
+        text: "You may buy as many spots as you like, up to however many are left in the game. There is no limit per person and no limit per order.",
+      },
+      {
+        text: "Spot numbers are assigned when you buy — you do not choose them. You get the lowest numbers still free, so if spots 2 and 4 have gone and you take three, you get 1, 3 and 5.",
+      },
+      {
+        text: "Adding more spots to your cart for the same game adds to what is already there. Your cart shows the running total before you pay.",
       },
       {
         text: "Your spots are held while you check out and are released back to the game if the payment does not complete. A spot is only yours once payment succeeds.",

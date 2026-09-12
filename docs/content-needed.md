@@ -16,7 +16,7 @@ sections 1 and 2 below.
 
 | What | Where | Status |
 | --- | --- | --- |
-| Sweepstakes rules, full text | `lib/games/rules.ts`, rendered at `app/(site)/sweepstakes-rules/page.tsx` | **Written as finished copy, pending the shop's three answers (§13) and an attorney read.** No longer a checklist. Every clause describes behaviour that exists and is traced to its implementation in the file header. Deliberately contains no limitation of liability, arbitration, publicity or prize-substitution clause — none of those is a behaviour of this system, and inventing them would be writing law rather than describing a service. If the attorney wants them they are additions, not corrections. Page stays `noindex` until launch. |
+| Sweepstakes rules, full text | `lib/games/rules.ts`, rendered at `app/(site)/sweepstakes-rules/page.tsx` | **Written as finished copy, pending the shop's three answers (§14) and an attorney read.** No longer a checklist. Every clause describes behaviour that exists and is traced to its implementation in the file header. Deliberately contains no limitation of liability, arbitration, publicity or prize-substitution clause — none of those is a behaviour of this system, and inventing them would be writing law rather than describing a service. If the attorney wants them they are additions, not corrections. Page stays `noindex` until launch. |
 | Privacy policy | `app/(site)/privacy/page.tsx` | **Drafted and live at `/privacy`, linked from the footer, marked for attorney review and `noindex`.** Written as real operative copy, because it describes what the site actually does. One explicit gap left for the lawyer: the retention period. |
 
 ## 2. Money — no longer visible, still undecided
@@ -295,7 +295,34 @@ the buyer to know their own state's law.** That may be an acceptable
 position — plenty of retailers take it, with a notice — but it should be
 a decision somebody made, and right now it is a decision nobody has made.
 
-## 13. The three answers the shop owes the rules
+## 13. ~~The per-order spot cap~~ — **removed, was never anyone's decision**
+
+`MAX_SPOTS_PER_ORDER = 25`, and `MAX_QUANTITY.none = 25` beside it. Both
+mine. Introduced in the fixed-pool rebuild (`8c5575e`) while building the
+quantity selector, with the comment "How many spots one person may take
+in a single transaction" and no reason given — then written into the
+official rules as though it were the shop's policy.
+
+The client's answer, when asked, was that people can buy as many spots as
+they want.
+
+**Nothing depended on it**, checked rather than assumed:
+
+- `claim_game_spots` takes `limit p_qty` with `for update skip locked`
+  and has no bound of its own.
+- The gateway is sent a total and **no line items at all**, so there is
+  no per-line limit to respect.
+- `order_items.quantity` is a plain integer, checked only for `> 0`.
+- Confirmed by purchase: **55 spots in one transaction, one charge, one
+  order line, spots 1–55.**
+
+The only real bound is how many spots remain, which the pricer enforces
+against the database at checkout rather than trusting the browser. The
+sanity bound on untrusted localStorage is now 10,000, which is the
+largest a game may be (`games_spots_sane`) rather than a number picked to
+look sensible.
+
+## 14. The three answers the shop owes the rules
 
 The sweepstakes rules are written as finished copy. Three clauses cannot
 be: they are decisions only the shop can make, and inventing them would

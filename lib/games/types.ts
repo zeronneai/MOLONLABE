@@ -81,5 +81,18 @@ export function gameState(game: {
   return "open";
 }
 
-/** How many spots one person may take in a single transaction. */
-export const MAX_SPOTS_PER_ORDER = 25;
+// MAX_SPOTS_PER_ORDER lived here and is gone.
+//
+// It was 25, and nobody had ever decided that. I introduced it in the
+// fixed-pool rebuild while building the quantity selector, with a
+// one-line comment and no reason, and it then got written into the
+// official rules as though it were policy.
+//
+// Nothing depended on it. The claim function takes `limit p_qty` with
+// `for update skip locked` and has no bound of its own; the gateway is
+// sent a total and no line items at all; `order_items.quantity` is a
+// plain integer checked only for being positive. It cost the shop its
+// best customer — the person who wants twenty spots — for nothing.
+//
+// The real bound is how many spots are left, which the pricer enforces
+// against the database at checkout rather than trusting the browser.

@@ -14,7 +14,13 @@ import { useState } from "react";
 import { useCart } from "@/lib/cart/store";
 import { formatUsd } from "@/lib/money";
 import { GAME_TERMS } from "@/lib/games/terms";
-import { MAX_SPOTS_PER_ORDER } from "@/lib/games/types";
+
+/**
+ * Below this, the count is stated next to the control rather than left
+ * to be discovered. Five is where "plenty" stops being true for a pool
+ * people are actively racing each other for.
+ */
+const LOW_SPOTS = 5;
 
 export default function BuySpots({
   gameId,
@@ -28,9 +34,14 @@ export default function BuySpots({
   const { addSpots } = useCart();
   const router = useRouter();
   const [count, setCount] = useState(1);
-  const [added, setAdded] = useState(false);
+  /** The cart total after the last add, so the button can say it. */
+  const [inCart, setInCart] = useState<number | null>(null);
 
-  const cap = Math.max(1, Math.min(remaining, MAX_SPOTS_PER_ORDER));
+  // What is left is the only bound. There used to be a second one of 25
+  // that nobody had decided on; it turned the best customer this feature
+  // will ever have — the person who wants twenty spots — away at the
+  // control.
+  const cap = Math.max(1, remaining);
   const clamped = Math.max(1, Math.min(count, cap));
 
   if (remaining === 0) {
@@ -92,30 +103,45 @@ export default function BuySpots({
         </div>
       </div>
 
-      {clamped === cap && cap < MAX_SPOTS_PER_ORDER && (
+      {/* Said before the control is touched, not after. Discovering at
+          checkout that only three were left is the thing that wastes a
+          customer's time, and it is worse than any cart bug. */}
+      {remaining <= LOW_SPOTS && (
         <p className="label mt-4 text-amber">
-          That is every spot left.
+          {remaining === 1
+            ? "One spot left."
+            : `Only ${remaining} spots left — that is all you can take.`}
         </p>
+      )}
+      {remaining > LOW_SPOTS && clamped === cap && (
+        <p className="label mt-4 text-amber">That is every spot left.</p>
       )}
 
       <button
         type="button"
         onClick={() => {
-          addSpots(gameId, clamped);
-          setAdded(true);
+          setInCart(addSpots(gameId, clamped));
           router.refresh();
         }}
         className="cta-primary control-go mt-8 w-full sm:w-auto"
       >
-        {added
-          ? "In your cart"
-          : `Take ${clamped === 1 ? "a spot" : `${clamped} spots`}`}
+        {`Take ${clamped === 1 ? "a spot" : `${clamped} spots`}`}
       </button>
 
-      {added && (
-        <a href="/cart" className="control ml-0 mt-3 block sm:ml-3 sm:mt-0 sm:inline-block">
-          Go to cart
-        </a>
+      {/* The button no longer becomes "In your cart" and stop there. It
+          stays a buy control, because taking more is a thing people do,
+          and what changed is said next to it instead — with the running
+          total, since adding three to two and being told only "added" is
+          a silent success. */}
+      {inCart !== null && (
+        <p role="status" className="mt-4 text-sm">
+          <span className="text-acid">
+            {inCart === 1 ? "1 spot" : `${inCart} spots`} in your cart.
+          </span>{" "}
+          <a href="/cart" className="underline">
+            Go to cart
+          </a>
+        </p>
       )}
 
       {/* Placement 1 of 2. The consent checkbox at checkout is the one

@@ -33,8 +33,11 @@ type CartContextValue = {
     fulfillment: FulfillmentType,
     variantId?: string | null,
   ) => void;
-  /** Spots in a game, by count. One game per cart — this replaces. */
-  addSpots: (gameId: string, quantity: number) => void;
+  /**
+   * Spots in a game. ADDS to the existing line for this game and
+   * returns the new total; a different game supersedes.
+   */
+  addSpots: (gameId: string, quantity: number) => number;
   /** Keyed by lineKey(), because item alone does not identify a line. */
   setQuantity: (key: string, quantity: number) => void;
   remove: (key: string) => void;
@@ -107,15 +110,37 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /**
-   * Spots, by the count. Replaces rather than increments — the buy
-   * control is a number the customer chose, not a tally, and one game per
-   * cart means any existing spot line is being superseded.
+   * Spots, added to whatever is already there for the same game.
+   *
+   * This used to REPLACE, on the reasoning that the buy control is a
+   * number the customer chose rather than a tally. That reasoning was
+   * wrong in the way that matters: somebody who took two spots, went
+   * back and took three more ended up with three, and the only sign was
+   * a number in the cart they had no reason to re-read. A control
+   * labelled "Take 3 spots" that silently removes two is the worst kind
+   * of bug — it looks like it worked.
+   *
+   * It is also what the rest of this cart does. Adding an item twice has
+   * always incremented; spots were the one thing that did not.
+   *
+   * A DIFFERENT game still supersedes, because checkout carries one game
+   * and merging two would be inventing an order we cannot take.
+   *
+   * Returns the new total so the caller can say what just happened. A
+   * silent success is nearly as confusing as a silent failure.
    */
   const addSpots = useCallback(
-    (gameId: string, quantity: number) => {
-      const qty = Math.max(1, Math.min(Math.floor(quantity), MAX_QUANTITY.none));
-      const withoutSpots = read().filter((l) => !l.gameId);
-      persist([...withoutSpots, { gameId, quantity: qty }]);
+    (gameId: string, quantity: number): number => {
+      const adding = Math.max(1, Math.floor(quantity));
+      const current = read();
+      const existing = current.find((l) => l.gameId === gameId);
+      const notSpots = current.filter((l) => !l.gameId);
+      const total = Math.min(
+        (existing?.quantity ?? 0) + adding,
+        MAX_QUANTITY.none,
+      );
+      persist([...notSpots, { gameId, quantity: total }]);
+      return total;
     },
     [persist],
   );
