@@ -172,3 +172,12 @@ the ones a missed migration would have added — sort last and are the first
 casualties of a cap. A truncated dump therefore fails in the most
 misleading possible direction: it manufactures exactly the symptom you are
 looking for. Use `scripts/check-schema.sql`.
+
+## What this document does not cover
+
+`baseline.sql` and `check-schema.sql` are verified against stock
+PostgreSQL 16, not against Supabase. PostgREST's schema cache, object
+ownership through the SQL editor, and policy behaviour with a real
+`auth.uid()` are all untested. That gap is tracked in `docs/untested.md`,
+which is the live ledger of everything only ever exercised against a
+stand-in.

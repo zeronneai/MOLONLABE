@@ -7,6 +7,10 @@ ran against a hand-written stand-in, which exercises the app's code but
 only *approximates* the RLS policies. This script covers what the mock
 could not: the real database, the real policies, the real storage bucket.
 
+`docs/untested.md` is the companion to this: a live checklist of what
+has only ever run against the stand-in, with what has since been covered
+and when. This file is the script; that one is the ledger.
+
 Do it on the deployed preview, on your phone, in one sitting. It takes
 about 25 minutes. **Steps 1–6 are the ones that would embarrass us if
 they failed.**
