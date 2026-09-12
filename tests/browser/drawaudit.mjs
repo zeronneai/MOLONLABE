@@ -65,7 +65,6 @@ for (const s of SPOTS) {
     first_name: s.sell ? (s.spot_number % 2 ? "Dana" : "Alma") : null,
     last_name: s.sell ? (s.spot_number % 2 ? "Ruiz" : "Castillo") : null,
     email: s.sell ? "buyer@example.com" : null,
-    show_name: true,
     sold_at: s.sell ? new Date().toISOString() : null,
   });
 }

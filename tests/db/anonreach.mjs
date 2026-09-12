@@ -108,10 +108,13 @@ try {
 
   check("game_spots is NOT public — it carries buyer names and emails",
     !readable.has("game_spots"));
-  check("game_spot_board IS public — the redacted board the site reads",
-    readable.has("game_spot_board"));
   check("game_scoreboard IS public — the counts the site reads",
     readable.has("game_scoreboard"));
+  // The board view carried a redacted buyer name. It is gone, and its
+  // absence is asserted rather than assumed: a view that reappears is a
+  // name that reappears.
+  check("game_spot_board no longer exists at all",
+    !readable.has("game_spot_board"));
 
   // Now prove the mechanism on real rows, because the catalogue says
   // what SHOULD happen and the whole bug was a gap between that and
@@ -132,8 +135,6 @@ try {
     `select count(*) from public.game_spots where status = 'sold'`));
   const anonSpots = Number(
     await asAnon(`select count(*) from public.game_spots where status = 'sold'`));
-  const anonBoard = Number(
-    await asAnon(`select count(*) from public.game_spot_board where status = 'sold'`));
 
   check("the sold spots genuinely exist", ownerSpots === 3, `${ownerSpots} rows`);
   check(
@@ -141,12 +142,6 @@ try {
     anonSpots === 0,
     `${anonSpots} of ${ownerSpots} rows — this is the bug's whole mechanism`,
   );
-  check(
-    "anon reading game_spot_board gets the real count",
-    anonBoard === ownerSpots,
-    `${anonBoard} of ${ownerSpots}`,
-  );
-
   // ------------------------------------------------------------------
   // 2. The scoreboard, which is what the public pages now read
   // ------------------------------------------------------------------

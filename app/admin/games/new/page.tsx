@@ -9,7 +9,7 @@ export default async function NewGame() {
   if (!sb) return null;
   const { data: items } = await sb
     .from("items")
-    .select("id, name")
+    .select("id, name, price_cents, price_display")
     .order("name");
 
   return (

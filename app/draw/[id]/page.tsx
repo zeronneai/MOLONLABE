@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getSessionSupabase } from "@/lib/supabase/session";
 import DrawStage from "@/components/draw/DrawStage";
-import { redactName, ticketsFor } from "@/lib/draw/select";
+import { ticketsFor } from "@/lib/draw/select";
 import type { PoolMember } from "@/lib/draw/presentation";
 
 // Deliberately outside both the public (site) group and the /admin
@@ -47,7 +47,7 @@ export default async function DrawPresentation({
       : Promise.resolve({ data: null }),
     sb
       .from("game_spots")
-      .select("id, spot_number, first_name, last_name, show_name")
+      .select("id, spot_number")
       .eq("game_id", id)
       .eq("status", "sold")
       .order("spot_number"),
@@ -58,20 +58,17 @@ export default async function DrawPresentation({
   // occupies five tiles because they own five of them, not because of any
   // arithmetic about weights.
   //
-  // The opt-in applies here too, and this is the stricter case: the board
-  // is a web page somebody chooses to open, and this is filmed and posted
-  // publicly. A buyer who declined to appear on the board has not agreed
-  // to appear on Instagram either, so their spot shows as its number.
+  // Numbers, never names. This is filmed and posted publicly, and there
+  // is no opt-in any more for a buyer to have agreed to that with — so
+  // the tiles carry the one thing that identifies a spot without
+  // identifying a person.
   //
-  // Redaction happens at this boundary. Surnames never cross into the
-  // client bundle, so nothing that gets broadcast can contain one even if
-  // a component asked for it.
+  // No name is fetched at all, rather than fetched and not rendered.
+  // Nothing that gets broadcast can contain a name that never left the
+  // database.
   const pool: PoolMember[] = (spots ?? []).map((sp) => ({
     id: sp.id,
-    name:
-      sp.show_name && sp.first_name
-        ? redactName(sp.first_name, sp.last_name ?? "")
-        : `Spot ${sp.spot_number}`,
+    name: `Spot ${sp.spot_number}`,
     weight: 1,
   }));
 

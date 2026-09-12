@@ -39,7 +39,6 @@ for (let n = 1; n <= TOTAL; n++) {
     first_name: "Alma",
     last_name: "Castillo",
     email: "alma@example.com",
-    show_name: true,
     sold_at: new Date().toISOString(),
   });
 }

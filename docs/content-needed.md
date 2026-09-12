@@ -354,3 +354,86 @@ liability, arbitration, publicity-rights or prize-substitution clause.
 Those are not behaviours of this system, so I did not write them. They
 are the attorney's to add if the shop wants them, and their absence is a
 choice rather than an oversight.
+
+## 15. The rules now describe a board that no longer exists — ON HOLD
+
+**Not fixed, deliberately. The terms are frozen at your instruction while
+the attorney settles what is actually being sold.**
+
+The spot board and every name on it were removed. Two clauses in
+`lib/games/rules.ts` still describe them:
+
+> Spots are anonymous on the public board by default. A first name and
+> last initial appear only if you ticked the box at checkout asking for
+> that. Your email address and phone number are never shown.
+
+There is no board, no box and no name. The clause is now false in every
+part except the last sentence.
+
+> A winner is published the same way — first name and last initial,
+> nothing more.
+
+Still true. `winners.display_name` was kept: it is one name, once, for a
+person who has won, and the problem being solved was one buyer's name
+repeated across forty cells of a grid.
+
+**Nothing customer-facing is affected today** — the rules page is
+`noindex` and the sweepstakes has not opened. This is a documentation
+inconsistency with a deadline, not a live misstatement.
+
+When the terms unfreeze, the first clause needs rewriting to say that
+spots are anonymous full stop and that the page shows a count. If the
+attorney's answer changes what is being sold, it may need rewriting
+anyway, which is the reason for the freeze.
+
+## 16. A security hole that six migrations thought they had closed
+
+**Fixed in `20260925100000_revoke_public_execute.sql`. Recorded because
+the shape of the mistake is worth keeping.**
+
+Every migration that created a privileged function revoked EXECUTE from
+`anon, authenticated`. None of it did anything: PostgreSQL grants EXECUTE
+on a new function to PUBLIC, and revoking from a named role does not
+remove a grant held by PUBLIC. The lines read exactly like the hole was
+closed.
+
+The functions are SECURITY DEFINER — they must be, since claiming a spot
+writes a table the buyer may not touch — so they never see row level
+security. With the anonymous key, which ships in the browser bundle by
+design:
+
+```
+set role anon;
+select claim_game_spots('…', 3);   -- {1,2,3}
+select sell_game_spots('…', array[1,2,3], null, 'Mallory', …);
+-- three spots now 'sold'. No order, no payment, no card.
+```
+
+Also reachable: `release_game_spots` (release someone else's held
+spots), and the three checkout-idempotency functions that decide whether
+a second card attempt is a duplicate or an honest retry.
+
+**If this database has ever been public with the anon key exposed, treat
+it as reachable.** Worth checking `game_spots` for sold rows with no
+`order_id`, which is what the exploit leaves behind:
+
+```sql
+select game_id, spot_number, first_name, email, sold_at
+from public.game_spots
+where status = 'sold' and order_id is null
+order by sold_at desc;
+```
+
+That query returning rows is not proof of an attack — a hand-edit would
+look the same — but it is the only trace it would leave.
+
+`tests/db/rpcgrants.mjs` now asserts the privilege as the database
+computes it AND proves it by attempting the calls, because a catalogue
+that says "denied" next to a call that succeeds is the exact gap that
+made the original revokes look like they worked. With the fix neutered it
+fails with "IT SUCCEEDED — spots sold with no payment".
+
+`scripts/gen-baseline.mjs` now emits `revoke execute … from public` for
+every function. Without that, the repair script would have rebuilt the
+hole on any database it was run against, silently, after the migration
+that fixed it.

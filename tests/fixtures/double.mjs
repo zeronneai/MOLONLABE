@@ -104,7 +104,7 @@ const seed = () => ({
     id: `bbbbbbbb-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
     game_id: GAME, spot_number: i + 1, status: "open",
     order_id: null, first_name: null, last_name: null, email: null, phone: null,
-    show_name: false, held_at: null, sold_at: null,
+    held_at: null, sold_at: null,
   })),
   settings: [
     { key: "commerce", value: {
@@ -384,7 +384,7 @@ http.createServer(async (req, res) => {
           Object.assign(sp, {
             status: "sold", sold_at: new Date().toISOString(), order_id: a.p_order,
             first_name: a.p_first_name, last_name: a.p_last_name,
-            email: a.p_email, phone: a.p_phone, show_name: a.p_show_name === true,
+            email: a.p_email, phone: a.p_phone,
           });
         }
       }
@@ -451,19 +451,6 @@ http.createServer(async (req, res) => {
 
   if (!path.startsWith("/rest/v1/")) return send(res, 404, { message: "no route" });
   const table = path.replace("/rest/v1/", "");
-  // The board is a view in Postgres; here it is derived on read, with the
-  // same rule — a name only where the buyer opted in.
-  if (table === "game_spot_board") {
-    db.game_spot_board = db.game_spots.map((sp) => ({
-      game_id: sp.game_id,
-      spot_number: sp.spot_number,
-      status: sp.status,
-      display_name:
-        sp.status === "sold" && sp.show_name && sp.first_name
-          ? `${sp.first_name}${sp.last_name ? ` ${sp.last_name[0].toUpperCase()}.` : ""}`
-          : null,
-    }));
-  }
   // Also a view. The freeze is the point of it: a drawn game reports
   // what was true at the draw, from the winners row, not a recount.
   if (table === "game_scoreboard") {

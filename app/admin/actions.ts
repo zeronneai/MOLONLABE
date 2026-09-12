@@ -1184,7 +1184,6 @@ export async function seedDemoGame(): Promise<ActionState> {
     first_name: "Demo",
     last_name: "Buyer",
     email: "demo@example.invalid",
-    show_name: false,
     sold_at: new Date().toISOString(),
   }));
   const { data: written, error: spotError } = await sb

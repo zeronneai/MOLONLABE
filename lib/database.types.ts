@@ -157,7 +157,6 @@ export interface Database {
           last_name: string | null;
           email: string | null;
           phone: string | null;
-          show_name: boolean;
           held_at: string | null;
           sold_at: string | null;
         };
@@ -171,14 +170,12 @@ export interface Database {
           last_name?: string | null;
           email?: string | null;
           phone?: string | null;
-          show_name?: boolean;
           held_at?: string | null;
           sold_at?: string | null;
         };
         Update: {
           status?: string;
           order_id?: string | null;
-          show_name?: boolean;
         };
         Relationships: [];
       };
@@ -516,20 +513,6 @@ export interface Database {
       };
     };
     Views: {
-      game_spot_board: {
-        Row: {
-          game_id: string;
-          spot_number: number;
-          status: string;
-          /**
-           * First name plus last initial, and only where the buyer opted
-           * in. There is no email column on this view at all — that is
-           * why the board reads it rather than the table.
-           */
-          display_name: string | null;
-        };
-        Relationships: [];
-      };
       /**
        * The sold count per game, for every surface including the
        * anonymous one. Counting from `game_spots` on a public page
@@ -577,7 +560,6 @@ export interface Database {
           p_last_name: string;
           p_email: string;
           p_phone: string | null;
-          p_show_name: boolean;
         };
         Returns: undefined;
       };

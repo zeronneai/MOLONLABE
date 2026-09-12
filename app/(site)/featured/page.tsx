@@ -4,8 +4,7 @@ import Link from "next/link";
 import Reveal from "@/components/motion/Reveal";
 import EmptyState from "@/components/ui/EmptyState";
 import BuySpots from "@/components/games/BuySpots";
-import SpotBoard from "@/components/games/SpotBoard";
-import { getCurrentGame, getBoard, getSpotCounts } from "@/lib/games/queries";
+import { getCurrentGame, getSpotCounts } from "@/lib/games/queries";
 import { ELIGIBILITY_SUMMARY } from "@/lib/games/rules";
 import { getWinners } from "@/lib/db/entries";
 import { itemImages } from "@/lib/db/items";
@@ -54,10 +53,7 @@ export default async function FeaturedPage() {
     );
   }
 
-  const [counts, board] = await Promise.all([
-    getSpotCounts(game.id, game.total_spots),
-    getBoard(game.id),
-  ]);
+  const counts = await getSpotCounts(game.id, game.total_spots);
   const image = game.item ? itemImages(game.item)[0] : undefined;
   const name = game.item?.name ?? game.title;
   const soldOut = counts.remaining === 0;
@@ -131,7 +127,6 @@ export default async function FeaturedPage() {
           </div>
         </div>
 
-        <SpotBoard spots={board} total={counts.total} />
       </section>
 
       {winners.length > 0 && (

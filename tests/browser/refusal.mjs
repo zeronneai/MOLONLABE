@@ -21,7 +21,7 @@ async function sell(n,orderId){
   return fetch(`${DOUBLE}/rest/v1/game_spots?game_id=eq.${GAME}&spot_number=eq.${n}`,
     {method:"PATCH",headers:{"content-type":"application/json"},
      body:JSON.stringify({status:"sold",order_id:orderId,first_name:"Dana",last_name:"Ruiz",
-       email:"dana.ruiz@example.com",show_name:true,sold_at:new Date().toISOString()})});
+       email:"dana.ruiz@example.com",sold_at:new Date().toISOString()})});
 }
 async function anOrder(num){
   const r=await fetch(`${DOUBLE}/rest/v1/orders`,{method:"POST",

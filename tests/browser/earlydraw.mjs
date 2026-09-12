@@ -30,7 +30,6 @@ for (let n = 1; n <= SOLD; n++) {
     first_name: "Dana",
     last_name: "Ruiz",
     email: "dana@example.com",
-    show_name: true,
     sold_at: new Date().toISOString(),
   });
 }
@@ -96,7 +95,7 @@ const browser = await chromium.launch({ executablePath: CHROMIUM });
   for (let n = 1; n <= TOTAL; n++) {
     await update("game_spots", `game_id=eq.${GAME}&spot_number=eq.${n}`, {
       status: "sold", order_id: o.id, first_name: "Alma", last_name: "Castillo",
-      email: "alma@example.com", show_name: true, sold_at: new Date().toISOString(),
+      email: "alma@example.com", sold_at: new Date().toISOString(),
     });
   }
   const page = await adminPage(browser);
@@ -125,7 +124,7 @@ const browser = await chromium.launch({ executablePath: CHROMIUM });
   for (let n = 1; n <= SOLD; n++) {
     await update("game_spots", `game_id=eq.${GAME}&spot_number=eq.${n}`, {
       status: "sold", order_id: o.id, first_name: "Dana", last_name: "Ruiz",
-      email: "dana@example.com", show_name: true, sold_at: new Date().toISOString(),
+      email: "dana@example.com", sold_at: new Date().toISOString(),
     });
   }
   const page = await adminPage(browser, { reducedMotion: "reduce" });

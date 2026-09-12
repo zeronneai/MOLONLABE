@@ -212,7 +212,6 @@ create table if not exists public.game_spots (
   last_name text,
   email text,
   phone text,
-  show_name boolean default false not null,
   held_at timestamp with time zone,
   sold_at timestamp with time zone
 );
@@ -277,20 +276,6 @@ alter table public.game_spots add column if not exists first_name text;
 alter table public.game_spots add column if not exists last_name text;
 alter table public.game_spots add column if not exists email text;
 alter table public.game_spots add column if not exists phone text;
-alter table public.game_spots add column if not exists show_name boolean default false;
-do $$ begin
-  if exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public' and table_name = 'game_spots'
-      and column_name = 'show_name' and is_nullable = 'YES'
-  ) then
-    if exists (select 1 from public.game_spots where show_name is null) then
-      raise notice 'public.game_spots.show_name holds nulls; left nullable. Fill them, then: alter table public.game_spots alter column show_name set not null;';
-    else
-      alter table public.game_spots alter column show_name set not null;
-    end if;
-  end if;
-end $$;
 alter table public.game_spots add column if not exists held_at timestamp with time zone;
 alter table public.game_spots add column if not exists sold_at timestamp with time zone;
 
@@ -1335,21 +1320,6 @@ SELECT g.id AS game_id,
            FROM game_spots s
           WHERE s.game_id = g.id AND s.status = 'sold'::text) c ON true;
 
-create or replace view public.game_spot_board
-with (security_invoker=false) as
-SELECT game_id,
-    spot_number,
-    status,
-        CASE
-            WHEN status = 'sold'::text AND show_name AND first_name IS NOT NULL THEN first_name ||
-            CASE
-                WHEN COALESCE(last_name, ''::text) = ''::text THEN ''::text
-                ELSE (' '::text || upper("left"(last_name, 1))) || '.'::text
-            END
-            ELSE NULL::text
-        END AS display_name
-   FROM game_spots s;
-
 -- ---------------------------------------------------------------------
 -- Constraints
 -- ---------------------------------------------------------------------
@@ -2266,7 +2236,7 @@ begin
 end;
 $function$;
 
-create or replace function public.sell_game_spots(p_game uuid, p_spots integer[], p_order uuid, p_first_name text, p_last_name text, p_email text, p_phone text, p_show_name boolean)
+create or replace function public.sell_game_spots(p_game uuid, p_spots integer[], p_order uuid, p_first_name text, p_last_name text, p_email text, p_phone text)
  RETURNS void
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -2280,8 +2250,7 @@ begin
       first_name = p_first_name,
       last_name = p_last_name,
       email = p_email,
-      phone = p_phone,
-      show_name = coalesce(p_show_name, false)
+      phone = p_phone
   where game_id = p_game
     and status = 'held'
     and spot_number = any(p_spots);
@@ -2366,8 +2335,6 @@ CREATE TRIGGER settings_stamp_authorship BEFORE INSERT OR UPDATE ON public.setti
 -- ---------------------------------------------------------------------
 
 comment on view public.game_scoreboard is 'Sold count per game, for every surface including the anonymous one. Frozen to winners.entry_total once drawn. Exposes no buyer data — a count cannot identify anyone — so it is safe to grant to anon, which counting from game_spots is not.';
-comment on column public.game_spots.show_name is 'Opt-in, unchecked at checkout. A spot is anonymous on the public board
-   unless the buyer asked otherwise.';
 comment on column public.games.total_spots is 'Fixed at creation. The spots rows are created with the game and the
    count never changes, so this and count(game_spots) always agree.';
 comment on column public.items.shipping_override_cents is 'Postage for this item, overriding shipping_tier. NULL = use the tier. 0 = free postage, which is a real choice and not the same as NULL.';
@@ -2511,37 +2478,56 @@ create policy "Owner manages winners" on public.winners for all to authenticated
 
 grant select on public.game_scoreboard to anon;
 grant select on public.game_scoreboard to authenticated;
-grant select on public.game_spot_board to anon;
-grant select on public.game_spot_board to authenticated;
 
 -- Execute privileges. The revokes matter as much as the grants: the
 -- spot-claiming and checkout functions must not be callable from a
 -- browser, and CREATE OR REPLACE above resets them to the default.
+--
+-- EVERY revoke names PUBLIC as well as the role, and that is the whole
+-- point of this block rather than a flourish. PostgreSQL grants EXECUTE
+-- on a new function to PUBLIC, and `revoke … from anon` does not remove
+-- a grant held by PUBLIC — so six migrations' worth of role-specific
+-- revokes left claim_game_spots and sell_game_spots callable with the
+-- anonymous key that ships in the browser bundle. Emitting only the role
+-- revoke here would have rebuilt that hole on every repair, silently,
+-- after the migration that fixed it.
 
-grant execute on function public.claim_checkout(p_key text) to anon;
-grant execute on function public.claim_checkout(p_key text) to authenticated;
-grant execute on function public.claim_game_spots(p_game uuid, p_qty integer) to anon;
-grant execute on function public.claim_game_spots(p_game uuid, p_qty integer) to authenticated;
-grant execute on function public.claim_variant_stock(p_variant uuid, p_qty integer) to anon;
-grant execute on function public.claim_variant_stock(p_variant uuid, p_qty integer) to authenticated;
-grant execute on function public.finish_checkout(p_key text, p_order text, p_outcome text) to anon;
-grant execute on function public.finish_checkout(p_key text, p_order text, p_outcome text) to authenticated;
+revoke execute on function public.claim_checkout(p_key text) from public;
+revoke execute on function public.claim_game_spots(p_game uuid, p_qty integer) from public;
+revoke execute on function public.claim_variant_stock(p_variant uuid, p_qty integer) from public;
+revoke execute on function public.finish_checkout(p_key text, p_order text, p_outcome text) from public;
+revoke execute on function public.game_spots_remaining(p_game uuid) from public;
+revoke execute on function public.release_checkout(p_key text) from public;
+revoke execute on function public.release_game_spots(p_game uuid, p_spots integer[]) from public;
+revoke execute on function public.release_variant_stock(p_variant uuid, p_qty integer) from public;
+revoke execute on function public.sell_game_spots(p_game uuid, p_spots integer[], p_order uuid, p_first_name text, p_last_name text, p_email text, p_phone text) from public;
+revoke execute on function public.set_updated_at() from public;
+revoke execute on function public.stamp_authorship() from public;
+revoke execute on function public.stamp_authorship_updated_only() from public;
+revoke execute on function public.claim_checkout(p_key text) from anon;
+revoke execute on function public.claim_checkout(p_key text) from authenticated;
+revoke execute on function public.claim_game_spots(p_game uuid, p_qty integer) from anon;
+revoke execute on function public.claim_game_spots(p_game uuid, p_qty integer) from authenticated;
+revoke execute on function public.claim_variant_stock(p_variant uuid, p_qty integer) from anon;
+revoke execute on function public.claim_variant_stock(p_variant uuid, p_qty integer) from authenticated;
+revoke execute on function public.finish_checkout(p_key text, p_order text, p_outcome text) from anon;
+revoke execute on function public.finish_checkout(p_key text, p_order text, p_outcome text) from authenticated;
 grant execute on function public.game_spots_remaining(p_game uuid) to anon;
 grant execute on function public.game_spots_remaining(p_game uuid) to authenticated;
-grant execute on function public.release_checkout(p_key text) to anon;
-grant execute on function public.release_checkout(p_key text) to authenticated;
-grant execute on function public.release_game_spots(p_game uuid, p_spots integer[]) to anon;
-grant execute on function public.release_game_spots(p_game uuid, p_spots integer[]) to authenticated;
-grant execute on function public.release_variant_stock(p_variant uuid, p_qty integer) to anon;
-grant execute on function public.release_variant_stock(p_variant uuid, p_qty integer) to authenticated;
-grant execute on function public.sell_game_spots(p_game uuid, p_spots integer[], p_order uuid, p_first_name text, p_last_name text, p_email text, p_phone text, p_show_name boolean) to anon;
-grant execute on function public.sell_game_spots(p_game uuid, p_spots integer[], p_order uuid, p_first_name text, p_last_name text, p_email text, p_phone text, p_show_name boolean) to authenticated;
-grant execute on function public.set_updated_at() to anon;
-grant execute on function public.set_updated_at() to authenticated;
-grant execute on function public.stamp_authorship() to anon;
-grant execute on function public.stamp_authorship() to authenticated;
-grant execute on function public.stamp_authorship_updated_only() to anon;
-grant execute on function public.stamp_authorship_updated_only() to authenticated;
+revoke execute on function public.release_checkout(p_key text) from anon;
+revoke execute on function public.release_checkout(p_key text) from authenticated;
+revoke execute on function public.release_game_spots(p_game uuid, p_spots integer[]) from anon;
+revoke execute on function public.release_game_spots(p_game uuid, p_spots integer[]) from authenticated;
+revoke execute on function public.release_variant_stock(p_variant uuid, p_qty integer) from anon;
+revoke execute on function public.release_variant_stock(p_variant uuid, p_qty integer) from authenticated;
+revoke execute on function public.sell_game_spots(p_game uuid, p_spots integer[], p_order uuid, p_first_name text, p_last_name text, p_email text, p_phone text) from anon;
+revoke execute on function public.sell_game_spots(p_game uuid, p_spots integer[], p_order uuid, p_first_name text, p_last_name text, p_email text, p_phone text) from authenticated;
+revoke execute on function public.set_updated_at() from anon;
+revoke execute on function public.set_updated_at() from authenticated;
+revoke execute on function public.stamp_authorship() from anon;
+revoke execute on function public.stamp_authorship() from authenticated;
+revoke execute on function public.stamp_authorship_updated_only() from anon;
+revoke execute on function public.stamp_authorship_updated_only() from authenticated;
 
 commit;
 

@@ -80,7 +80,6 @@ const checkoutSchema = z.object({
    * Opt-in, and it stays false unless the buyer ticked the box. Never
    * inferred from anything else.
    */
-  showName: z.boolean().optional(),
   /**
    * One per rendered checkout form. The server refuses to charge twice
    * for the same one, which is what protects against a double-submit
@@ -493,7 +492,6 @@ export async function submitCheckout(
       p_email: data.customer.email,
       p_phone: data.customer.phone || null,
       // Opt-in. False unless the box was ticked, never inferred.
-      p_show_name: data.showName === true,
     });
     if (error) {
       logDbError("checkout sell spots", error);

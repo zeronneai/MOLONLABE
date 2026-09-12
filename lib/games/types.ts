@@ -15,19 +15,9 @@ export type Game = {
   winnerNote: string | null;
 };
 
-/**
- * One cell of the public board.
- *
- * `displayName` is non-null only where the buyer ticked the opt-in, and
- * even then it is first name plus last initial. There is no shape of this
- * type that can carry an email address — that is the point of reading it
- * through a view rather than filtering the table in application code.
- */
-export type BoardSpot = {
-  spotNumber: number;
-  status: SpotStatus;
-  displayName: string | null;
-};
+// BoardSpot lived here and is gone. There is no per-spot public shape
+// any more: the page shows how many remain out of the total, and nothing
+// about who holds what leaves the server.
 
 /** The scoreboard: the two numbers, and nothing derived from guesswork. */
 export type SpotCounts = {

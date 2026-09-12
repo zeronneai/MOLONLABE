@@ -15,7 +15,6 @@ type Row = {
   status: "open" | "held" | "sold";
   name: string | null;
   email: string | null;
-  showName: boolean;
   soldAt: string | null;
 };
 
@@ -30,7 +29,6 @@ export default function SpotLedger({
   const sold = spots.filter((s) => s.status === "sold");
   const held = spots.filter((s) => s.status === "held");
   const shown = showAll ? sold : sold.slice(0, 12);
-  const named = sold.filter((s) => s.showName).length;
 
   return (
     <section className="mt-14 border-t hairline pt-8">
@@ -56,9 +54,8 @@ export default function SpotLedger({
       ) : (
         <>
           <p className="mt-4 max-w-[60ch] text-sm text-muted">
-            {named} of {sold.length} asked to show their name on the public
-            board. The rest appear as taken, with no name — that is the
-            default and most people leave it alone.
+            Buyer details, for you only. Nothing on this list is public —
+            the game page shows how many spots remain and nothing else.
           </p>
           <div className="mt-6 border-t hairline">
             {shown.map((s) => (
@@ -71,9 +68,6 @@ export default function SpotLedger({
                 </span>
                 <span className="min-w-0 flex-1 truncate text-sm">
                   {s.name}
-                  {s.showName && (
-                    <span className="label ml-2 text-acid">on board</span>
-                  )}
                 </span>
                 <span className="shrink-0 truncate text-sm text-muted">
                   {s.email}

@@ -31,7 +31,7 @@ with expected(kind, name) as (values
   ('table','game_spots'), ('table','games'), ('table','inquiries'),
   ('table','item_variants'), ('table','items'), ('table','order_items'),
   ('table','orders'), ('table','settings'), ('table','winners'),
-  ('view','game_scoreboard'), ('view','game_spot_board'),
+  ('view','game_scoreboard'),
   ('function','claim_checkout'), ('function','claim_game_spots'),
   ('function','claim_variant_stock'), ('function','finish_checkout'),
   ('function','game_spots_remaining'), ('function','release_checkout'),
@@ -70,6 +70,20 @@ where not exists (select 1 from actual a where a.kind=e.kind and a.name=e.name)
 
 union all
 
+-- The board view and its name column were removed deliberately. A
+-- reappearance means somebody re-ran an old migration over the top.
+select 'STRAY VIEW (should have been dropped)', 'view', 'game_spot_board'
+where to_regclass('public.game_spot_board') is not null
+
+union all
+
+select 'STRAY COLUMN', 'game_spots', 'show_name'
+where exists (select 1 from information_schema.columns
+              where table_schema='public' and table_name='game_spots'
+                and column_name='show_name')
+
+union all
+
 select 'STRAY COLUMN', 'items', 'surface'
 where exists (select 1 from information_schema.columns
               where table_schema='public' and table_name='items' and column_name='surface')
@@ -79,7 +93,7 @@ union all
 select 'VIEW NOT ANON-READABLE', 'view', c.relname
 from pg_class c join pg_namespace n on n.oid=c.relnamespace
 where n.nspname='public' and c.relkind='v'
-  and c.relname in ('game_scoreboard','game_spot_board')
+  and c.relname = 'game_scoreboard'
   and not has_table_privilege('anon', c.oid, 'select')
 
 union all
@@ -87,7 +101,7 @@ union all
 select 'VIEW RUNS AS INVOKER (must be false)', 'view', c.relname
 from pg_class c join pg_namespace n on n.oid=c.relnamespace
 where n.nspname='public' and c.relkind='v'
-  and c.relname in ('game_scoreboard','game_spot_board')
+  and c.relname = 'game_scoreboard'
   and coalesce(array_to_string(c.reloptions,','),'') not like '%security_invoker=false%'
 
 order by 1, 2, 3;

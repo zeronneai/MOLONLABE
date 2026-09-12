@@ -47,17 +47,13 @@ check("the terms sit next to the buy control, not only in the rules",
   has(text, "runs until all spots are sold") &&
   has(text, "There is no end date") &&
   has(text, "purchases are final"));
-check("the board renders a cell per spot",
-  (await page.locator("#board-heading").count()) === 1);
-// The legend says "5 open · 0 taken", so assert on the cells rather than
-// the page text.
-check("every spot starts open",
-  (await page.locator('section[aria-labelledby="board-heading"] ul li').count()) === 5 &&
-  (await page.locator('section[aria-labelledby="board-heading"] ul li', { hasText: /^\d+Taken$/ }).count()) === 0,
-  `${await page.locator('section[aria-labelledby="board-heading"] ul li').count()} cells`);
+// The board is gone. The count IS the public view of the game now, so
+// the assertion is that there is no per-spot rendering at all.
+check("there is no board on the page",
+  (await page.locator("#board-heading").count()) === 0);
 
 // ------------------------------------------------------- buy three
-async function buySpots(qty, { optIn = false, acceptTerms = true } = {}) {
+async function buySpots(qty, { acceptTerms = true } = {}) {
   await page.goto(`${APP}/featured`, { waitUntil: "networkidle" });
   await page.fill("#spot-count", String(qty));
   await page.getByRole("button", { name: /^Take/ }).click();
@@ -71,15 +67,16 @@ async function buySpots(qty, { optIn = false, acceptTerms = true } = {}) {
   const boxes = page.getByRole("checkbox");
   await boxes.nth(0).check();
   if (acceptTerms) await boxes.nth(1).check();
-  if (optIn) await boxes.nth(2).check();
   return boxes;
 }
 
 {
   const boxes = await buySpots(3, { acceptTerms: false });
-  check("there are three checkboxes: sale terms, game terms, board opt-in",
-    (await boxes.count()) === 3, String(await boxes.count()));
-  check("the board opt-in starts unchecked", !(await boxes.nth(2).isChecked()));
+  // Two, not three. The board opt-in was the third and is gone with the
+  // board — there is no longer anywhere a buyer's name could appear, so
+  // there is nothing to ask them about.
+  check("there are two checkboxes: sale terms and game terms",
+    (await boxes.count()) === 2, String(await boxes.count()));
   check("the game terms start unchecked", !(await boxes.nth(1).isChecked()));
   const pay = page.getByRole("button", { name: /Pay \$/ });
   check("payment is blocked until the game terms are accepted",
@@ -122,42 +119,59 @@ check("the spot numbers are on the order line",
 check("the line is typed as a game spot", d1.order_items[0]?.line_type === "game_spot");
 check("a spot is neither shipped nor collected",
   d1.order_items[0]?.fulfillment_type === "none", d1.order_items[0]?.fulfillment_type);
-check("the buyer did not opt in, so show_name is false",
-  sold1.every((s) => s.show_name === false));
 
 const receipt = await page.locator("body").innerText();
 check("the receipt names the spot numbers", has(receipt, "1, 2, 3"));
 check("the receipt states there is no end date", has(receipt, "no end date"));
 
-// --------------------------------------- the board hides the names
+// ----------------------------- the page shows a count and nothing else
+//
+// The board and every name on it were removed. What is asserted here is
+// absence, and it is asserted against the MARKUP as well as the rendered
+// text: a name that never reaches the page cannot leak from it, and the
+// two failures that matter — a grid coming back, and a buyer's name
+// appearing anywhere — both look like nothing at all on screen.
 await page.goto(`${APP}/featured`, { waitUntil: "networkidle" });
 text = await page.locator("body").innerText();
+const html = await page.content();
+
 check("the scoreboard moved", /2\s*\/\s*5/.test(text.replace(/\s+/g, " ")),
   (text.match(/\d+\s*\/\s*\d+/) ?? ["none"])[0]);
-check("sold spots read as taken on the board",
-  (await page.locator('section[aria-labelledby="board-heading"] ul li').filter({ hasText: "Taken" }).count()) === 3,
-  `${await page.locator('section[aria-labelledby="board-heading"] ul li').filter({ hasText: "Taken" }).count()} taken cells`);
-check("an opted-out buyer's name is nowhere on the page",
-  !has(text, "Dana") && !has(text, "Ruiz"));
-const boardHtml = await page.content();
-check("and not in the markup either",
-  !boardHtml.includes("dana.ruiz@example.com") && !boardHtml.includes("Ruiz"));
+check("there is no board section at all",
+  (await page.locator('section[aria-labelledby="board-heading"]').count()) === 0);
+check("and no per-spot grid anywhere on the page",
+  (await page.locator("li").filter({ hasText: /^Taken$/ }).count()) === 0);
 
-// --------------------------------- the opt-in puts a name up
+// The buyer's own details, from an order that just completed.
+for (const secret of ["Dana", "Ruiz", "dana.ruiz@example.com"]) {
+  check(`"${secret}" appears nowhere in the rendered text`, !has(text, secret));
+  check(`"${secret}" appears nowhere in the markup either`,
+    !html.includes(secret));
+}
+
+// There is no opt-in to tick, so nobody can put a name up by accident.
+await page.goto(`${APP}/checkout`, { waitUntil: "networkidle" });
+await page.waitForTimeout(500);
+const checkoutText = await page.locator("body").innerText();
+check("checkout offers no show-my-name opt-in",
+  !/show my (first )?name|on the spot board|spot board/i.test(checkoutText),
+  (checkoutText.match(/[^\n]*name on[^\n]*/i) ?? ["none offered"])[0].slice(0, 60));
+await page.goto(`${APP}/featured`, { waitUntil: "networkidle" });
+
+// A fourth spot, so the count below still reaches the pool size. This
+// used to be the "opt-in puts a name up" purchase; the opt-in is gone
+// but the sale it made is still needed to fill the game.
 {
-  await buySpots(1, { optIn: true });
+  await buySpots(1, {});
   await page.getByRole("button", { name: /Pay \$/ }).click();
   await page.waitForURL(/confirmation/, { timeout: 25000 });
   await page.waitForTimeout(600);
 }
 await page.goto(`${APP}/featured`, { waitUntil: "networkidle" });
-text = await page.locator("body").innerText();
-check("an opted-in buyer shows first name and last initial",
-  has(text, "Dana R."), (text.match(/Dana[^\n]*/) ?? ["absent"])[0]);
-check("even opted in, the surname is never shown in full",
-  !(await page.content()).includes("Dana Ruiz"));
-check("and the email is still nowhere",
-  !(await page.content()).includes("dana.ruiz@example.com"));
+const afterFour = await page.locator("body").innerText();
+check("four sold, and still no name anywhere",
+  !has(afterFour, "Dana") && !has(afterFour, "Ruiz"),
+  (afterFour.match(/Dana[^\n]*/) ?? ["clean"])[0].slice(0, 40));
 
 // ------------------------------------- selling the last spot closes it
 {

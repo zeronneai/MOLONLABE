@@ -62,7 +62,6 @@ for (let n = 1; n <= TOTAL; n++) {
     first_name: n <= SOLD ? "Alma" : null,
     last_name: n <= SOLD ? "Castillo" : null,
     email: n <= SOLD ? "alma@example.com" : null,
-    show_name: n <= SOLD,
     sold_at: n <= SOLD ? new Date().toISOString() : null,
   });
 }
@@ -146,7 +145,7 @@ await page.context().close();
 // on camera.
 await update("game_spots", `game_id=eq.${DRAWN}&spot_number=eq.1`, {
   status: "open", order_id: null, first_name: null, last_name: null,
-  email: null, show_name: false, sold_at: null,
+  email: null, sold_at: null,
 });
 
 const after = await newPage(browser);
@@ -167,7 +166,7 @@ await after.context().close();
   });
   await update("game_spots", `game_id=eq.${GAME}&spot_number=eq.1`, {
     status: "sold", order_id: o.id, first_name: "Ray", last_name: "Ortega",
-    email: "ray@example.com", show_name: false,
+    email: "ray@example.com",
     sold_at: new Date().toISOString(),
   });
   const live = await newPage(browser);

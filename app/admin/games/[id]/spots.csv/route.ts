@@ -26,7 +26,7 @@ export async function GET(
     sb.from("games").select("title").eq("id", id).maybeSingle(),
     sb
       .from("game_spots")
-      .select("spot_number, status, first_name, last_name, email, phone, show_name, sold_at")
+      .select("spot_number, status, first_name, last_name, email, phone, sold_at")
       .eq("game_id", id)
       .eq("status", "sold")
       .order("spot_number"),
@@ -41,7 +41,6 @@ export async function GET(
     s.last_name,
     s.email,
     s.phone,
-    s.show_name ? "yes" : "no",
     s.sold_at,
   ]);
 

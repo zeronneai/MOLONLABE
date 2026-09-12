@@ -40,8 +40,7 @@ export const GAME_TERMS_VERSION = "2026-09-agency-2";
 export const GAME_TERMS_CONSENT =
   "I understand this game has no end date, that the shop may draw before every spot sells, and that my purchase is final.";
 
-/** The opt-in that puts a first name on the public board. */
-export const SHOW_NAME_LABEL = "Show my first name on the spot board";
-
-export const SHOW_NAME_HELP =
-  "Off by default. Tick this and your spots show your first name and last initial — nothing else, and never your email or phone. Leave it and they stay anonymous.";
+// SHOW_NAME_LABEL and SHOW_NAME_HELP lived here and are gone with the
+// board they belonged to. There is no opt-in at checkout because there is
+// nowhere a buyer's name could appear: the public page shows how many
+// spots remain out of the total and nothing else.

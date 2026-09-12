@@ -27,8 +27,6 @@ import { lineKey, type PricedCart } from "@/lib/cart/types";
 import {
   GAME_TERMS,
   GAME_TERMS_CONSENT,
-  SHOW_NAME_HELP,
-  SHOW_NAME_LABEL,
 } from "@/lib/games/terms";
 import { receiptPath } from "@/lib/receipt";
 
@@ -79,7 +77,6 @@ export default function CheckoutForm({
   // payment; the board opt-in changes nothing about the sale and only
   // decides whether a first name appears in public.
   const [gameTerms, setGameTerms] = useState(false);
-  const [showName, setShowName] = useState(false);
   const buyingSpots = Boolean(cart?.spotGame && cart.spotCount > 0);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -253,7 +250,6 @@ export default function CheckoutForm({
               shipping,
               disclaimerAccepted: true,
               gameTermsAccepted: buyingSpots ? gameTerms : undefined,
-              showName: buyingSpots ? showName : undefined,
               idempotencyKey,
               opaqueData: response.opaqueData!,
             });
@@ -457,23 +453,6 @@ export default function CheckoutForm({
             </label>
             {err("gameTermsAccepted")}
 
-            {/* Opt-in, unchecked, and it stays that way unless somebody
-                deliberately ticks it. Publishing a name against a spot in
-                a firearms game without being asked is a real exposure. */}
-            <label className="mt-8 flex max-w-[62ch] cursor-pointer items-start gap-3 border-t hairline pt-8">
-              <input
-                type="checkbox"
-                checked={showName}
-                onChange={(e) => setShowName(e.target.checked)}
-                className="mt-1 h-5 w-5 shrink-0 accent-[var(--color-acid)]"
-              />
-              <span className="text-sm leading-relaxed">
-                {SHOW_NAME_LABEL}
-                <span className="label mt-2 block text-muted">
-                  {SHOW_NAME_HELP}
-                </span>
-              </span>
-            </label>
           </section>
         )}
       </div>

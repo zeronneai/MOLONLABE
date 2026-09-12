@@ -16,12 +16,43 @@ import { saveGame } from "@/app/admin/actions";
 import { formatUsd } from "@/lib/money";
 import type { GameRow } from "@/lib/database.types";
 
+/**
+ * What the prize is worth, and where that number came from.
+ *
+ * A firearm has NO `price_cents` — `items_firearms_have_no_online_price`
+ * forbids it, because a price is what makes a thing cartable and a
+ * firearm must never be. Its value lives in `price_display`, which is
+ * free text the owner typed ("$2,199").
+ *
+ * So the number is parsed out of that text when there is no real one,
+ * and which source was used is reported rather than hidden. A figure the
+ * owner is making a money decision against should not quietly be the
+ * result of a regex over a label.
+ */
+function valueOf(item: {
+  price_cents: number | null;
+  price_display: string | null;
+}): { cents: number; exact: boolean } | null {
+  if (typeof item.price_cents === "number" && item.price_cents > 0) {
+    return { cents: item.price_cents, exact: true };
+  }
+  const digits = (item.price_display ?? "").replace(/[^0-9.]/g, "");
+  const dollars = Number(digits);
+  if (!Number.isFinite(dollars) || dollars <= 0) return null;
+  return { cents: Math.round(dollars * 100), exact: false };
+}
+
 export default function GameForm({
   game,
   items,
 }: {
   game?: GameRow;
-  items: { id: string; name: string }[];
+  items: {
+    id: string;
+    name: string;
+    price_cents: number | null;
+    price_display: string | null;
+  }[];
 }) {
   const [state, action, pending] = useActionState(saveGame, {
     status: "idle" as const,
@@ -37,6 +68,13 @@ export default function GameForm({
   const spotCount = Math.max(0, Math.round(Number(spots) || 0));
   const priceCents = Math.round((Number(price) || 0) * 100);
   const pot = spotCount * priceCents;
+
+  // The prize has to be in state, not left to the select's defaultValue,
+  // because its value is half of the comparison below.
+  const [itemId, setItemId] = useState(game?.item_id ?? "");
+  const prize = items.find((i) => i.id === itemId) ?? null;
+  const prizeValue = prize ? valueOf(prize) : null;
+  const covers = prizeValue && pot > 0 ? pot - prizeValue.cents : null;
 
   return (
     <form action={action} className="max-w-2xl">
@@ -63,7 +101,8 @@ export default function GameForm({
           <select
             id="g-item"
             name="item_id"
-            defaultValue={game?.item_id ?? ""}
+            value={itemId}
+            onChange={(e) => setItemId(e.target.value)}
             className="field-input"
           >
             <option value="" className="bg-surface text-bone">
@@ -131,18 +170,82 @@ export default function GameForm({
               />
             </div>
 
+            {/* The arithmetic the owner would otherwise do in his head
+                every time: what the game takes if it fills, against what
+                the prize costs him. Side by side, because the decision is
+                the comparison and not either number alone. */}
             <div className="sm:col-span-2 border-l-2 border-amber pl-5">
               {spotCount > 0 && priceCents > 0 ? (
-                <p className="text-sm leading-relaxed text-amber">
-                  {spotCount} spots at {formatUsd(priceCents)} brings in{" "}
-                  <strong>{formatUsd(pot)}</strong> if it sells out, before
-                  tax. Sales tax is added on top of the spot price at
-                  checkout.
-                </p>
+                <>
+                  <div className="flex flex-wrap gap-x-12 gap-y-4">
+                    <div>
+                      <p className="label text-muted">If it sells out</p>
+                      <p className="display mt-2 text-2xl tabular-nums">
+                        {formatUsd(pot)}
+                      </p>
+                      <p className="label mt-1 text-muted">
+                        {spotCount} × {formatUsd(priceCents)}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="label text-muted">The prize</p>
+                      <p className="display mt-2 text-2xl tabular-nums">
+                        {prizeValue ? formatUsd(prizeValue.cents) : "—"}
+                      </p>
+                      <p className="label mt-1 text-muted">
+                        {!prize
+                          ? "none chosen"
+                          : prizeValue
+                            ? prizeValue.exact
+                              ? prize.name
+                              : `${prize.name} · from the listed price`
+                            : `${prize.name} · no price on the item`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {covers !== null && (
+                    <p
+                      className={`mt-5 text-sm leading-relaxed ${
+                        covers >= 0 ? "text-acid" : "text-danger"
+                      }`}
+                    >
+                      {covers >= 0 ? (
+                        <>
+                          Covers the prize with{" "}
+                          <strong>{formatUsd(covers)}</strong> over, if
+                          every spot sells.
+                        </>
+                      ) : (
+                        <>
+                          <strong>
+                            {formatUsd(Math.abs(covers))} short of the prize
+                          </strong>{" "}
+                          even if every spot sells.
+                        </>
+                      )}
+                    </p>
+                  )}
+
+                  <p className="label mt-3 max-w-[52ch] text-muted">
+                    Before tax, and before anything it costs you to run.
+                    Sales tax is added on top of the spot price at
+                    checkout, so it is not yours to keep.
+                    {prizeValue && !prizeValue.exact && (
+                      <>
+                        {" "}
+                        The prize figure is read from the price shown on
+                        the item, since a firearm carries no online price.
+                        Check it is current.
+                      </>
+                    )}
+                  </p>
+                </>
               ) : (
                 <p className="text-sm leading-relaxed text-amber">
                   Set both and this will show what the game brings in if it
-                  sells out.
+                  sells out, against what the prize is worth.
                 </p>
               )}
               <p className="label mt-3 max-w-[52ch] text-muted">

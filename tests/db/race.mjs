@@ -229,22 +229,29 @@ async function stampede(gameId, workers, qtyEach) {
      returning id;`,
   );
   await sql(`select claim_game_spots('${game}', 1);`);
-  await sql(`select sell_game_spots('${game}', array[1], '${order}', 'Dana','Ruiz','d@e.com',null,false);`);
+  await sql(`select sell_game_spots('${game}', array[1], '${order}', 'Dana','Ruiz','d@e.com',null);`);
   check("one of two sold leaves the game open",
     (await sql(`select status from games where id='${game}';`)) === "open");
 
   await sql(`select claim_game_spots('${game}', 1);`);
-  await sql(`select sell_game_spots('${game}', array[2], '${order}', 'Alma','Cortez','a@e.com',null,true);`);
+  await sql(`select sell_game_spots('${game}', array[2], '${order}', 'Alma','Cortez','a@e.com',null);`);
   check("selling the last spot closes the game",
     (await sql(`select status from games where id='${game}';`)) === "full");
 
-  // The board must show the opted-in name and nothing for the other.
-  const board = await sqlAll(
-    `select spot_number || '=' || coalesce(display_name, 'null')
-     from game_spot_board where game_id='${game}' order by spot_number;`,
+  // The board and its display_name view are gone. What still has to be
+  // true is that both spots sold to the right buyers and that no name
+  // is reachable through anything public.
+  const owners = await sqlAll(
+    `select spot_number || '=' || coalesce(first_name, 'null')
+     from game_spots where game_id='${game}' order by spot_number;`,
   );
-  check("the board names only the buyer who opted in",
-    board === "1=null 2=Alma C.", board);
+  check("both spots sold, each to its own buyer",
+    owners === "1=Dana 2=Alma", owners);
+  const boardGone = await sql(
+    `select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname='public' and c.relname='game_spot_board';`,
+  );
+  check("the name-bearing board view no longer exists", boardGone === "0", boardGone);
 }
 
 // ------------------------- a stale hold is reclaimed, not lost

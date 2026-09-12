@@ -41,7 +41,7 @@ for (let n = 1; n <= 8; n++) {
     id: `cccccccc-0000-4000-8000-${String(n).padStart(12, "0")}`,
     game_id: GAME, spot_number: n, status: "sold", order_id: orderId,
     first_name: n % 2 ? "Dana" : "Alma", last_name: n % 2 ? "Ruiz" : "Castillo",
-    email: `buyer${n}@example.com`, show_name: true,
+    email: `buyer${n}@example.com`,
     sold_at: new Date().toISOString(),
   });
 }

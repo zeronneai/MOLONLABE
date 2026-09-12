@@ -53,7 +53,6 @@ for (let n = 1; n <= 20; n++) {
     last_name: sold ? "Ruiz" : null,
     email: sold ? "dana@example.com" : null,
     // Opted in, so the presentation is allowed to show a name at all.
-    show_name: true,
     sold_at: sold ? new Date().toISOString() : null,
   });
 }

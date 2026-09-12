@@ -18,7 +18,7 @@ export default async function EditGamePage({
 
   const [{ data: game }, { data: items }] = await Promise.all([
     sb.from("games").select("*").eq("id", id).maybeSingle(),
-    sb.from("items").select("id, name").order("name"),
+    sb.from("items").select("id, name, price_cents, price_display").order("name"),
   ]);
   if (!game) notFound();
 
@@ -27,7 +27,7 @@ export default async function EditGamePage({
   const [{ data: spots }, { data: winner }] = await Promise.all([
     sb
       .from("game_spots")
-      .select("spot_number, status, first_name, last_name, email, show_name, sold_at")
+      .select("spot_number, status, first_name, last_name, email, sold_at")
       .eq("game_id", id)
       .order("spot_number"),
     sb.from("winners").select("display_name, ticket").eq("game_id", id).maybeSingle(),
@@ -54,7 +54,6 @@ export default async function EditGamePage({
               ? [s.first_name, s.last_name].filter(Boolean).join(" ") || "—"
               : null,
           email: s.status === "sold" ? s.email : null,
-          showName: s.show_name,
           soldAt: s.sold_at,
         }))}
         gameId={game.id}

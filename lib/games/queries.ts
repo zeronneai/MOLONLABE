@@ -2,7 +2,7 @@ import { getSupabase } from "@/lib/supabase/server";
 import { logDbError } from "@/lib/db/log";
 import type { GameRow, ItemRow } from "@/lib/database.types";
 import { gameState } from "./types";
-import type { BoardSpot, Game, SpotCounts } from "./types";
+import type { Game, SpotCounts } from "./types";
 
 export type GameWithItem = GameRow & { item: ItemRow | null };
 
@@ -86,33 +86,12 @@ export async function getSpotCounts(
   return { total: totalSpots, remaining, sold: totalSpots - remaining };
 }
 
-/**
- * Every spot, for the board.
- *
- * Read from the view, never the table. The view has no email column at
- * all, so no bug in this file or any component downstream of it can leak
- * one.
- */
-export async function getBoard(gameId: string): Promise<BoardSpot[]> {
-  const sb = getSupabase();
-  if (!sb) return [];
-  const { data, error } = await sb
-    .from("game_spot_board")
-    .select("spot_number, status, display_name")
-    .eq("game_id", gameId)
-    .order("spot_number");
-  if (error) {
-    logDbError("getBoard", error);
-    return [];
-  }
-  return (data ?? []).map((r) => ({
-    spotNumber: r.spot_number,
-    // A held spot is mid-checkout and nobody else's business. It reads as
-    // taken on the board, because to anyone else that is what it is.
-    status: r.status === "held" ? "sold" : (r.status as BoardSpot["status"]),
-    displayName: r.display_name,
-  }));
-}
+// getBoard lived here and is gone with the board it fed.
+//
+// It read `game_spot_board`, a view whose whole purpose was to expose a
+// redacted name without exposing an email. The public page shows a count
+// now and nothing per-spot, so both the function and the view are gone
+// rather than left unused. Counts come from `game_spots_remaining`.
 
 // ---------------------------------------------------------------------
 // The Games surface

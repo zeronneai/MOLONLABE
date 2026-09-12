@@ -466,7 +466,25 @@ if (fnGrants.length) {
   w(`-- Execute privileges. The revokes matter as much as the grants: the
 -- spot-claiming and checkout functions must not be callable from a
 -- browser, and CREATE OR REPLACE above resets them to the default.
+--
+-- EVERY revoke names PUBLIC as well as the role, and that is the whole
+-- point of this block rather than a flourish. PostgreSQL grants EXECUTE
+-- on a new function to PUBLIC, and \`revoke … from anon\` does not remove
+-- a grant held by PUBLIC — so six migrations' worth of role-specific
+-- revokes left claim_game_spots and sell_game_spots callable with the
+-- anonymous key that ships in the browser bundle. Emitting only the role
+-- revoke here would have rebuilt that hole on every repair, silently,
+-- after the migration that fixed it.
 `);
+  // Revoke from PUBLIC once per function, before any per-role line, so a
+  // function nobody is granted ends up reachable by nobody.
+  const seen = new Set();
+  for (const [name, args] of fnGrants) {
+    const sig = `public.${name}(${args})`;
+    if (seen.has(sig)) continue;
+    seen.add(sig);
+    w(`revoke execute on function ${sig} from public;`);
+  }
   for (const [name, args, role, allowed] of fnGrants) {
     const verb = allowed === "true" ? "grant" : "revoke";
     const dir = allowed === "true" ? "to" : "from";
