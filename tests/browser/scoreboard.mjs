@@ -117,9 +117,20 @@ const featured = await page.locator("body").innerText();
 const liveSold = (await dump()).game_spots.filter(
   (s) => s.game_id === GAME && s.status === "sold",
 ).length;
+// The page shows REMAINING out of total. This used to look for the sold
+// count as a bare number anywhere on the page, which passed because the
+// board's legend read "5 open · 0 taken" and happened to contain a zero.
+// It was asserting against a component that no longer exists, by
+// accident — so it now checks the pair the page actually prints,
+// against the spots in the database.
+const liveTotal = (await dump()).game_spots.filter(
+  (s) => s.game_id === GAME,
+).length;
+const expected = `${liveTotal - liveSold}/${liveTotal}`;
 check("FEATURED: the live game's scoreboard agrees with its spots",
-  new RegExp(`\\b${liveSold}\\b`).test(featured),
-  `${liveSold} sold — ${seen(featured)}`);
+  new RegExp(`\\b${liveTotal - liveSold}\\s*/\\s*${liveTotal}\\b`)
+    .test(featured.replace(/\s+/g, " ")),
+  `${liveSold} sold, so expected ${expected} — page shows ${seen(featured)}`);
 
 await page.context().close();
 
