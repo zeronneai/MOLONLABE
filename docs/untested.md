@@ -151,23 +151,24 @@ Its documented primary path had only ever run through `psql`. Now
 exercised both ways: reports clean against a matching schema, and
 correctly names a column the code declares that the database lacks.
 
-### ☐ The test suite is not in the repository
+### ✅ The test suite is in the repository — *covered 2026-09-12*
 
-About 4,000 lines across ~30 files — the double, the concurrency tests,
-the checkout and draw suites — live only in an ephemeral sandbox, with
-hardcoded paths to it. Everything this document calls "covered" is
-covered by code that does not survive the session.
+`tests/`, with `npm test`. Paths and ports are all configurable and all
+have working defaults; nothing points at a sandbox any more. See
+`tests/README.md`.
 
-The cost is not theoretical. Re-verifying the concurrency claims above,
-in order to write this file honestly, meant rebuilding a PostgreSQL
-cluster and replaying all fourteen migrations first, because the previous
-one had been reclaimed. A claim that expensive to re-check is a claim
-that will stop being re-checked.
+Moving it found four things that had been broken without anyone noticing,
+which is its own argument for the move:
 
-This is the same class of problem as the drift: the evidence has to
-outlive the person holding it. Committing it means parameterising the
-paths and adding a runner — an afternoon, not a day. **Ask when you want
-it done; it is not a decision to make silently.**
+- `form.mjs` tested `/formcheck`, a route that no longer exists. Deleted.
+- `mailfail.mjs` asserted on `entrants`, the table the fixed-pool rebuild
+  dropped — a fourth remnant of that rebuild, throwing since it landed.
+- The same suite had stopped pointing the app at a refusing mail endpoint,
+  so it asserted a transport failure while the transport succeeded. Four
+  assertions were failing against the send working. The double now has a
+  refusal toggle the test flips itself.
+- `emaildesign` read files another suite had written; it places its own
+  order now.
 
 ### ☐ Cloudinary
 
@@ -182,15 +183,19 @@ goes static.
 
 ## Noted while checking, not yet acted on
 
-- **Constraint names still say `campaign`.** `winners_campaign_id_fkey`
-  survives on the renamed column, because renaming a column does not
-  rename its constraint. Purely cosmetic — it enforces the right thing —
-  but it will confuse whoever reads an error message naming it. Worth a
-  line in a future migration; not worth one of its own.
-- **Two concurrency tests share one database** and the first leaves rows
-  the second trips over. A fixture problem, not a product one, but it
-  means the suite's result depends on the order it is run in. Fix when
-  the suite is committed.
+Both items previously listed here are done, and both were larger than
+they looked:
+
+- **Names carrying `campaign`** — not one but **nine**: six constraints
+  (including `games_pkey`, which was still `campaigns_pkey`), two indexes,
+  and four policy names visible in the Supabase dashboard.
+  `20260921100000_rename_campaign_constraints.sql` renames them all,
+  guarded so it is a no-op where they are already right.
+- **Order-dependent concurrency tests** — each db suite now creates its
+  own database from a template and drops it. The runner also sweeps
+  scratch databases a crashed suite left behind, and rebuilds the template
+  when the migrations change, because a template that silently predates a
+  new migration is the same failure wearing different clothes.
 
 ---
 
@@ -202,10 +207,13 @@ goes static.
 | Second draw on a drawn game | 2026-09-11 | replay verified by row identity, three times |
 | Winning spot number on screen | 2026-09-12 | found "Entry 16 of 12" on the filmed screen |
 | `check-schema.mjs` OpenAPI path | 2026-09-12 | both clean and drift cases |
+| Test suite committed | 2026-09-12 | `npm test`; found four suites broken in place |
+| Stale `campaign` names | 2026-09-12 | nine objects, not one |
+| Order-dependent db tests | 2026-09-12 | a database per suite, plus a template fingerprint |
 
 ## Still carried in the top three
 
 1. **A genuinely declined card.** In progress.
-2. **The repair scripts against Supabase**, not stock PostgreSQL.
-3. **The suite committed to the repository**, so "covered" means
-   something after this session ends.
+2. **The repair scripts against Supabase**, not stock PostgreSQL. Now the
+   largest untested claim in the repo by a distance.
+3. **The confirmation email actually arriving** in a real inbox.

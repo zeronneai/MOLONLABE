@@ -1363,10 +1363,10 @@ end $$;
 do $$ begin
   if not exists (
     select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'campaigns_pkey'
+    where n.nspname = 'public' and c.conname = 'games_pkey'
       and c.conrelid = 'games'::regclass
   ) then
-    alter table games add constraint campaigns_pkey PRIMARY KEY (id);
+    alter table games add constraint games_pkey PRIMARY KEY (id);
   end if;
 end $$;
 do $$ begin
@@ -1606,28 +1606,28 @@ end $$;
 do $$ begin
   if not exists (
     select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'campaigns_created_by_fkey'
+    where n.nspname = 'public' and c.conname = 'games_created_by_fkey'
       and c.conrelid = 'games'::regclass
   ) then
-    alter table games add constraint campaigns_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+    alter table games add constraint games_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
   end if;
 end $$;
 do $$ begin
   if not exists (
     select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'campaigns_item_id_fkey'
+    where n.nspname = 'public' and c.conname = 'games_item_id_fkey'
       and c.conrelid = 'games'::regclass
   ) then
-    alter table games add constraint campaigns_item_id_fkey FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE RESTRICT;
+    alter table games add constraint games_item_id_fkey FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE RESTRICT;
   end if;
 end $$;
 do $$ begin
   if not exists (
     select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'campaigns_updated_by_fkey'
+    where n.nspname = 'public' and c.conname = 'games_updated_by_fkey'
       and c.conrelid = 'games'::regclass
   ) then
-    alter table games add constraint campaigns_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+    alter table games add constraint games_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
   end if;
 end $$;
 do $$ begin
@@ -1705,10 +1705,10 @@ end $$;
 do $$ begin
   if not exists (
     select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'orders_campaign_id_fkey'
+    where n.nspname = 'public' and c.conname = 'orders_game_id_fkey'
       and c.conrelid = 'orders'::regclass
   ) then
-    alter table orders add constraint orders_campaign_id_fkey FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE SET NULL;
+    alter table orders add constraint orders_game_id_fkey FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE SET NULL;
   end if;
 end $$;
 do $$ begin
@@ -1723,10 +1723,10 @@ end $$;
 do $$ begin
   if not exists (
     select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'winners_campaign_id_fkey'
+    where n.nspname = 'public' and c.conname = 'winners_game_id_fkey'
       and c.conrelid = 'winners'::regclass
   ) then
-    alter table winners add constraint winners_campaign_id_fkey FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE RESTRICT;
+    alter table winners add constraint winners_game_id_fkey FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE RESTRICT;
   end if;
 end $$;
 do $$ begin
@@ -1747,12 +1747,12 @@ end $$;
 
 create index if not exists admin_activity_at_idx ON public.admin_activity USING btree (at DESC);
 create index if not exists admin_activity_entity_idx ON public.admin_activity USING btree (entity, entity_id);
-create index if not exists campaigns_status_idx ON public.games USING btree (status);
 create index if not exists checkout_attempts_started_idx ON public.checkout_attempts USING btree (started_at DESC);
 create index if not exists game_events_kind_idx ON public.game_events USING btree (kind, created_at DESC);
 create index if not exists game_spots_email_idx ON public.game_spots USING btree (game_id, lower(email));
 create index if not exists game_spots_game_status_idx ON public.game_spots USING btree (game_id, status);
 create index if not exists game_spots_order_idx ON public.game_spots USING btree (order_id);
+create index if not exists games_status_idx ON public.games USING btree (status);
 create index if not exists inquiries_status_idx ON public.inquiries USING btree (status);
 create index if not exists item_variants_item_idx ON public.item_variants USING btree (item_id, sort_order);
 create UNIQUE index if not exists item_variants_item_size_idx ON public.item_variants USING btree (item_id, lower(size));
@@ -1764,7 +1764,7 @@ create index if not exists orders_confirmation_idx ON public.orders USING btree 
 create index if not exists orders_created_idx ON public.orders USING btree (created_at DESC);
 create index if not exists orders_email_idx ON public.orders USING btree (lower(email));
 create UNIQUE index if not exists orders_idempotency_key_idx ON public.orders USING btree (idempotency_key) WHERE (idempotency_key IS NOT NULL);
-create index if not exists winners_campaign_idx ON public.winners USING btree (game_id);
+create index if not exists winners_game_idx ON public.winners USING btree (game_id);
 create UNIQUE index if not exists winners_one_per_game_idx ON public.winners USING btree (game_id);
 
 -- ---------------------------------------------------------------------
@@ -2073,17 +2073,17 @@ create policy "Owner manages spots" on public.game_spots for all to authenticate
 drop policy if exists "Anyone can read games" on public.games;
 create policy "Anyone can read games" on public.games for select to anon,authenticated
   using (true);
-drop policy if exists "Owner can delete campaigns" on public.games;
-create policy "Owner can delete campaigns" on public.games for delete to authenticated
+drop policy if exists "Owner can delete games" on public.games;
+create policy "Owner can delete games" on public.games for delete to authenticated
   using (true);
-drop policy if exists "Owner can insert campaigns" on public.games;
-create policy "Owner can insert campaigns" on public.games for insert to authenticated
+drop policy if exists "Owner can insert games" on public.games;
+create policy "Owner can insert games" on public.games for insert to authenticated
   with check (true);
-drop policy if exists "Owner can read all campaigns" on public.games;
-create policy "Owner can read all campaigns" on public.games for select to authenticated
+drop policy if exists "Owner can read all games" on public.games;
+create policy "Owner can read all games" on public.games for select to authenticated
   using (true);
-drop policy if exists "Owner can update campaigns" on public.games;
-create policy "Owner can update campaigns" on public.games for update to authenticated
+drop policy if exists "Owner can update games" on public.games;
+create policy "Owner can update games" on public.games for update to authenticated
   using (true)
   with check (true);
 drop policy if exists "Owner can delete inquiries" on public.inquiries;

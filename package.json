@@ -9,7 +9,9 @@
     "lint": "next lint",
     "check:schema": "node scripts/check-schema.mjs",
     "walkthrough:capture": "node scripts/walkthrough/capture.mjs",
-    "walkthrough:build": "node scripts/walkthrough/build.mjs"
+    "walkthrough:build": "node scripts/walkthrough/build.mjs",
+    "test": "node tests/run.mjs",
+    "test:db": "node tests/run.mjs --db"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
