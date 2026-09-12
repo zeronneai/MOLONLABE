@@ -123,7 +123,23 @@ export type GameSummary = {
   status: Game["status"];
   totalSpots: number;
   spotPriceCents: number;
+  /**
+   * Spots sold. For a drawn game this is the number frozen at the draw,
+   * not a live recount — see the 20260923 migration for why.
+   */
   sold: number;
+  /** True when `sold` is the frozen number rather than a live count. */
+  soldFrozen: boolean;
+  /**
+   * What a recount says right now. Equal to `sold` unless a drawn game's
+   * spots changed after the draw — a refund, a correction.
+   *
+   * Nothing renders it yet. It is carried because the difference between
+   * these two numbers is the only evidence that a finished game was
+   * touched afterwards, and losing that is how the frozen count would
+   * become unfalsifiable rather than merely stable.
+   */
+  soldNow: number;
   item: ItemRow | null;
   /** Set once drawn. First name plus last initial, never more. */
   winnerName: string | null;
@@ -147,10 +163,18 @@ export async function getAllGames(): Promise<{
   const sb = getSupabase();
   if (!sb) return { live: [], finished: [] };
 
-  const [{ data: games, error }, { data: spots }, { data: winners }] =
+  // The counts come from game_scoreboard, never from game_spots.
+  //
+  // game_spots is readable only by an authenticated role — it holds
+  // buyer names and emails — and this function runs on public pages
+  // with the anonymous key. Row level security answers that select with
+  // an EMPTY SET rather than an error, so counting from the table here
+  // succeeded, returned nothing, and rendered every game as "0 / N".
+  // The view is granted to anon and exposes a count and nothing else.
+  const [{ data: games, error }, { data: board }, { data: winners }] =
     await Promise.all([
       sb.from("games").select("*, item:items(*)").order("created_at", { ascending: false }),
-      sb.from("game_spots").select("game_id, status").eq("status", "sold"),
+      sb.from("game_scoreboard").select("game_id, sold, frozen, sold_now"),
       sb
         .from("winners")
         .select("game_id, display_name, drawn_at, drawn_early, unsold_spots"),
@@ -160,23 +184,25 @@ export async function getAllGames(): Promise<{
     return { live: [], finished: [] };
   }
 
-  const soldBy = new Map<string, number>();
-  for (const s of spots ?? []) {
-    soldBy.set(s.game_id, (soldBy.get(s.game_id) ?? 0) + 1);
-  }
+  const scoreBy = new Map(
+    (board ?? []).map((r) => [r.game_id, r] as const),
+  );
   const winnerBy = new Map(
     (winners ?? []).map((w) => [w.game_id, w] as const),
   );
 
   const all: GameSummary[] = ((games ?? []) as GameWithItem[]).map((g) => {
     const w = winnerBy.get(g.id);
+    const score = scoreBy.get(g.id);
     return {
       id: g.id,
       title: g.title,
       status: g.status as Game["status"],
       totalSpots: g.total_spots,
       spotPriceCents: g.spot_price_cents,
-      sold: soldBy.get(g.id) ?? 0,
+      sold: score?.sold ?? 0,
+      soldFrozen: score?.frozen ?? false,
+      soldNow: score?.sold_now ?? score?.sold ?? 0,
       item: g.item,
       winnerName: w?.display_name ?? null,
       drawnAt: w?.drawn_at ?? null,
@@ -195,7 +221,7 @@ export async function getAllGames(): Promise<{
 /**
  * Item ids currently attached to a game, so the case can exclude them.
  *
- * Includes drawn games. A rifle that was raffled stays on the Games
+ * Includes drawn games. A rifle that was given away stays on the Games
  * surface as history rather than reappearing in the case, which is the
  * client's instruction — and is also true: it has an owner now.
  */

@@ -1322,16 +1322,30 @@ alter table public.winners add column if not exists unsold_spots integer;
 -- Views
 -- ---------------------------------------------------------------------
 
-create or replace view public.game_spot_board as
+create or replace view public.game_scoreboard
+with (security_invoker=false) as
+SELECT g.id AS game_id,
+    g.total_spots,
+    COALESCE(w.entry_total, c.sold, 0) AS sold,
+    w.entry_total IS NOT NULL AS frozen,
+    c.sold AS sold_now
+   FROM games g
+     LEFT JOIN winners w ON w.game_id = g.id
+     LEFT JOIN LATERAL ( SELECT count(*)::integer AS sold
+           FROM game_spots s
+          WHERE s.game_id = g.id AND s.status = 'sold'::text) c ON true;
+
+create or replace view public.game_spot_board
+with (security_invoker=false) as
 SELECT game_id,
     spot_number,
     status,
         CASE
-            WHEN ((status = 'sold'::text) AND show_name AND (first_name IS NOT NULL)) THEN (first_name ||
+            WHEN status = 'sold'::text AND show_name AND first_name IS NOT NULL THEN first_name ||
             CASE
-                WHEN (COALESCE(last_name, ''::text) = ''::text) THEN ''::text
-                ELSE ((' '::text || upper("left"(last_name, 1))) || '.'::text)
-            END)
+                WHEN COALESCE(last_name, ''::text) = ''::text THEN ''::text
+                ELSE (' '::text || upper("left"(last_name, 1))) || '.'::text
+            END
             ELSE NULL::text
         END AS display_name
    FROM game_spots s;
@@ -1339,439 +1353,698 @@ SELECT game_id,
 -- ---------------------------------------------------------------------
 -- Constraints
 -- ---------------------------------------------------------------------
--- Added only when absent. A constraint that exists is left exactly as it
--- is rather than dropped and recreated, so this cannot briefly open a
--- window where the rule is not enforced.
+-- Added when absent, and REPLACED when present under the same name with
+-- a different definition.
+--
+-- The replace half was missing, and the gap was not theoretical. When
+-- the fixed-pool rebuild changed order_items_line_type_valid from
+-- ('inventory','entry_pack') to ('inventory','game_spot'), a database
+-- repaired by this script kept the old rule: the name already existed,
+-- so it was left alone. Every table and column would have been correct,
+-- check-schema.sql would have reported all clear — and the database
+-- would have rejected every game-spot order line at insert, which is to
+-- say every sale.
+--
+-- Comparing the definition rather than just the name is what closes it.
+-- A constraint that already matches is still not touched, so the
+-- original reason for the caution is kept; the drop and re-add happen
+-- only where the rule is genuinely out of date, inside the same
+-- transaction as everything else, under a lock no writer can cross.
+--
+-- Re-adding a check validates the existing rows, so if live data breaks
+-- the new rule the whole script aborts and changes nothing. That is the
+-- behaviour to want: it is the difference between finding out now and
+-- finding out at the next checkout.
 
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'admin_activity_pkey'
-      and c.conrelid = 'admin_activity'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'admin_activity_pkey'
+    and c.conrelid = 'admin_activity'::regclass;
+  if current_def is null then
+    alter table admin_activity add constraint admin_activity_pkey PRIMARY KEY (id);
+  elsif current_def is distinct from 'PRIMARY KEY (id)' then
+    alter table admin_activity drop constraint admin_activity_pkey;
     alter table admin_activity add constraint admin_activity_pkey PRIMARY KEY (id);
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'checkout_attempts_pkey'
-      and c.conrelid = 'checkout_attempts'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'checkout_attempts_pkey'
+    and c.conrelid = 'checkout_attempts'::regclass;
+  if current_def is null then
+    alter table checkout_attempts add constraint checkout_attempts_pkey PRIMARY KEY (key);
+  elsif current_def is distinct from 'PRIMARY KEY (key)' then
+    alter table checkout_attempts drop constraint checkout_attempts_pkey;
     alter table checkout_attempts add constraint checkout_attempts_pkey PRIMARY KEY (key);
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'game_events_pkey'
-      and c.conrelid = 'game_events'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'game_events_pkey'
+    and c.conrelid = 'game_events'::regclass;
+  if current_def is null then
+    alter table game_events add constraint game_events_pkey PRIMARY KEY (id);
+  elsif current_def is distinct from 'PRIMARY KEY (id)' then
+    alter table game_events drop constraint game_events_pkey;
     alter table game_events add constraint game_events_pkey PRIMARY KEY (id);
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'game_spots_pkey'
-      and c.conrelid = 'game_spots'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'game_spots_pkey'
+    and c.conrelid = 'game_spots'::regclass;
+  if current_def is null then
+    alter table game_spots add constraint game_spots_pkey PRIMARY KEY (id);
+  elsif current_def is distinct from 'PRIMARY KEY (id)' then
+    alter table game_spots drop constraint game_spots_pkey;
     alter table game_spots add constraint game_spots_pkey PRIMARY KEY (id);
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'games_pkey'
-      and c.conrelid = 'games'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'games_pkey'
+    and c.conrelid = 'games'::regclass;
+  if current_def is null then
+    alter table games add constraint games_pkey PRIMARY KEY (id);
+  elsif current_def is distinct from 'PRIMARY KEY (id)' then
+    alter table games drop constraint games_pkey;
     alter table games add constraint games_pkey PRIMARY KEY (id);
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'inquiries_pkey'
-      and c.conrelid = 'inquiries'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'inquiries_pkey'
+    and c.conrelid = 'inquiries'::regclass;
+  if current_def is null then
+    alter table inquiries add constraint inquiries_pkey PRIMARY KEY (id);
+  elsif current_def is distinct from 'PRIMARY KEY (id)' then
+    alter table inquiries drop constraint inquiries_pkey;
     alter table inquiries add constraint inquiries_pkey PRIMARY KEY (id);
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'item_variants_pkey'
-      and c.conrelid = 'item_variants'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'item_variants_pkey'
+    and c.conrelid = 'item_variants'::regclass;
+  if current_def is null then
+    alter table item_variants add constraint item_variants_pkey PRIMARY KEY (id);
+  elsif current_def is distinct from 'PRIMARY KEY (id)' then
+    alter table item_variants drop constraint item_variants_pkey;
     alter table item_variants add constraint item_variants_pkey PRIMARY KEY (id);
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'items_pkey'
-      and c.conrelid = 'items'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'items_pkey'
+    and c.conrelid = 'items'::regclass;
+  if current_def is null then
+    alter table items add constraint items_pkey PRIMARY KEY (id);
+  elsif current_def is distinct from 'PRIMARY KEY (id)' then
+    alter table items drop constraint items_pkey;
     alter table items add constraint items_pkey PRIMARY KEY (id);
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'order_items_pkey'
-      and c.conrelid = 'order_items'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'order_items_pkey'
+    and c.conrelid = 'order_items'::regclass;
+  if current_def is null then
+    alter table order_items add constraint order_items_pkey PRIMARY KEY (id);
+  elsif current_def is distinct from 'PRIMARY KEY (id)' then
+    alter table order_items drop constraint order_items_pkey;
     alter table order_items add constraint order_items_pkey PRIMARY KEY (id);
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'orders_pkey'
-      and c.conrelid = 'orders'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'orders_pkey'
+    and c.conrelid = 'orders'::regclass;
+  if current_def is null then
+    alter table orders add constraint orders_pkey PRIMARY KEY (id);
+  elsif current_def is distinct from 'PRIMARY KEY (id)' then
+    alter table orders drop constraint orders_pkey;
     alter table orders add constraint orders_pkey PRIMARY KEY (id);
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'settings_pkey'
-      and c.conrelid = 'settings'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'settings_pkey'
+    and c.conrelid = 'settings'::regclass;
+  if current_def is null then
+    alter table settings add constraint settings_pkey PRIMARY KEY (key);
+  elsif current_def is distinct from 'PRIMARY KEY (key)' then
+    alter table settings drop constraint settings_pkey;
     alter table settings add constraint settings_pkey PRIMARY KEY (key);
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'winners_pkey'
-      and c.conrelid = 'winners'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'winners_pkey'
+    and c.conrelid = 'winners'::regclass;
+  if current_def is null then
+    alter table winners add constraint winners_pkey PRIMARY KEY (id);
+  elsif current_def is distinct from 'PRIMARY KEY (id)' then
+    alter table winners drop constraint winners_pkey;
     alter table winners add constraint winners_pkey PRIMARY KEY (id);
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'game_spots_game_id_spot_number_key'
-      and c.conrelid = 'game_spots'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'game_spots_game_id_spot_number_key'
+    and c.conrelid = 'game_spots'::regclass;
+  if current_def is null then
+    alter table game_spots add constraint game_spots_game_id_spot_number_key UNIQUE (game_id, spot_number);
+  elsif current_def is distinct from 'UNIQUE (game_id, spot_number)' then
+    alter table game_spots drop constraint game_spots_game_id_spot_number_key;
     alter table game_spots add constraint game_spots_game_id_spot_number_key UNIQUE (game_id, spot_number);
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'items_slug_key'
-      and c.conrelid = 'items'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'items_slug_key'
+    and c.conrelid = 'items'::regclass;
+  if current_def is null then
+    alter table items add constraint items_slug_key UNIQUE (slug);
+  elsif current_def is distinct from 'UNIQUE (slug)' then
+    alter table items drop constraint items_slug_key;
     alter table items add constraint items_slug_key UNIQUE (slug);
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'orders_gateway_transaction_id_key'
-      and c.conrelid = 'orders'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'orders_gateway_transaction_id_key'
+    and c.conrelid = 'orders'::regclass;
+  if current_def is null then
+    alter table orders add constraint orders_gateway_transaction_id_key UNIQUE (gateway_transaction_id);
+  elsif current_def is distinct from 'UNIQUE (gateway_transaction_id)' then
+    alter table orders drop constraint orders_gateway_transaction_id_key;
     alter table orders add constraint orders_gateway_transaction_id_key UNIQUE (gateway_transaction_id);
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'orders_order_number_key'
-      and c.conrelid = 'orders'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'orders_order_number_key'
+    and c.conrelid = 'orders'::regclass;
+  if current_def is null then
+    alter table orders add constraint orders_order_number_key UNIQUE (order_number);
+  elsif current_def is distinct from 'UNIQUE (order_number)' then
+    alter table orders drop constraint orders_order_number_key;
     alter table orders add constraint orders_order_number_key UNIQUE (order_number);
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'game_spots_status_valid'
-      and c.conrelid = 'game_spots'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'game_spots_status_valid'
+    and c.conrelid = 'game_spots'::regclass;
+  if current_def is null then
+    alter table game_spots add constraint game_spots_status_valid CHECK ((status = ANY (ARRAY['open'::text, 'held'::text, 'sold'::text])));
+  elsif current_def is distinct from 'CHECK ((status = ANY (ARRAY[''open''::text, ''held''::text, ''sold''::text])))' then
+    alter table game_spots drop constraint game_spots_status_valid;
     alter table game_spots add constraint game_spots_status_valid CHECK ((status = ANY (ARRAY['open'::text, 'held'::text, 'sold'::text])));
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'games_price_sane'
-      and c.conrelid = 'games'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'games_price_sane'
+    and c.conrelid = 'games'::regclass;
+  if current_def is null then
+    alter table games add constraint games_price_sane CHECK (((spot_price_cents >= 100) AND (spot_price_cents <= 100000000)));
+  elsif current_def is distinct from 'CHECK (((spot_price_cents >= 100) AND (spot_price_cents <= 100000000)))' then
+    alter table games drop constraint games_price_sane;
     alter table games add constraint games_price_sane CHECK (((spot_price_cents >= 100) AND (spot_price_cents <= 100000000)));
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'games_spots_sane'
-      and c.conrelid = 'games'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'games_spots_sane'
+    and c.conrelid = 'games'::regclass;
+  if current_def is null then
+    alter table games add constraint games_spots_sane CHECK (((total_spots >= 1) AND (total_spots <= 10000)));
+  elsif current_def is distinct from 'CHECK (((total_spots >= 1) AND (total_spots <= 10000)))' then
+    alter table games drop constraint games_spots_sane;
     alter table games add constraint games_spots_sane CHECK (((total_spots >= 1) AND (total_spots <= 10000)));
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'games_status_valid'
-      and c.conrelid = 'games'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'games_status_valid'
+    and c.conrelid = 'games'::regclass;
+  if current_def is null then
+    alter table games add constraint games_status_valid CHECK ((status = ANY (ARRAY['open'::text, 'full'::text, 'drawn'::text])));
+  elsif current_def is distinct from 'CHECK ((status = ANY (ARRAY[''open''::text, ''full''::text, ''drawn''::text])))' then
+    alter table games drop constraint games_status_valid;
     alter table games add constraint games_status_valid CHECK ((status = ANY (ARRAY['open'::text, 'full'::text, 'drawn'::text])));
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'item_variants_stock_not_negative'
-      and c.conrelid = 'item_variants'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'item_variants_stock_not_negative'
+    and c.conrelid = 'item_variants'::regclass;
+  if current_def is null then
+    alter table item_variants add constraint item_variants_stock_not_negative CHECK ((stock >= 0));
+  elsif current_def is distinct from 'CHECK ((stock >= 0))' then
+    alter table item_variants drop constraint item_variants_stock_not_negative;
     alter table item_variants add constraint item_variants_stock_not_negative CHECK ((stock >= 0));
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'items_firearms_have_no_online_price'
-      and c.conrelid = 'items'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'items_firearms_have_no_online_price'
+    and c.conrelid = 'items'::regclass;
+  if current_def is null then
+    alter table items add constraint items_firearms_have_no_online_price CHECK (((category <> ALL (ARRAY['pistol'::text, 'revolver'::text, 'rifle'::text, 'shotgun'::text, 'pcc'::text])) OR (price_cents IS NULL)));
+  elsif current_def is distinct from 'CHECK (((category <> ALL (ARRAY[''pistol''::text, ''revolver''::text, ''rifle''::text, ''shotgun''::text, ''pcc''::text])) OR (price_cents IS NULL)))' then
+    alter table items drop constraint items_firearms_have_no_online_price;
     alter table items add constraint items_firearms_have_no_online_price CHECK (((category <> ALL (ARRAY['pistol'::text, 'revolver'::text, 'rifle'::text, 'shotgun'::text, 'pcc'::text])) OR (price_cents IS NULL)));
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'items_fulfillment_type_valid'
-      and c.conrelid = 'items'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'items_fulfillment_type_valid'
+    and c.conrelid = 'items'::regclass;
+  if current_def is null then
+    alter table items add constraint items_fulfillment_type_valid CHECK ((fulfillment_type = ANY (ARRAY['ship'::text, 'pickup'::text])));
+  elsif current_def is distinct from 'CHECK ((fulfillment_type = ANY (ARRAY[''ship''::text, ''pickup''::text])))' then
+    alter table items drop constraint items_fulfillment_type_valid;
     alter table items add constraint items_fulfillment_type_valid CHECK ((fulfillment_type = ANY (ARRAY['ship'::text, 'pickup'::text])));
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'items_price_cents_positive'
-      and c.conrelid = 'items'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'items_price_cents_positive'
+    and c.conrelid = 'items'::regclass;
+  if current_def is null then
+    alter table items add constraint items_price_cents_positive CHECK (((price_cents IS NULL) OR (price_cents > 0)));
+  elsif current_def is distinct from 'CHECK (((price_cents IS NULL) OR (price_cents > 0)))' then
+    alter table items drop constraint items_price_cents_positive;
     alter table items add constraint items_price_cents_positive CHECK (((price_cents IS NULL) OR (price_cents > 0)));
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'items_shipping_override_sane'
-      and c.conrelid = 'items'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'items_shipping_override_sane'
+    and c.conrelid = 'items'::regclass;
+  if current_def is null then
+    alter table items add constraint items_shipping_override_sane CHECK (((shipping_override_cents IS NULL) OR ((shipping_override_cents >= 0) AND (shipping_override_cents <= 100000))));
+  elsif current_def is distinct from 'CHECK (((shipping_override_cents IS NULL) OR ((shipping_override_cents >= 0) AND (shipping_override_cents <= 100000))))' then
+    alter table items drop constraint items_shipping_override_sane;
     alter table items add constraint items_shipping_override_sane CHECK (((shipping_override_cents IS NULL) OR ((shipping_override_cents >= 0) AND (shipping_override_cents <= 100000))));
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'items_shipping_tier_valid'
-      and c.conrelid = 'items'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'items_shipping_tier_valid'
+    and c.conrelid = 'items'::regclass;
+  if current_def is null then
+    alter table items add constraint items_shipping_tier_valid CHECK ((shipping_tier = ANY (ARRAY['standard'::text, 'oversize'::text])));
+  elsif current_def is distinct from 'CHECK ((shipping_tier = ANY (ARRAY[''standard''::text, ''oversize''::text])))' then
+    alter table items drop constraint items_shipping_tier_valid;
     alter table items add constraint items_shipping_tier_valid CHECK ((shipping_tier = ANY (ARRAY['standard'::text, 'oversize'::text])));
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'order_items_fulfillment_valid'
-      and c.conrelid = 'order_items'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'order_items_fulfillment_valid'
+    and c.conrelid = 'order_items'::regclass;
+  if current_def is null then
+    alter table order_items add constraint order_items_fulfillment_valid CHECK ((fulfillment_type = ANY (ARRAY['ship'::text, 'pickup'::text, 'none'::text])));
+  elsif current_def is distinct from 'CHECK ((fulfillment_type = ANY (ARRAY[''ship''::text, ''pickup''::text, ''none''::text])))' then
+    alter table order_items drop constraint order_items_fulfillment_valid;
     alter table order_items add constraint order_items_fulfillment_valid CHECK ((fulfillment_type = ANY (ARRAY['ship'::text, 'pickup'::text, 'none'::text])));
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'order_items_line_type_valid'
-      and c.conrelid = 'order_items'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'order_items_line_type_valid'
+    and c.conrelid = 'order_items'::regclass;
+  if current_def is null then
+    alter table order_items add constraint order_items_line_type_valid CHECK ((line_type = ANY (ARRAY['inventory'::text, 'game_spot'::text])));
+  elsif current_def is distinct from 'CHECK ((line_type = ANY (ARRAY[''inventory''::text, ''game_spot''::text])))' then
+    alter table order_items drop constraint order_items_line_type_valid;
     alter table order_items add constraint order_items_line_type_valid CHECK ((line_type = ANY (ARRAY['inventory'::text, 'game_spot'::text])));
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'order_items_quantity_positive'
-      and c.conrelid = 'order_items'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'order_items_quantity_positive'
+    and c.conrelid = 'order_items'::regclass;
+  if current_def is null then
+    alter table order_items add constraint order_items_quantity_positive CHECK ((quantity > 0));
+  elsif current_def is distinct from 'CHECK ((quantity > 0))' then
+    alter table order_items drop constraint order_items_quantity_positive;
     alter table order_items add constraint order_items_quantity_positive CHECK ((quantity > 0));
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'orders_status_valid'
-      and c.conrelid = 'orders'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'orders_status_valid'
+    and c.conrelid = 'orders'::regclass;
+  if current_def is null then
+    alter table orders add constraint orders_status_valid CHECK ((status = ANY (ARRAY['paid'::text, 'fulfilled'::text, 'cancelled'::text, 'refunded'::text])));
+  elsif current_def is distinct from 'CHECK ((status = ANY (ARRAY[''paid''::text, ''fulfilled''::text, ''cancelled''::text, ''refunded''::text])))' then
+    alter table orders drop constraint orders_status_valid;
     alter table orders add constraint orders_status_valid CHECK ((status = ANY (ARRAY['paid'::text, 'fulfilled'::text, 'cancelled'::text, 'refunded'::text])));
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'admin_activity_actor_id_fkey'
-      and c.conrelid = 'admin_activity'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'admin_activity_actor_id_fkey'
+    and c.conrelid = 'admin_activity'::regclass;
+  if current_def is null then
+    alter table admin_activity add constraint admin_activity_actor_id_fkey FOREIGN KEY (actor_id) REFERENCES auth.users(id) ON DELETE SET NULL;
+  elsif current_def is distinct from 'FOREIGN KEY (actor_id) REFERENCES auth.users(id) ON DELETE SET NULL' then
+    alter table admin_activity drop constraint admin_activity_actor_id_fkey;
     alter table admin_activity add constraint admin_activity_actor_id_fkey FOREIGN KEY (actor_id) REFERENCES auth.users(id) ON DELETE SET NULL;
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'game_spots_game_id_fkey'
-      and c.conrelid = 'game_spots'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'game_spots_game_id_fkey'
+    and c.conrelid = 'game_spots'::regclass;
+  if current_def is null then
+    alter table game_spots add constraint game_spots_game_id_fkey FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE;
+  elsif current_def is distinct from 'FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE' then
+    alter table game_spots drop constraint game_spots_game_id_fkey;
     alter table game_spots add constraint game_spots_game_id_fkey FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE;
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'game_spots_order_id_fkey'
-      and c.conrelid = 'game_spots'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'game_spots_order_id_fkey'
+    and c.conrelid = 'game_spots'::regclass;
+  if current_def is null then
+    alter table game_spots add constraint game_spots_order_id_fkey FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL;
+  elsif current_def is distinct from 'FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL' then
+    alter table game_spots drop constraint game_spots_order_id_fkey;
     alter table game_spots add constraint game_spots_order_id_fkey FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL;
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'games_created_by_fkey'
-      and c.conrelid = 'games'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'games_created_by_fkey'
+    and c.conrelid = 'games'::regclass;
+  if current_def is null then
+    alter table games add constraint games_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+  elsif current_def is distinct from 'FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL' then
+    alter table games drop constraint games_created_by_fkey;
     alter table games add constraint games_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'games_item_id_fkey'
-      and c.conrelid = 'games'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'games_item_id_fkey'
+    and c.conrelid = 'games'::regclass;
+  if current_def is null then
+    alter table games add constraint games_item_id_fkey FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE RESTRICT;
+  elsif current_def is distinct from 'FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE RESTRICT' then
+    alter table games drop constraint games_item_id_fkey;
     alter table games add constraint games_item_id_fkey FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE RESTRICT;
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'games_updated_by_fkey'
-      and c.conrelid = 'games'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'games_updated_by_fkey'
+    and c.conrelid = 'games'::regclass;
+  if current_def is null then
+    alter table games add constraint games_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+  elsif current_def is distinct from 'FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL' then
+    alter table games drop constraint games_updated_by_fkey;
     alter table games add constraint games_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'inquiries_item_id_fkey'
-      and c.conrelid = 'inquiries'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'inquiries_item_id_fkey'
+    and c.conrelid = 'inquiries'::regclass;
+  if current_def is null then
+    alter table inquiries add constraint inquiries_item_id_fkey FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE RESTRICT;
+  elsif current_def is distinct from 'FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE RESTRICT' then
+    alter table inquiries drop constraint inquiries_item_id_fkey;
     alter table inquiries add constraint inquiries_item_id_fkey FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE RESTRICT;
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'item_variants_item_id_fkey'
-      and c.conrelid = 'item_variants'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'item_variants_item_id_fkey'
+    and c.conrelid = 'item_variants'::regclass;
+  if current_def is null then
+    alter table item_variants add constraint item_variants_item_id_fkey FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE;
+  elsif current_def is distinct from 'FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE' then
+    alter table item_variants drop constraint item_variants_item_id_fkey;
     alter table item_variants add constraint item_variants_item_id_fkey FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE;
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'items_created_by_fkey'
-      and c.conrelid = 'items'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'items_created_by_fkey'
+    and c.conrelid = 'items'::regclass;
+  if current_def is null then
+    alter table items add constraint items_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+  elsif current_def is distinct from 'FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL' then
+    alter table items drop constraint items_created_by_fkey;
     alter table items add constraint items_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'items_updated_by_fkey'
-      and c.conrelid = 'items'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'items_updated_by_fkey'
+    and c.conrelid = 'items'::regclass;
+  if current_def is null then
+    alter table items add constraint items_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+  elsif current_def is distinct from 'FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL' then
+    alter table items drop constraint items_updated_by_fkey;
     alter table items add constraint items_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'order_items_game_id_fkey'
-      and c.conrelid = 'order_items'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'order_items_game_id_fkey'
+    and c.conrelid = 'order_items'::regclass;
+  if current_def is null then
+    alter table order_items add constraint order_items_game_id_fkey FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE SET NULL;
+  elsif current_def is distinct from 'FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE SET NULL' then
+    alter table order_items drop constraint order_items_game_id_fkey;
     alter table order_items add constraint order_items_game_id_fkey FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE SET NULL;
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'order_items_item_id_fkey'
-      and c.conrelid = 'order_items'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'order_items_item_id_fkey'
+    and c.conrelid = 'order_items'::regclass;
+  if current_def is null then
+    alter table order_items add constraint order_items_item_id_fkey FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE RESTRICT;
+  elsif current_def is distinct from 'FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE RESTRICT' then
+    alter table order_items drop constraint order_items_item_id_fkey;
     alter table order_items add constraint order_items_item_id_fkey FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE RESTRICT;
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'order_items_order_id_fkey'
-      and c.conrelid = 'order_items'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'order_items_order_id_fkey'
+    and c.conrelid = 'order_items'::regclass;
+  if current_def is null then
+    alter table order_items add constraint order_items_order_id_fkey FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE;
+  elsif current_def is distinct from 'FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE' then
+    alter table order_items drop constraint order_items_order_id_fkey;
     alter table order_items add constraint order_items_order_id_fkey FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE;
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'order_items_variant_id_fkey'
-      and c.conrelid = 'order_items'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'order_items_variant_id_fkey'
+    and c.conrelid = 'order_items'::regclass;
+  if current_def is null then
+    alter table order_items add constraint order_items_variant_id_fkey FOREIGN KEY (variant_id) REFERENCES item_variants(id) ON DELETE SET NULL;
+  elsif current_def is distinct from 'FOREIGN KEY (variant_id) REFERENCES item_variants(id) ON DELETE SET NULL' then
+    alter table order_items drop constraint order_items_variant_id_fkey;
     alter table order_items add constraint order_items_variant_id_fkey FOREIGN KEY (variant_id) REFERENCES item_variants(id) ON DELETE SET NULL;
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'orders_game_id_fkey'
-      and c.conrelid = 'orders'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'orders_game_id_fkey'
+    and c.conrelid = 'orders'::regclass;
+  if current_def is null then
+    alter table orders add constraint orders_game_id_fkey FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE SET NULL;
+  elsif current_def is distinct from 'FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE SET NULL' then
+    alter table orders drop constraint orders_game_id_fkey;
     alter table orders add constraint orders_game_id_fkey FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE SET NULL;
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'settings_updated_by_fkey'
-      and c.conrelid = 'settings'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'settings_updated_by_fkey'
+    and c.conrelid = 'settings'::regclass;
+  if current_def is null then
+    alter table settings add constraint settings_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+  elsif current_def is distinct from 'FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL' then
+    alter table settings drop constraint settings_updated_by_fkey;
     alter table settings add constraint settings_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'winners_game_id_fkey'
-      and c.conrelid = 'winners'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'winners_game_id_fkey'
+    and c.conrelid = 'winners'::regclass;
+  if current_def is null then
+    alter table winners add constraint winners_game_id_fkey FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE RESTRICT;
+  elsif current_def is distinct from 'FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE RESTRICT' then
+    alter table winners drop constraint winners_game_id_fkey;
     alter table winners add constraint winners_game_id_fkey FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE RESTRICT;
   end if;
 end $$;
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = 'winners_spot_id_fkey'
-      and c.conrelid = 'winners'::regclass
-  ) then
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'winners_spot_id_fkey'
+    and c.conrelid = 'winners'::regclass;
+  if current_def is null then
+    alter table winners add constraint winners_spot_id_fkey FOREIGN KEY (spot_id) REFERENCES game_spots(id) ON DELETE SET NULL;
+  elsif current_def is distinct from 'FOREIGN KEY (spot_id) REFERENCES game_spots(id) ON DELETE SET NULL' then
+    alter table winners drop constraint winners_spot_id_fkey;
     alter table winners add constraint winners_spot_id_fkey FOREIGN KEY (spot_id) REFERENCES game_spots(id) ON DELETE SET NULL;
   end if;
 end $$;
@@ -2070,6 +2343,47 @@ end;
 $function$;
 
 -- ---------------------------------------------------------------------
+-- Triggers
+-- ---------------------------------------------------------------------
+-- There is no CREATE OR REPLACE TRIGGER before Postgres 14 and no
+-- IF NOT EXISTS at all, so each is dropped first. Dropping a trigger
+-- touches no data; it is off for the length of one transaction and this
+-- whole script runs in one.
+
+drop trigger if exists campaigns_stamp_authorship on public.games;
+CREATE TRIGGER campaigns_stamp_authorship BEFORE INSERT OR UPDATE ON public.games FOR EACH ROW EXECUTE FUNCTION stamp_authorship();
+drop trigger if exists items_set_updated_at on public.items;
+CREATE TRIGGER items_set_updated_at BEFORE UPDATE ON public.items FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+drop trigger if exists items_stamp_authorship on public.items;
+CREATE TRIGGER items_stamp_authorship BEFORE INSERT OR UPDATE ON public.items FOR EACH ROW EXECUTE FUNCTION stamp_authorship();
+drop trigger if exists settings_set_updated_at on public.settings;
+CREATE TRIGGER settings_set_updated_at BEFORE UPDATE ON public.settings FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+drop trigger if exists settings_stamp_authorship on public.settings;
+CREATE TRIGGER settings_stamp_authorship BEFORE INSERT OR UPDATE ON public.settings FOR EACH ROW EXECUTE FUNCTION stamp_authorship_updated_only();
+
+-- ---------------------------------------------------------------------
+-- Comments
+-- ---------------------------------------------------------------------
+
+comment on view public.game_scoreboard is 'Sold count per game, for every surface including the anonymous one. Frozen to winners.entry_total once drawn. Exposes no buyer data — a count cannot identify anyone — so it is safe to grant to anon, which counting from game_spots is not.';
+comment on column public.game_spots.show_name is 'Opt-in, unchecked at checkout. A spot is anonymous on the public board
+   unless the buyer asked otherwise.';
+comment on column public.games.total_spots is 'Fixed at creation. The spots rows are created with the game and the
+   count never changes, so this and count(game_spots) always agree.';
+comment on column public.items.shipping_override_cents is 'Postage for this item, overriding shipping_tier. NULL = use the tier. 0 = free postage, which is a real choice and not the same as NULL.';
+comment on column public.orders.confirmation_expires_at is 'When the receipt link stops working. The token is the credential; this
+   bounds it. Extending an individual order means moving this date, not
+   minting a new token, so an old email keeps working if someone chooses
+   to let it.';
+comment on column public.winners.ticket is 'The WINNING SPOT NUMBER — what gets read aloud. This is pool[ticket_index-1].spot_number, not the index itself: the selector orders by spot id, so the index and the spot number are different numbers.';
+comment on column public.winners.ticket_index is '1-based index the selector returned, into pool. The raw output of the algorithm.';
+comment on column public.winners.unsold_spots is 'How many spots were still unsold at the moment of the draw. Zero or null on a full game.';
+comment on column public.winners.drawn_early is 'True when the draw ran before every spot sold. The terms buyers accepted say the game runs until the last spot goes.';
+comment on column public.winners.entry_total is 'Spots in the pool at the moment of the draw. Frozen, unlike a live count.';
+comment on column public.winners.pool is 'The spots the draw ran against, frozen: [{"spot_id":…,"spot_number":…}, …] in the order the selector walked them (sorted by spot id). Re-running selectWinner over this with the seed must return ticket_index.';
+comment on column public.winners.seed is 'Random seed handed to the deterministic selector. With pool, this reproduces the result.';
+
+-- ---------------------------------------------------------------------
 -- Row level security
 -- ---------------------------------------------------------------------
 
@@ -2195,6 +2509,8 @@ create policy "Owner manages winners" on public.winners for all to authenticated
 -- Grants
 -- ---------------------------------------------------------------------
 
+grant select on public.game_scoreboard to anon;
+grant select on public.game_scoreboard to authenticated;
 grant select on public.game_spot_board to anon;
 grant select on public.game_spot_board to authenticated;
 

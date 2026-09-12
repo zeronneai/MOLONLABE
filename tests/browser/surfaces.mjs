@@ -134,8 +134,22 @@ const home = await page.locator("body").innerText();
 check("HOME: fresh arrivals shows at most two items",
   (home.match(/newest in the shop/i) ?? []).length === 1);
 check("HOME: has a past games section", /already drawn|past games/i.test(home));
+// This used to accept `/\d+\s*\/\s*\d+/` — any two numbers with a slash
+// between them — as proof the section was working. "0 / 5" matched, so
+// the assertion passed for weeks against a section that showed zero sold
+// for every game that had ever sold anything. A pattern loose enough to
+// match the bug is not coverage, it is the appearance of it.
+//
+// The count itself is asserted by value in tests/browser/scoreboard.mjs.
+// What is left here is the narrower thing this suite is about: either
+// the empty state, or a real game with a count that is not zero.
+const pastGamesPairs = [...home.matchAll(/(\d+)\s*\/\s*(\d+)/g)];
 check("HOME: the past games section is honest about being empty",
-  /no game has been drawn yet/i.test(home) || /\d+\s*\/\s*\d+/.test(home));
+  /no game has been drawn yet/i.test(home) || pastGamesPairs.length > 0,
+  pastGamesPairs.map((m) => m[0]).join(", ") || "empty state shown");
+check("HOME: no past game claims zero spots sold",
+  pastGamesPairs.every((m) => Number(m[1]) > 0),
+  pastGamesPairs.map((m) => m[0]).join(", ") || "none rendered");
 
 const grounds = await page.evaluate(() =>
   [...document.querySelectorAll("section")]

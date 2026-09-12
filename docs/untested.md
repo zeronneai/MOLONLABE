@@ -259,9 +259,71 @@ It is marked `[DEMO]` in the title, badged on every public card, and has
 a one-click removal. The failure it guards against is nobody removing it.
 That is a calendar problem, not a code one.
 
+## Added by the "0 / 5 spots sold" bug (2026-09-12)
+
+Every completed game on the home page read zero sold while spots were
+selling. The cause was the games list counting from `game_spots` with the
+**anonymous** key: that table is authenticated-only, and row level
+security answers an unauthorised select with an empty set rather than an
+error. The query succeeded and returned nothing.
+
+It was found by looking at the page. Twenty-one browser suites and three
+database suites did not see it, and this is the useful part — there were
+two independent reasons, not one.
+
+### ✅ What the anonymous role can actually read — *covered 2026-09-12*
+
+`tests/db/anonreach.mjs`, against real PostgreSQL with the real policies.
+It asserts the mechanism (anon sees 0 of 3 sold spots, silently), the
+view that replaces it, the freeze, and then does the part that
+generalises: it walks every file that uses the anonymous client and fails
+if any of them reads a relation anon cannot see. Reverting the fix makes
+it fail with `lib/games/queries.ts reads game_spots`.
+
+### ☐ The double implements no row level security at all
+
+**This is the structural gap, and it is still open.** Under the test
+double the anonymous key reads everything, so an RLS mistake is invisible
+to all twenty-two browser suites by construction — not overlooked,
+*unrepresentable*. Confirmed rather than assumed: with the bug
+reinstated, the browser suites still pass and only `anonreach` fails.
+
+Two ways to close it, neither done:
+
+- Teach the double a permissions model. Honest, and a lot of surface to
+  keep in step with the policies — a stand-in that drifts is worse than
+  one that openly does less.
+- Run some browser suites against real PostgreSQL through PostgREST.
+  Slower, but the stand-in stops being the thing under test.
+
+Until one of them exists, **an RLS question is not answered by `npm
+test`.** `anonreach` covers the reads that exist today; it cannot cover a
+page that renders correctly but leaks, or a write path RLS should refuse.
+
+### ☐ Whether the live database has the grants this assumes
+
+`anonreach` grants `select` on all public tables to anon before testing,
+because the migration chain does not — Supabase does it. So the suite
+proves the *policies* are right given Supabase's grants. It does not
+prove the live project's grants are what Supabase's defaults say. One
+query in the SQL editor settles it, and nobody has run it:
+
+```sql
+select c.relname, has_table_privilege('anon', c.oid, 'select') as anon_select
+from pg_class c join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public' and c.relkind in ('r','v') order by 1;
+```
+
+### ☐ Counts on the deployed site, by eye
+
+The fix is asserted against the double and against stock PostgreSQL.
+Nobody has loaded the real home page since. `test` should read 5 of 5 and
+`PRUEBA` 12 of 100.
+
 ## Still carried in the top three
 
 1. **A genuinely declined card.** In progress.
 2. **The repair scripts against Supabase**, not stock PostgreSQL. Now the
    largest untested claim in the repo by a distance.
-3. **The confirmation email actually arriving** in a real inbox.
+3. **The double has no row level security**, so no browser suite can see
+   an RLS mistake. New, and it has already cost one production bug.

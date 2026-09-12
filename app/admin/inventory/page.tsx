@@ -52,11 +52,12 @@ export default async function AdminInventory({
       .from("games")
       .select("id, title, status, total_spots, spot_price_cents, item_id")
       .order("created_at", { ascending: false }),
-    sb.from("game_spots").select("game_id").eq("status", "sold"),
+    // The same view the public pages count from, so the owner and a
+    // customer looking at the same game never see two different numbers.
+    sb.from("game_scoreboard").select("game_id, sold"),
   ]);
 
-  const soldBy = new Map<string, number>();
-  for (const s of sold ?? []) soldBy.set(s.game_id, (soldBy.get(s.game_id) ?? 0) + 1);
+  const soldBy = new Map((sold ?? []).map((s) => [s.game_id, s.sold] as const));
 
   // The item attached to a game is managed from the game, not from here.
   const inGames = new Set(

@@ -17,7 +17,7 @@
 -- lib/database.types.ts:
 --   node scripts/gen-check-schema.mjs > scripts/check-schema.sql
 --
--- Expecting 154 columns across 12 tables.
+-- Expecting 159 columns across 13 tables.
 
 with expected(table_name, column_name) as (values
   ('admin_activity','action'),
@@ -35,6 +35,11 @@ with expected(table_name, column_name) as (values
   ('game_events','id'),
   ('game_events','kind'),
   ('game_events','mode'),
+  ('game_scoreboard','frozen'),
+  ('game_scoreboard','game_id'),
+  ('game_scoreboard','sold'),
+  ('game_scoreboard','sold_now'),
+  ('game_scoreboard','total_spots'),
   ('game_spot_board','display_name'),
   ('game_spot_board','game_id'),
   ('game_spot_board','spot_number'),

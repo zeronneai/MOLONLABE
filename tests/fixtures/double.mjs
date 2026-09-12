@@ -464,6 +464,24 @@ http.createServer(async (req, res) => {
           : null,
     }));
   }
+  // Also a view. The freeze is the point of it: a drawn game reports
+  // what was true at the draw, from the winners row, not a recount.
+  if (table === "game_scoreboard") {
+    db.game_scoreboard = db.games.map((g) => {
+      const soldNow = db.game_spots.filter(
+        (sp) => sp.game_id === g.id && sp.status === "sold",
+      ).length;
+      const w = db.winners.find((x) => x.game_id === g.id);
+      const frozen = w?.entry_total != null;
+      return {
+        game_id: g.id,
+        total_spots: g.total_spots,
+        sold: frozen ? w.entry_total : soldNow,
+        frozen,
+        sold_now: soldNow,
+      };
+    });
+  }
   if (!db[table]) db[table] = [];
 
   // `head: true` in supabase-js is a real HEAD request: the caller wants

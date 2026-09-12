@@ -144,8 +144,52 @@ Verified, and the verification is the point of trusting it:
 | A database with the audit columns, the rebuild tail, `checkout_attempts`, a function and a policy all removed | identical to the chain |
 
 "Identical" means columns with their defaults and nullability,
-constraints, indexes, policies, functions, views, and execute grants —
-all diffed, all matching.
+constraints, indexes, policies, functions, views, triggers, comments and
+execute grants — all diffed, all matching.
+
+#### Three things that list did not use to include — corrected 2026-09-12
+
+The list above previously ran "…functions, views, and execute grants".
+That was accurate about what had been diffed, and that was the problem:
+the diff only covered the kinds of object somebody had thought to name.
+Widening it found three real gaps, all of which would have produced a
+database that looked repaired and behaved wrongly.
+
+1. **Triggers were not emitted at all.** A database rebuilt from the
+   baseline would have had every table, column and constraint correct,
+   `check-schema.sql` would have reported all clear, and it would have
+   silently stopped stamping `updated_at`, `created_by` and `updated_by`
+   — those are enforced by trigger and by nothing else.
+
+2. **Constraints were added but never replaced.** The script added a
+   constraint when the name was absent and left it alone when present,
+   including when the definition was out of date. When the fixed-pool
+   rebuild changed `order_items_line_type_valid` from `entry_pack` to
+   `game_spot`, a database repaired from the older state kept the old
+   rule — and would have rejected every game-spot order line at insert,
+   which is to say every sale. It now compares the definition and
+   replaces only what genuinely differs.
+
+3. **A view's `security_invoker` setting was dropped.** Both views read
+   a table the anonymous role may not read and answer safely on its
+   behalf, which only works while that option is off. It survived on
+   Postgres's default rather than on anything written down, and the
+   failure if the default ever moved is the silent kind: RLS returns an
+   empty set, not an error, so the page would go quietly back to
+   reporting zero — the exact bug the 20260923 migration exists to fix.
+
+None of these affects a database built by the migration chain, which is
+what the live one is. They affect anything rebuilt or repaired from the
+baseline. If you have run `baseline.sql` against a database that was NOT
+chain-built, check the triggers:
+
+```sql
+select tgname, tgrelid::regclass from pg_trigger where not tgisinternal;
+```
+
+Five expected: `items_set_updated_at`, `items_stamp_authorship`,
+`settings_set_updated_at`, `settings_stamp_authorship`,
+`campaigns_stamp_authorship` (the last keeps its old name, on `games`).
 
 Separately: a database seeded with items, a game, sold spots, a winner
 and an order, then damaged, then repaired — **every row survived**, and

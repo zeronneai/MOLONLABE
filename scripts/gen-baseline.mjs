@@ -80,6 +80,9 @@ function splitTopLevel(cols) {
   return out;
 }
 
+/** A SQL string literal. Comments contain apostrophes and newlines. */
+const quote = (s) => `'${String(s).replace(/'/g, "''")}'`;
+
 const out = [];
 const w = (s = "") => out.push(s);
 
@@ -190,19 +193,32 @@ end $$;`);
 }
 
 // ------------------------------------------------------------------ views
+// reloptions is read alongside the definition because security_invoker
+// lives there, and it is the whole reason these views exist. Both of
+// them read a table the anonymous role is not allowed to read, and
+// answer safely on its behalf. A view emitted without that option would
+// still work today — Postgres defaults security_invoker to false — but
+// the baseline would then be asserting the shape by omission, and the
+// failure if the default ever moved is silent: RLS returns an empty set,
+// not an error, so the page would go quietly back to reading zero. That
+// is the bug this migration exists to fix, so it is written down.
 const views = q(`
-  select table_name, view_definition
-  from information_schema.views
-  where table_schema = 'public'
-  order by table_name
+  select c.relname,
+         pg_get_viewdef(c.oid, true),
+         coalesce(array_to_string(c.reloptions, ', '), '')
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public' and c.relkind = 'v'
+  order by c.relname
 `);
 if (views.length) {
   w(`-- ---------------------------------------------------------------------
 -- Views
 -- ---------------------------------------------------------------------
 `);
-  for (const [name, def] of views) {
-    w(`create or replace view public.${name} as\n${def.trim().replace(/;$/, "")};`);
+  for (const [name, def, opts] of views) {
+    const withClause = opts ? `\nwith (${opts})` : "";
+    w(`create or replace view public.${name}${withClause} as\n${def.trim().replace(/;$/, "")};`);
     w("");
   }
 }
@@ -226,19 +242,43 @@ const constraints = q(`
 w(`-- ---------------------------------------------------------------------
 -- Constraints
 -- ---------------------------------------------------------------------
--- Added only when absent. A constraint that exists is left exactly as it
--- is rather than dropped and recreated, so this cannot briefly open a
--- window where the rule is not enforced.
+-- Added when absent, and REPLACED when present under the same name with
+-- a different definition.
+--
+-- The replace half was missing, and the gap was not theoretical. When
+-- the fixed-pool rebuild changed order_items_line_type_valid from
+-- ('inventory','entry_pack') to ('inventory','game_spot'), a database
+-- repaired by this script kept the old rule: the name already existed,
+-- so it was left alone. Every table and column would have been correct,
+-- check-schema.sql would have reported all clear — and the database
+-- would have rejected every game-spot order line at insert, which is to
+-- say every sale.
+--
+-- Comparing the definition rather than just the name is what closes it.
+-- A constraint that already matches is still not touched, so the
+-- original reason for the caution is kept; the drop and re-add happen
+-- only where the rule is genuinely out of date, inside the same
+-- transaction as everything else, under a lock no writer can cross.
+--
+-- Re-adding a check validates the existing rows, so if live data breaks
+-- the new rule the whole script aborts and changes nothing. That is the
+-- behaviour to want: it is the difference between finding out now and
+-- finding out at the next checkout.
 `);
 for (const [name, table, def] of constraints) {
   // Primary keys and uniques arrive as index-backed constraints; the
   // form below covers all of them.
-  w(`do $$ begin
-  if not exists (
-    select 1 from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-    where n.nspname = 'public' and c.conname = '${name}'
-      and c.conrelid = '${table}'::regclass
-  ) then
+  w(`do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = '${name}'
+    and c.conrelid = '${table}'::regclass;
+  if current_def is null then
+    alter table ${table} add constraint ${name} ${def};
+  elsif current_def is distinct from ${quote(def)} then
+    alter table ${table} drop constraint ${name};
     alter table ${table} add constraint ${name} ${def};
   end if;
 end $$;`);
@@ -285,6 +325,73 @@ for (const [def] of functions) {
     .replace(/^CREATE FUNCTION/i, "create or replace function")
     .trimEnd();
   w(body.endsWith(";") ? body : `${body};`);
+  w("");
+}
+
+// ---------------------------------------------------------------- triggers
+// These were missing, and missing triggers are not a cosmetic gap: a
+// database repaired by this script would have looked correct — every
+// table, column and constraint present, check-schema.sql clean — and
+// would silently have stopped stamping updated_at, created_by and
+// updated_by, because those are enforced by trigger and by nothing else.
+// The script's whole claim is that it converges a database in one pass,
+// so anything the chain creates and this omits makes that claim false.
+const triggers = q(`
+  select t.tgname, c.relname, pg_get_triggerdef(t.oid)
+  from pg_trigger t
+  join pg_class c on c.oid = t.tgrelid
+  join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public' and not t.tgisinternal
+  order by c.relname, t.tgname
+`);
+if (triggers.length) {
+  w(`-- ---------------------------------------------------------------------
+-- Triggers
+-- ---------------------------------------------------------------------
+-- There is no CREATE OR REPLACE TRIGGER before Postgres 14 and no
+-- IF NOT EXISTS at all, so each is dropped first. Dropping a trigger
+-- touches no data; it is off for the length of one transaction and this
+-- whole script runs in one.
+`);
+  for (const [name, table, def] of triggers) {
+    w(`drop trigger if exists ${name} on public.${table};`);
+    w(`${def.trim().replace(/;$/, "")};`);
+  }
+  w("");
+}
+
+// ---------------------------------------------------------------- comments
+// Column comments are where the non-obvious decisions are written down —
+// that entry_total is frozen rather than live, that show_name is opt-in,
+// that a null shipping override is not the same as zero. The owner reads
+// them in the Supabase table editor, so losing them loses the only
+// explanation visible from inside the database.
+//
+// One select rather than a union: q() rewrites only the first SELECT
+// list to base64, so a second branch would come back as raw text and
+// decode to rubbish. Same reason the helper encodes at all.
+const comments = q(`
+  select case when d.objsubid > 0 then 'column'
+              when c.relkind = 'v' then 'view' else 'table' end,
+         case when d.objsubid > 0 then c.relname || '.' || a.attname
+              else c.relname end,
+         d.description
+  from pg_description d
+  join pg_class c on c.oid = d.objoid
+  join pg_namespace n on n.oid = c.relnamespace
+  left join pg_attribute a
+    on a.attrelid = c.oid and a.attnum = d.objsubid
+  where n.nspname = 'public' and c.relkind in ('r', 'v')
+  order by 2, 1
+`);
+if (comments.length) {
+  w(`-- ---------------------------------------------------------------------
+-- Comments
+-- ---------------------------------------------------------------------
+`);
+  for (const [kind, target, text] of comments) {
+    w(`comment on ${kind} public.${target} is ${quote(text)};`);
+  }
   w("");
 }
 

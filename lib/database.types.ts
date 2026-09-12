@@ -530,6 +530,25 @@ export interface Database {
         };
         Relationships: [];
       };
+      /**
+       * The sold count per game, for every surface including the
+       * anonymous one. Counting from `game_spots` on a public page
+       * returns zero, silently, because that table is authenticated-only
+       * and RLS answers with an empty set rather than an error.
+       */
+      game_scoreboard: {
+        Row: {
+          game_id: string;
+          total_spots: number;
+          /** Frozen to the draw once drawn; a live count until then. */
+          sold: number;
+          /** Whether `sold` is the frozen number. */
+          frozen: boolean;
+          /** What a recount says now, frozen or not. */
+          sold_now: number | null;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
       claim_variant_stock: {

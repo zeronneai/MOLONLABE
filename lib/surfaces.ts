@@ -26,8 +26,8 @@
 //   firearm category    -> IN_THE_CASE
 //   everything else     -> SHOP
 //
-// The game override comes first because a rifle being raffled is on the
-// Games surface for as long as the game exists and afterwards as history,
+// The game override comes first because a rifle put up as a prize is on
+// the Games surface for as long as the game exists and afterwards as history,
 // which is the client's instruction.
 //
 // Two guards stop the derivation being defeated, because a rule nothing

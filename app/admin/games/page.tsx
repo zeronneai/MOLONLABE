@@ -17,20 +17,14 @@ export default async function AdminGames() {
   ]);
   const itemName = new Map((items ?? []).map((i) => [i.id, i.name]));
 
-  // Counted from the rows rather than stored on the game, so the number
-  // here and the number that decides whether a sale can happen cannot
-  // disagree.
-  const sold = await Promise.all(
-    (games ?? []).map(async (g) => {
-      const { count } = await sb
-        .from("game_spots")
-        .select("id", { count: "exact", head: true })
-        .eq("game_id", g.id)
-        .eq("status", "sold");
-      return [g.id, count ?? 0] as const;
-    }),
-  );
-  const soldMap = new Map(sold);
+  // One query for every game, from the same view the public pages read,
+  // rather than one count per game from the table. Two reasons: twenty
+  // games was twenty-one round trips, and counting it separately here is
+  // how the owner's screen and the customer's screen came to disagree.
+  const { data: score } = await sb
+    .from("game_scoreboard")
+    .select("game_id, sold");
+  const soldMap = new Map((score ?? []).map((s) => [s.game_id, s.sold] as const));
 
   return (
     <div className="mx-auto max-w-2xl">
