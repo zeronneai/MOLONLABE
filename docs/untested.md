@@ -242,6 +242,17 @@ The arithmetic is covered. What is not: an actual order where a
 tier-priced item and an override-priced item sit in the same basket and
 somebody checks the postage against what the Post Office charged.
 
+### ☐ Nothing checks where an order may lawfully be sent
+
+Not "untested" — **absent**. The cart takes a shipping address and ships
+anything that is not a firearm. Several states cap magazine capacity and
+restrict ammunition, and no rule in the codebase consults the
+destination for either.
+
+It is on this list because a green suite should not be read as saying
+the shipping rules are covered. They are not implemented, so there is
+nothing to cover. `docs/content-needed.md` §12.
+
 ### ☐ The demo game, removed before launch
 
 It is marked `[DEMO]` in the title, badged on every public card, and has

@@ -147,7 +147,7 @@ carries across drawings, the schema would need to change to match.
 
 | What | Why it needs a person |
 | --- | --- |
-| **Which categories belong at /shop** | Currently apparel and accessories, per the brief's own logic that this is the part of the catalogue that ships without a legal conversation. Ammunition and magazines were deliberately left in `/inventory`: ammunition cannot go to every state, and magazines carry capacity limits in several. If the client wants them in the grid, it is one line — `SHOP_CATEGORIES` in `lib/admin/constants.ts`. |
+| ~~**Which categories belong at /shop**~~ — **superseded.** | The site is three surfaces now and placement is derived rather than listed: firearm categories go in the case, everything else is shop stock, and an item in a game overrides both. There is no category allow-list left to edit. `SHOP_CATEGORIES` was the lever this row pointed at; it governed nothing after the restructure and has been deleted so nobody pulls it. See `lib/surfaces.ts`. **The live question this row used to carry has not gone away — it has moved to §12, restated as what it actually is.** |
 | **The new categories** | `shotgun`, `ammunition`, `magazine` and `apparel` were added. Suppressors and other NFA items were deliberately left out: they need an SOT and a different transfer process, and listing them would imply the shop can sell them. Confirm that is right. |
 | **Sizes are free text** | No fixed S–XXL list, so a one-size hat, a 34 waist and a 9.5 boot all fit. The cost is that "Med" and "Medium" are different sizes to the database; the form warns on an exact repeat but cannot catch a near-miss. |
 
@@ -189,6 +189,10 @@ behaviour that exists rather than in the abstract:
 Until the rules change, the honest position is that this is a capability
 the shop has and has not yet been given permission to use.
 
+**Going to the attorney at the same time:** §12, where magazines and
+ammunition may lawfully be shipped. They are the two open legal items and
+neither is a copy change.
+
 ## 11. Copy for the three surfaces
 
 The site is now Shop, Games and In the case. The headings and standfirsts
@@ -204,3 +208,61 @@ the whole site:
 Worth ten minutes with the client. They are the first thing a visitor
 reads on each surface and they are currently a developer's guess at his
 voice.
+
+## 12. Where magazines can ship — a compliance question, not a category
+
+**Do not close this by choosing a category.** Magazines are in the Shop
+and that is settled; the client has confirmed it. Putting them somewhere
+else would not answer anything, and moving them back out would look like
+a resolution while leaving the actual risk untouched.
+
+**The question is where an order containing one may lawfully be sent.**
+Several states cap magazine capacity, and the caps differ — some by round
+count, some by whether the magazine is detachable, some with carve-outs
+for law enforcement or for magazines owned before a given date. A
+magazine that is ordinary stock in Texas is contraband in California, and
+the shop would be the one posting it.
+
+Nothing in the build knows this. The cart asks for a shipping address and
+the item ships if its category is not a firearm. There is no
+destination-based rule anywhere in the codebase, for magazines or for
+anything else.
+
+### What the client and his attorney need to decide
+
+This goes to the attorney **alongside the terms change in §10** — they are
+the two open legal items and they are best answered together.
+
+- **Which states, and what limit in each.** A list, not a principle. It
+  becomes a table in the code.
+- **What happens at checkout when the address is in one of them.** Refuse
+  the line and say why; refuse the whole order; accept and cancel it
+  afterwards; or ship and put the burden on the buyer with an attested
+  checkbox. These are materially different, and the last one is a
+  question for the attorney rather than for us.
+- **Whether the buyer's billing address, shipping address, or both
+  govern.** They can differ, and people do order to a second address.
+- **Whether the same rule applies to ammunition**, which has its own
+  state restrictions and is also in the Shop. If the answer for
+  magazines is a destination rule, ammunition almost certainly needs one
+  too, and building one mechanism for both is much cheaper than two.
+
+### What it would take to build
+
+A destination rule is genuinely new machinery, not a flag:
+
+- A table of restricted destinations per category, editable by the owner
+  or at least by us without a deploy.
+- A check in `priceCart` that can reject a line on the shipping address,
+  which today it cannot — rejection reasons there are about stock and
+  price, and the address is not consulted at all.
+- Something at checkout that explains a refusal in a way that does not
+  read as a bug, and that survives the buyer changing the address and
+  trying again.
+- A decision about carts that mix a restricted item with an unrestricted
+  one, which is the common case and the awkward one.
+
+**Until that exists, the honest position is that the shop is relying on
+the buyer to know their own state's law.** That may be an acceptable
+position — plenty of retailers take it, with a notice — but it should be
+a decision somebody made, and right now it is a decision nobody has made.

@@ -43,18 +43,22 @@ export const CATEGORIES = [
   "apparel",
 ] as const;
 
-/**
- * What lives at /shop rather than /inventory.
- *
- * The line is not "small things" — it is what ships without a legal
- * conversation. Ammunition looks like it belongs here until you remember
- * it cannot go to every state, and magazines carry capacity limits in
- * several. Both stay in the inventory, where the fulfilment choice is
- * made deliberately per item.
- *
- * Moving a category between the two listings is this one line.
- */
-export const SHOP_CATEGORIES = ["apparel", "accessory"] as const;
+// SHOP_CATEGORIES lived here and is gone.
+//
+// It was the allow-list of what appeared at /shop, and after the site
+// split into three surfaces it governed nothing — placement is derived
+// from the category instead (lib/surfaces.ts). Deleted rather than left
+// in place because docs/content-needed.md pointed at it as the lever to
+// pull, and a dead constant that looks like a lever is worse than no
+// lever at all: somebody edits it, nothing changes, and they conclude
+// the restructure is broken.
+//
+// It also carried the note that ammunition and magazines "cannot go to
+// every state". That is true and it is not a display question — it is
+// about where an order may lawfully be sent, which nothing in this
+// codebase checks. It is now docs/content-needed.md §12, stated as the
+// compliance question it is so that it cannot be closed by choosing a
+// category.
 
 /**
  * Which categories carry the attorney's firearms notice on their product
@@ -84,10 +88,6 @@ export function needsFirearmDisclaimer(category: string): boolean {
 
 /** Shipping tiers. Only meaningful for items that ship. */
 export const SHIPPING_TIERS = ["standard", "oversize"] as const;
-
-export function isShopCategory(category: string): boolean {
-  return (SHOP_CATEGORIES as readonly string[]).includes(category);
-}
 
 /**
  * Apparel is the one category that is always posted, so the form starts
