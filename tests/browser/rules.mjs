@@ -74,7 +74,10 @@ const must = [
   [/federally licensed firearms dealer/i, "the FFL transfer condition"],
   [/first name and last initial/i, "how a winner is published"],
   [/only be bought/i, "purchase-only, stated rather than omitted"],
-  [/25 in a single order/i, "the per-order cap, which the checkout enforces"],
+  [/no limit per person and no limit per order/i,
+    "that there is NO cap — the 25-an-order one was invented and is gone"],
+  [/lowest numbers still free/i, "that numbers are assigned, not chosen"],
+  [/adds to what is already there/i, "that a second add merges"],
 ];
 for (const [re, what] of must) {
   check(`states ${what}`, re.test(text),
@@ -100,6 +103,12 @@ check("does not claim a no-purchase route",
   !/no purchase is necessary|free entry|alternative method of entry/i.test(text));
 check("does not promise an entry period or closing date",
   !/entry period|closes on|closing date/i.test(text));
+// The cap is gone from the code, so it must be gone from the terms. This
+// assertion is the one that failed when the code changed and the rules
+// did not, which is exactly what it is for.
+check("states no per-order spot cap, because there is none",
+  !/\b25\b[^\n]{0,30}(order|transaction)/i.test(text),
+  (text.match(/[^\n]*\b25\b[^\n]*/) ?? ["no stale cap"])[0].slice(0, 60));
 
 // ------------------------------------------------- the three open items
 const pending = (text.match(/to be confirmed/gi) ?? []).length;
