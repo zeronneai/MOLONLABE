@@ -222,7 +222,17 @@ function runSuite(s) {
         seconds: ((Date.now() - started) / 1000).toFixed(1),
         passed: summary ? Number(summary[1]) : null,
         failed: summary ? Number(summary[2]) : null,
-        failures: out.split("\n").filter((l) => l.startsWith("FAIL ")),
+        // PAGE ERROR as well as FAIL. Eight suites report an uncaught
+        // browser exception by pushing "PAGE ERROR …" onto the same list
+        // as their assertions, so it counts toward the failure total —
+        // but this filter only looked for "FAIL ", and a failure that is
+        // counted and never named is the worst shape a runner has: the
+        // tally says something broke and the output says nothing did.
+        // Caught by a real one, a page error in `tax` that appeared only
+        // in a full run and printed no reason at all.
+        failures: out
+          .split("\n")
+          .filter((l) => /^(FAIL |PAGE ERROR )/.test(l)),
         out,
       });
     });
