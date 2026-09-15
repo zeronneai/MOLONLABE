@@ -104,6 +104,14 @@ export interface Database {
           winner_note: string | null;
           total_spots: number;
           spot_price_cents: number;
+          // The three the owner writes, and the three the renderer keeps.
+          // See 20260926100000_game_guides.sql.
+          guide_why: string | null;
+          guide_care: string | null;
+          guide_pairs: string | null;
+          guide_path: string | null;
+          guide_fingerprint: string | null;
+          guide_generated_at: string | null;
           created_by: string | null;
           created_by_name: string | null;
           updated_by: string | null;
@@ -119,6 +127,12 @@ export interface Database {
           winner_note?: string | null;
           total_spots: number;
           spot_price_cents: number;
+          guide_why?: string | null;
+          guide_care?: string | null;
+          guide_pairs?: string | null;
+          guide_path?: string | null;
+          guide_fingerprint?: string | null;
+          guide_generated_at?: string | null;
           created_by_name?: string | null;
           updated_by_name?: string | null;
           created_at?: string | null;
@@ -132,6 +146,12 @@ export interface Database {
           winner_note?: string | null;
           total_spots?: number;
           spot_price_cents?: number;
+          guide_why?: string | null;
+          guide_care?: string | null;
+          guide_pairs?: string | null;
+          guide_path?: string | null;
+          guide_fingerprint?: string | null;
+          guide_generated_at?: string | null;
           created_by_name?: string | null;
           updated_by_name?: string | null;
           created_at?: string | null;
