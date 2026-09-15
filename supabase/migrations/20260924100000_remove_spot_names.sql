@@ -87,10 +87,17 @@ begin
 end;
 $$;
 
--- Not callable from a browser. CREATE OR REPLACE resets privileges to the
--- default, so this is restated rather than assumed.
+-- Not callable from a browser, and PUBLIC is named because it is the
+-- grant that is actually there.
+--
+-- Dropping and recreating a function resets its privileges to the
+-- built-in default, which is EXECUTE to PUBLIC. (CREATE OR REPLACE does
+-- not — it preserves them. Measured, not assumed.) So changing an
+-- argument list, as this migration does, re-opens the function even if
+-- it had been locked down before. Revoking from `anon, authenticated`
+-- alone would not close it: that is the mistake 20260925 exists to fix.
 revoke execute on function public.sell_game_spots(uuid, int[], uuid, text, text, text, text)
-  from anon, authenticated;
+  from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------
 -- 3. The column

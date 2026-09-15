@@ -465,7 +465,14 @@ const fnGrants = q(`
 if (fnGrants.length) {
   w(`-- Execute privileges. The revokes matter as much as the grants: the
 -- spot-claiming and checkout functions must not be callable from a
--- browser, and CREATE OR REPLACE above resets them to the default.
+-- browser.
+--
+-- Measured on PostgreSQL 16, because the rule is not what it looks like:
+--   CREATE OR REPLACE  PRESERVES existing privileges
+--   DROP then CREATE   RESETS to the built-in default, EXECUTE to PUBLIC
+-- So a migration that changes a function's ARGUMENT LIST — which has to
+-- drop and recreate — silently re-opens it, and a migration that only
+-- changes the body does not.
 --
 -- EVERY revoke names PUBLIC as well as the role, and that is the whole
 -- point of this block rather than a flourish. PostgreSQL grants EXECUTE

@@ -36,6 +36,24 @@ begin;
 -- The two together cover a missing table, a table missing some columns,
 -- and a table that is already correct.
 
+create table if not exists public._test_template_fingerprint (
+  fingerprint text not null
+);
+alter table public._test_template_fingerprint add column if not exists fingerprint text;
+do $$ begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = '_test_template_fingerprint'
+      and column_name = 'fingerprint' and is_nullable = 'YES'
+  ) then
+    if exists (select 1 from public._test_template_fingerprint where fingerprint is null) then
+      raise notice 'public._test_template_fingerprint.fingerprint holds nulls; left nullable. Fill them, then: alter table public._test_template_fingerprint alter column fingerprint set not null;';
+    else
+      alter table public._test_template_fingerprint alter column fingerprint set not null;
+    end if;
+  end if;
+end $$;
+
 create table if not exists public.admin_activity (
   id uuid default gen_random_uuid() not null,
   at timestamp with time zone default now() not null,
@@ -1351,6 +1369,20 @@ declare current_def text;
 begin
   select pg_get_constraintdef(c.oid) into current_def
   from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = '_test_template_fingerprint_pkey'
+    and c.conrelid = '_test_template_fingerprint'::regclass;
+  if current_def is null then
+    alter table _test_template_fingerprint add constraint _test_template_fingerprint_pkey PRIMARY KEY (fingerprint);
+  elsif current_def is distinct from 'PRIMARY KEY (fingerprint)' then
+    alter table _test_template_fingerprint drop constraint _test_template_fingerprint_pkey;
+    alter table _test_template_fingerprint add constraint _test_template_fingerprint_pkey PRIMARY KEY (fingerprint);
+  end if;
+end $$;
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
   where n.nspname = 'public' and c.conname = 'admin_activity_pkey'
     and c.conrelid = 'admin_activity'::regclass;
   if current_def is null then
@@ -2481,7 +2513,14 @@ grant select on public.game_scoreboard to authenticated;
 
 -- Execute privileges. The revokes matter as much as the grants: the
 -- spot-claiming and checkout functions must not be callable from a
--- browser, and CREATE OR REPLACE above resets them to the default.
+-- browser.
+--
+-- Measured on PostgreSQL 16, because the rule is not what it looks like:
+--   CREATE OR REPLACE  PRESERVES existing privileges
+--   DROP then CREATE   RESETS to the built-in default, EXECUTE to PUBLIC
+-- So a migration that changes a function's ARGUMENT LIST — which has to
+-- drop and recreate — silently re-opens it, and a migration that only
+-- changes the body does not.
 --
 -- EVERY revoke names PUBLIC as well as the role, and that is the whole
 -- point of this block rather than a flourish. PostgreSQL grants EXECUTE
