@@ -74,12 +74,22 @@ export type OwnerNotification =
     }
   | {
       kind: "order_error";
-      severity: "urgent";
-      /** Which of the three failures. `charged_not_saved` is the bad one. */
+      /**
+       * How loudly to read it. Three of the four failures below mean
+       * money or stock is in an unresolved state and need somebody now;
+       * `guide_not_built` means a deliverable is missing and can wait
+       * until the shop opens, which is a different thing and should not
+       * wear the same word.
+       */
+      severity: "urgent" | "attention";
+      /** Which of the four failures. `charged_not_saved` is the bad one. */
       failure:
         | "charged_not_saved"
         | "lines_not_saved"
-        | "spots_not_sold";
+        | "spots_not_sold"
+        // The money and the spots are fine; the guide the customer paid
+        // for could not be produced, so their link will not open.
+        | "guide_not_built";
       message: string;
       order_number: string;
       transaction_id?: string;
@@ -370,6 +380,31 @@ function orderErrorSummary(
     ].join("\n");
   }
 
+  if (n.failure === "guide_not_built") {
+    return [
+      "A GUIDE COULD NOT BE PRODUCED.",
+      "",
+      "The order is fine. The money is fine. The spots are recorded.",
+      "What failed is the guide that comes with the purchase, so the",
+      "link in the customer's email will not open yet.",
+      "",
+      ...facts,
+      ...(n.game ? [`Game: ${n.game}`] : []),
+      ...(n.message ? ["", `Reason given: ${n.message}`] : []),
+      "",
+      "WHAT TO DO",
+      "",
+      "1. Open the game in the admin and press 'Open the guide as a",
+      "   customer sees it'. Whatever is wrong, it will say so there.",
+      "2. The usual cause is one of the three guide sections being",
+      "   empty on an older game. Fill it in and save.",
+      "3. The link rebuilds itself. Once it opens for you it opens for",
+      "   the customer — they do not need a new email.",
+      "",
+      `${AGENCY_NAME}: ${AGENCY_CONTACT}`,
+    ].join("\n");
+  }
+
   return [
     "URGENT — SPOTS WERE PAID FOR AND NOT RECORDED AS SOLD.",
     "",
@@ -422,11 +457,14 @@ export function subjectFor(n: OwnerNotification): string {
     case "game_full":
       return `${n.game} has SOLD OUT — ready to draw`;
     case "order_error":
-      return n.failure === "charged_not_saved"
-        ? `URGENT: card charged, order NOT saved — ${n.order_number}`
-        : n.failure === "lines_not_saved"
-          ? `URGENT: order ${n.order_number} saved without its items`
-          : `URGENT: order ${n.order_number} paid for spots that were not recorded`;
+      return {
+        charged_not_saved: `URGENT: card charged, order NOT saved — ${n.order_number}`,
+        lines_not_saved: `URGENT: order ${n.order_number} saved without its items`,
+        spots_not_sold: `URGENT: order ${n.order_number} paid for spots that were not recorded`,
+        // Not urgent in the same sense — nothing is lost and nothing is
+        // held — so the subject does not shout. It still names the order.
+        guide_not_built: `Guide not produced for order ${n.order_number}`,
+      }[n.failure];
   }
 }
 

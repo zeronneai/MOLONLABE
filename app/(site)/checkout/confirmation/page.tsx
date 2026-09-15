@@ -16,7 +16,7 @@ import {
   SHOP_PHONE_DISPLAY,
   SHOP_PHONE_HREF,
 } from "@/lib/brand";
-import { RECEIPT_TTL_LABEL } from "@/lib/receipt";
+import { RECEIPT_TTL_LABEL, guidePath } from "@/lib/receipt";
 
 export const metadata: Metadata = {
   title: "Order confirmed",
@@ -69,9 +69,17 @@ export default async function ConfirmationPage({
   // than from the pool — the receipt has to keep saying what was bought
   // even after the game is drawn and the spots have served their purpose.
   let spots: { game: string; numbers: number[]; totalSpots: number } | null = null;
+  // The piece the guide is about, and the only thing that decides whether
+  // the guide is offered below. Read from the game rather than from the
+  // order lines because the guide belongs to the game, not to the sale.
+  let guideItem: string | null = null;
   if (order.game_id) {
     const [{ data: game }, { data: spotLine }] = await Promise.all([
-      sb.from("games").select("title, total_spots").eq("id", order.game_id).maybeSingle(),
+      sb
+        .from("games")
+        .select("title, total_spots, item:items(name)")
+        .eq("id", order.game_id)
+        .maybeSingle(),
       sb
         .from("order_items")
         .select("spot_numbers")
@@ -87,6 +95,7 @@ export default async function ConfirmationPage({
         totalSpots: game.total_spots,
       };
     }
+    guideItem = (game?.item as { name?: string } | null)?.name ?? null;
   }
 
   const { data: lines } = await sb
@@ -210,6 +219,35 @@ export default async function ConfirmationPage({
               </Link>
               .
             </p>
+          </div>
+        )}
+
+        {/* The guide. Linked rather than described at length — the
+            document says what it is better than a paragraph about it
+            would, and it is one click away.
+
+            Offered whenever the order has a game, even if the build
+            failed during checkout: /guide rebuilds on demand, so by the
+            time anybody follows this it has very likely fixed itself,
+            and if it has not it answers with a phone number rather than
+            an error. This page is rendered fresh on every visit, which
+            is what makes that safe here and not in the email. */}
+        {guideItem && (
+          <div className="mt-10 border-t hairline pt-8">
+            <h2 className="label text-muted">Your guide</h2>
+            <p className="mt-4 max-w-[56ch] text-sm leading-relaxed text-muted">
+              A guide to the {guideItem}, written by the shop — what it
+              is, why we picked it, how to look after it, and what we
+              would put on it.
+            </p>
+            <a
+              href={guidePath(order.order_number, token)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="control mt-5 inline-block"
+            >
+              Open your guide
+            </a>
           </div>
         )}
 

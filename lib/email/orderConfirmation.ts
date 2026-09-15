@@ -43,7 +43,7 @@ import {
   SHOP_PHONE_E164,
   SITE_URL,
 } from "@/lib/brand";
-import { RECEIPT_TTL_LABEL, receiptUrl } from "@/lib/receipt";
+import { RECEIPT_TTL_LABEL, guideUrl, receiptUrl } from "@/lib/receipt";
 import { BODY, DISPLAY, EMAIL_COLORS as C, FONT_STACK, LABEL, SMALL } from "./theme";
 
 export type EmailLine = {
@@ -87,6 +87,16 @@ export type OrderEmailData = {
   cardLast4: string | null;
   /** Credential for the receipt link. Never rendered on its own. */
   confirmationToken: string;
+  /**
+   * The piece the guide is about, when a guide exists for this order.
+   *
+   * Null on a merchandise sale, and null when the guide could not be
+   * built — checkout sets it from the build's own result rather than
+   * from "there were spots", so this email never links to something that
+   * is not there. The receipt page offers it either way, and that page is
+   * rendered fresh every time.
+   */
+  guideFor?: string | null;
 };
 
 export type RenderedEmail = { subject: string; html: string; text: string };
@@ -179,6 +189,7 @@ function panel(accent: string, textColor: string, inner: string): string {
 export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
   const subject = `Order ${order.orderNumber} — ${SHOP_NAME}`;
   const receipt = receiptUrl(order.orderNumber, order.confirmationToken);
+  const guide = guideUrl(order.orderNumber, order.confirmationToken);
   const collecting = order.pickupLines.length > 0;
 
   // The line under the subject in an inbox list. Without one, clients
@@ -248,6 +259,25 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
          <span style="${SMALL};color:${C.muted}">The draw happens once the last
          spot sells, or earlier if the shop decides. There is no end date.
          <a href="${SITE_URL}/featured" style="color:${C.acid};text-decoration:underline">Watch the board</a>.</span>`,
+      )
+    : "";
+
+  // A line and a link, never an attachment.
+  //
+  // Attaching it would push the message past the 102KB where Gmail clips
+  // and hides everything after the cut — which here is the legal text —
+  // and a PDF attachment is one of the strongest spam signals there is.
+  // The link is behind the same token as the receipt, so it is as private
+  // as the rest of this email and no more.
+  const guideBlock = order.guideFor
+    ? panel(
+        C.bone,
+        C.bone,
+        `<strong style="color:${C.bone}">Your guide to the ${escapeHtml(order.guideFor)}</strong>
+         <div style="height:10px;line-height:10px">&nbsp;</div>
+         <span style="${SMALL};color:${C.muted}">Written by the shop — what it is,
+         why we picked it, how to look after it and what we would put on it.
+         <a href="${guide}" style="color:${C.acid};text-decoration:underline">Open your guide</a>.</span>`,
       )
     : "";
 
@@ -335,6 +365,7 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
   </td></tr>
 
   ${order.spots ? row(spotsBlock, "padding-top:28px") : ""}
+  ${order.guideFor ? row(guideBlock, "padding-top:28px") : ""}
 
   <!-- The way back to the receipt. Without this the page exists and
        nobody can reach it once the tab is closed. A bordered block rather
@@ -471,6 +502,18 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
           `The draw happens once the last spot sells, or earlier if the`,
           `shop decides. There is no end date.`,
           `${SITE_URL}/featured`,
+        ]
+      : []),
+    ...(order.guideFor
+      ? [
+          ``,
+          `YOUR GUIDE`,
+          RULE,
+          `Your guide to the ${order.guideFor}. Written by the shop —`,
+          `what it is, why we picked it, how to look after it and what`,
+          `we would put on it.`,
+          ``,
+          guide,
         ]
       : []),
     ``,

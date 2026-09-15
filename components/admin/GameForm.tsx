@@ -14,6 +14,12 @@
 import { useActionState, useState } from "react";
 import { saveGame } from "@/app/admin/actions";
 import { formatUsd } from "@/lib/money";
+import {
+  GUIDE_FIELDS,
+  GUIDE_MIN_CHARS,
+  guideFieldErrors,
+  type GuideFieldKey,
+} from "@/lib/guides/fields";
 import type { GameRow } from "@/lib/database.types";
 
 /**
@@ -76,6 +82,16 @@ export default function GameForm({
   const prizeValue = prize ? valueOf(prize) : null;
   const covers = prizeValue && pot > 0 ? pot - prizeValue.cents : null;
 
+  // The three guide sections, in state so the owner sees the count move
+  // as he writes rather than being told on submit that he was short.
+  const [guide, setGuide] = useState<Record<GuideFieldKey, string>>({
+    guide_why: game?.guide_why ?? "",
+    guide_care: game?.guide_care ?? "",
+    guide_pairs: game?.guide_pairs ?? "",
+  });
+  const guideErrors = guideFieldErrors(guide);
+  const guideReady = Object.keys(guideErrors).length === 0;
+
   return (
     <form action={action} className="max-w-2xl">
       {game && <input type="hidden" name="id" value={game.id} />}
@@ -114,6 +130,89 @@ export default function GameForm({
               </option>
             ))}
           </select>
+        </div>
+
+        {/* ------------------------------------------------- the guide */}
+        {/* Placed directly under the prize and above the money, because
+            it is the thing being sold. The customer is buying a written
+            guide to this piece; entry into the drawing comes with it.
+            Everything else in the guide — the name, the specifications,
+            the description, the photographs — is lifted from the item,
+            so these three sections are the entire difference between a
+            guide and the product page printed out.
+
+            The form refuses to save without them. That is not a
+            formality: a game published with these blank is selling
+            something that isn't there. */}
+        <div className="sm:col-span-2 border-l-2 border-acid pl-5">
+          <p className="label text-acid">The guide — what they are paying for</p>
+          <p className="mt-3 max-w-[56ch] text-sm leading-relaxed text-muted">
+            Every customer gets a guide to this piece, made automatically
+            from the item — its name, brand, specifications, description
+            and photographs. These three sections are the only part that
+            is yours, and they are the only part that could not have been
+            printed off the website. Write them the way you would say them
+            across the counter.
+          </p>
+          <p className="mt-3 max-w-[56ch] text-sm leading-relaxed text-amber">
+            This is not optional. A game will not go on sale, and will not
+            save afterwards, until all three are filled in.
+          </p>
+
+          <div className="mt-8 space-y-8">
+            {GUIDE_FIELDS.map((field) => {
+              const value = guide[field.key];
+              const count = value.trim().length;
+              const short = count < GUIDE_MIN_CHARS;
+              return (
+                <div key={field.key}>
+                  <label className="field-label" htmlFor={`g-${field.key}`}>
+                    {field.label}
+                  </label>
+                  <p className="mb-3 mt-2 max-w-[56ch] text-sm text-muted">
+                    {field.prompt}
+                  </p>
+                  <textarea
+                    id={`g-${field.key}`}
+                    name={field.key}
+                    rows={5}
+                    value={value}
+                    onChange={(e) =>
+                      setGuide((g) => ({ ...g, [field.key]: e.target.value }))
+                    }
+                    placeholder={field.placeholder}
+                    aria-describedby={`g-${field.key}-count`}
+                    aria-invalid={short}
+                    className="field-input"
+                  />
+                  <p
+                    id={`g-${field.key}-count`}
+                    aria-live="polite"
+                    className={`label mt-2 ${short ? "text-amber" : "text-acid"}`}
+                  >
+                    {short
+                      ? `${count} of ${GUIDE_MIN_CHARS} characters`
+                      : `${count} characters`}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* The owner is selling this, so he should be able to look at
+              it. Built on demand, which means opening it after an edit
+              shows the edit. Only offered once the game exists — there
+              is nothing to render before that. */}
+          {editing && (
+            <a
+              href={`/admin/games/${game!.id}/guide.pdf`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="control control-sm mt-8 inline-block"
+            >
+              Open the guide as a customer sees it
+            </a>
+          )}
         </div>
 
         {editing ? (
@@ -287,6 +386,20 @@ export default function GameForm({
           className="mt-6 text-[11px] uppercase tracking-[0.18em] text-danger"
         >
           {state.message}
+        </p>
+      )}
+
+      {/* Said here as well as at the field, because this is where the
+          owner is looking when he wonders why nothing happened. The
+          button is deliberately NOT disabled — the server is the
+          authority on this and refuses with the same sentence, and a
+          dead button with no explanation is how somebody concludes the
+          admin is broken. */}
+      {!guideReady && (
+        <p className="mt-8 border-l-2 border-amber pl-5 text-sm leading-relaxed text-amber">
+          {editing ? "This game cannot be saved" : "This game cannot be created"}{" "}
+          until the three guide sections above are filled in.{" "}
+          {Object.values(guideErrors)[0]}
         </p>
       )}
 

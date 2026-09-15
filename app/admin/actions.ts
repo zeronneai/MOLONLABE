@@ -28,6 +28,7 @@ import {
 } from "@/lib/admin/audit";
 import { DIFFICULTY_RANGES } from "@/lib/game/settings";
 import { DEMO_GAME_PREFIX, isFirearmCategory } from "@/lib/surfaces";
+import { firstGuideError } from "@/lib/guides/fields";
 import { newSeed, redactName, selectWinner, verifyDraw } from "@/lib/draw/select";
 import type { DrawRecord } from "@/lib/draw/presentation";
 
@@ -781,6 +782,27 @@ export async function saveGame(
   const winnerNote = String(formData.get("winner_note") ?? "").trim() || null;
   const itemId = String(formData.get("item_id") ?? "").trim() || null;
 
+  // The guide is the thing being sold, so a game without one is refused.
+  //
+  // This is the enforcement the whole approved structure rests on: the
+  // customer is buying a written guide to the piece, and entry into the
+  // drawing comes with it. Everything else in that document is assembled
+  // from the item — name, brand, specifications, description, photographs
+  // — so a game whose three owner sections are blank is selling the
+  // product page with a border round it.
+  //
+  // It refuses on EDIT as well as on create. Creating a game opens it for
+  // sale in the same breath, so creation is publication and there is no
+  // draft state to hold it in; and a game that could be emptied out after
+  // the fact would make the rule decorative.
+  const guide = {
+    guide_why: String(formData.get("guide_why") ?? "").trim(),
+    guide_care: String(formData.get("guide_care") ?? "").trim(),
+    guide_pairs: String(formData.get("guide_pairs") ?? "").trim(),
+  };
+  const guideProblem = firstGuideError(guide);
+  if (guideProblem) return { status: "error", message: guideProblem };
+
   // Editing: only the words. The numbers are settled.
   if (id) {
     const { error } = await sb
@@ -790,6 +812,7 @@ export async function saveGame(
         description,
         winner_note: winnerNote,
         item_id: itemId,
+        ...guide,
         updated_by_name: actor,
       })
       .eq("id", id);
@@ -819,6 +842,7 @@ export async function saveGame(
       description,
       winner_note: winnerNote,
       item_id: itemId,
+      ...guide,
       total_spots: totalSpots,
       spot_price_cents: spotPriceCents,
       status: "open",

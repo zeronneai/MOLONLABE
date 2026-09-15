@@ -28,6 +28,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { priceCart } from "@/lib/cart/pricing";
 import { getPaymentProvider } from "@/lib/payments";
 import { renderOrderConfirmation } from "@/lib/email/orderConfirmation";
+import { refreshGuide } from "@/lib/guides/build";
 import { sendEmail } from "@/lib/email/send";
 import { notifyOwner } from "@/lib/notify";
 import { logDbError } from "@/lib/db/log";
@@ -509,6 +510,44 @@ export async function submitCheckout(
     revalidatePath("/featured");
   }
 
+  // The guide, built now so the first buyer's link is already warm.
+  //
+  // Lazy on purpose — a game nobody buys into never costs a render — but
+  // "lazy" must not mean "while the customer waits with the email open",
+  // so the first purchase pays for it and every purchase after that is
+  // a fingerprint comparison and nothing else.
+  //
+  // It cannot fail the order. The card has been charged; a PDF that will
+  // not render is not a reason to tell somebody their payment went wrong.
+  // The link self-heals too — /guide rebuilds on demand — so the worst
+  // case here is a customer who follows the link before the owner has
+  // read the message below.
+  //
+  // The email names the guide only when one exists. A link in the
+  // customer's copy that does not open is worse than no link: the
+  // receipt page carries it too, and that page is rendered fresh every
+  // time, so a guide that is fixed an hour later still reaches them.
+  let guideFor: string | null = null;
+  if (cart.spotGame && claimedSpots.length > 0) {
+    const guide = await refreshGuide(sb, cart.spotGame.id);
+    if (guide.ok) {
+      guideFor = guide.itemName;
+    } else {
+      console.error(
+        `Order ${number}: guide not built for ${cart.spotGame.id} — ${guide.message}`,
+      );
+      await notifyOwner({
+        kind: "order_error",
+        severity: "attention",
+        failure: "guide_not_built",
+        message: guide.message,
+        order_number: number,
+        email: data.customer.email,
+        game: cart.spotGame.title,
+      });
+    }
+  }
+
   // Shipped goods are done; collected goods stay reserved until the
   // background check clears at the counter, because a check that fails
   // puts the firearm back on the shelf.
@@ -553,6 +592,7 @@ export async function submitCheckout(
     cardBrand: charge.cardBrand,
     cardLast4: charge.cardLast4,
     confirmationToken: token,
+    guideFor,
   });
 
   // Never allowed to fail the order: sendEmail resolves a result, it does
