@@ -43,6 +43,33 @@ export function suite() {
 /** Resets the double to its seeded state. Call at the top of every test. */
 export const reset = () => fetch(`${DOUBLE}/__reset`);
 
+/** The seeded game, whose prize is the seeded rifle. */
+const SEEDED_GAME = "55555555-5555-4555-8555-555555555555";
+
+/**
+ * Makes the seeded rifle ordinary stock by detaching it from the seeded
+ * game.
+ *
+ * The seeded game's prize IS the rifle, and a prize in an open or full
+ * game cannot be bought — the pricer refuses the line, because somebody
+ * buying the prize outright while others pay for a chance at it is the
+ * failure that rule exists to prevent.
+ *
+ * So any suite that carts the rifle for some OTHER reason — tax, sizes,
+ * a mixed order — has to say so. Call this after every reset() in those
+ * suites; reset() restores the seed, which restores the prize.
+ *
+ * Deliberately not folded into reset(): suites like prizelock and
+ * surfaces depend on the seeded game having a prize, and a reset that
+ * quietly unhooked it would make the guard untestable.
+ */
+export const detachSeededPrize = () =>
+  fetch(`${DOUBLE}/rest/v1/games?id=eq.${SEEDED_GAME}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ item_id: null }),
+  });
+
 /** Everything the double is currently holding. */
 export const dump = async () => (await fetch(`${DOUBLE}/__dump`)).json();
 

@@ -2,7 +2,7 @@
 
 import { chromium } from "playwright";
 import { APP, DOUBLE, CHROMIUM } from "../lib/config.mjs";
-import { artifacts } from "../lib/harness.mjs";
+import { artifacts, detachSeededPrize } from "../lib/harness.mjs";
 
 
 
@@ -77,6 +77,14 @@ await page.screenshot({ path: `${SHOT}/a2-item-sizes.png` });
 await page.getByRole("button", { name: /^Medium/ }).click();
 await page.waitForTimeout(200);
 check("add unlocks once a size is chosen", await page.getByRole("button", { name: "Add to cart" }).isEnabled());
+
+// From here the rifle is ordinary stock, not the seeded game's prize.
+//
+// The two case assertions above NEED it to be a prize — that is what
+// they check. Everything below carts it, and a prize cannot be bought.
+// So the detach sits exactly between the two uses rather than at the top
+// of the file, where it silently broke the checks above.
+await detachSeededPrize();
 
 // A rifle must be untouched by any of this.
 await page.goto(`${APP}/inventory/sig-mpx-carbon`, { waitUntil: "networkidle" });
@@ -176,6 +184,7 @@ check("a sized item with no size chosen is refused",
 // The claim step was refactored to handle two kinds of stock; a rifle
 // must still reserve exactly as it did before.
 await fetch(`${DOUBLE}/__reset`);
+await detachSeededPrize();
 await page.evaluate(() => window.localStorage.removeItem("mlf_cart"));
 await page.goto(`${APP}/inventory/sig-mpx-carbon`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Add to cart" }).click();
