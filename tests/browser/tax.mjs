@@ -20,6 +20,21 @@ const usd = (c) =>
 
 await fetch(`${DOUBLE}/__reset`);
 
+/**
+ * Detach the seeded game from its prize before buying the rifle.
+ *
+ * The seeded game's prize IS the rifle, and a prize in an open game is
+ * refused by the pricer — correctly, since somebody buying the prize
+ * outright while others pay for a chance at it is the failure that rule
+ * exists to prevent. This suite is about tax, so the rifle is
+ * made ordinary stock rather than working around the guard.
+ */
+await fetch(`${DOUBLE}/rest/v1/games?id=eq.55555555-5555-4555-8555-555555555555`, {
+  method: "PATCH",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ item_id: null }),
+});
+
 const browser = await chromium.launch({ executablePath: CHROMIUM });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
 // Cloudinary is unreachable, so the intro game's art fails and it skips

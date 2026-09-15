@@ -24,6 +24,23 @@ const V_M = "aaaaaaaa-0000-4000-8000-000000000002";
  */
 export async function placeMixedOrder() {
   await fetch(`${DOUBLE}/__reset`);
+
+  // Detach the seeded game from its prize before buying the rifle.
+  //
+  // The seeded game's prize IS the rifle, and a prize in an open game is
+  // refused by the pricer — correctly, since somebody buying the prize
+  // outright while others pay for a chance at it is the failure that
+  // rule exists to prevent. This helper is about a MIXED ORDER, so the
+  // rifle is made ordinary stock rather than the guard worked around.
+  await fetch(
+    `${DOUBLE}/rest/v1/games?id=eq.55555555-5555-4555-8555-555555555555`,
+    {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ item_id: null }),
+    },
+  );
+
   const browser = await chromium.launch({ executablePath: CHROMIUM });
   try {
     const ctx = await browser.newContext();
