@@ -198,6 +198,11 @@ the schema check came out clean.
 One thing the baseline cannot do: a dropped column's **data** is gone for
 good. It restores the column, not the values that were in it.
 
+Nor does it carry **storage buckets**. It is generated from the `public`
+schema, and `product-images` and `game-guides` both live in `storage`. A
+database repaired from the baseline has every table it should and no
+buckets at all. See `docs/guides.md` for what `game-guides` needs.
+
 `supabase/repair/2026-09-20-bring-to-head.sql` is the smaller, targeted
 version of the same repair, kept for when you want to read every
 statement before running it. The baseline supersedes it.

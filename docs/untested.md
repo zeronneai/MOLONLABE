@@ -320,6 +320,53 @@ The fix is asserted against the double and against stock PostgreSQL.
 Nobody has loaded the real home page since. `test` should read 5 of 5 and
 `PRUEBA` 12 of 100.
 
+## Added by the guide (2026-09-15)
+
+See `docs/guides.md`. The document itself is asserted on end to end — the
+PDF is decoded and its words read back — but three things about it can
+only be settled on real infrastructure.
+
+### ☐ Cloudinary photographs actually embedding
+
+**The largest of the three.** Every outbound host is blocked from the
+sandbox this was built in, so no guide produced here has ever contained a
+Cloudinary image. The suite proves the path works by serving a PNG from
+the local double, which exercises the fetch, the format sniff and the
+embed — but not Cloudinary's own behaviour.
+
+Two specific things to look at on a real deployment:
+
+- The transform. `guideImageUrl` rewrites `/upload/` to
+  `/upload/f_jpg,q_auto:good,w_1000/`. `f_jpg` rather than `f_auto`
+  deliberately: `f_auto` negotiates from the Accept header and would
+  cheerfully return WebP to a server-side fetch that sends none, and the
+  renderer's decoders handle JPEG and PNG only.
+- A photograph whose URL already carries a transform. The rewrite tries
+  to detect one and leave it alone; a stacked transform is a 400 from
+  Cloudinary, which shows up as a guide with no picture in it.
+
+**How to tell it failed:** the guide renders perfectly, with no
+photographs and no error on the page. The reason is on the server
+console, one line per image, starting `guide image`.
+
+### ☐ The bucket, created for real
+
+The bucket is created by hand or by the migration; either way nothing in
+the suite has ever talked to Supabase Storage. What the double models is
+the shape of the API, not its permissions. Worth confirming after
+creating it: an upload succeeds, a second upload to the same path
+succeeds (the app passes `upsert`), and an anonymous request for
+`/storage/v1/object/public/game-guides/<game id>.pdf` gets **nothing**.
+That last one is the whole reason the bucket is private.
+
+### ☐ A guide opened on a phone
+
+It is sent as a link, `Content-Disposition: inline`, and read almost
+entirely on phones. Nobody has opened one on an actual handset. What to
+look for: whether iOS opens it in place or drops it into Files, whether
+the dark pages read as intended at that size, and whether the running
+header and page number sit where they should on a small screen.
+
 ## An intermittent hydration mismatch, seen only under load (2026-09-12)
 
 **Open. Not diagnosed. Pre-existing — not caused by any change this

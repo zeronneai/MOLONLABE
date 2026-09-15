@@ -26,6 +26,12 @@ Three states and no clock:
 None of them is settable by hand. A status control that could contradict
 the spot rows would be worse than no control.
 
+**Creating a game is publishing it**, which is why the guide's three
+owner sections are demanded at creation and not afterwards. A game whose
+prize has no guide written for it cannot be created and cannot be saved —
+see `docs/guides.md`. That is the only thing standing between the shop
+and selling a document it has not written.
+
 ## Spots are rows, created up front
 
 All N exist from the moment the game does, at `status = 'open'`.

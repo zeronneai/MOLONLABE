@@ -223,9 +223,15 @@ that line.
 
 ### `order_error` → the shop, urgently
 
-Three cases, each with `severity: "urgent"` and a `failure` field naming
-which. **Read `failure`, not `message`** — the message is prose and the
-three payloads differ in shape.
+Four cases, with a `failure` field naming which. **Read `failure`, not
+`message`** — the message is prose and the payloads differ in shape.
+
+`severity` is `"urgent"` for the three where money or stock is in an
+unresolved state and somebody is needed now. The fourth,
+`guide_not_built`, carries `"attention"`: nothing is lost and nothing is
+held, a deliverable is simply missing, and it can wait until the shop
+opens. A notification that shouts about everything gets read as
+furniture.
 
 ```json
 {
@@ -251,7 +257,13 @@ three payloads differ in shape.
 | --- | --- | --- |
 | `charged_not_saved` | **The bad one.** Money moved and nothing recorded it | `transaction_id`, `total_cents`, `email`, `held` |
 | `lines_not_saved` | The order exists with totals but no line items | — |
-| `entries_not_awarded` | The purchase earned entries that were not credited | `email`, `entries_awarded` |
+| `spots_not_sold` | Spots were paid for and are still sitting as held, so they are not in the draw and release themselves in 15 minutes | `email`, `spot_numbers`, `game` |
+| `guide_not_built` | The order is fine; the guide that came with it could not be produced, so the customer's link will not open yet | `email`, `game` |
+
+The third row used to read `entries_not_awarded`, which was the
+entry-program model the fixed-pool rebuild replaced. It is `spots_not_sold`
+and has been since that rebuild; the table said otherwise until
+2026-09-15.
 
 `held` is what checkout is still keeping off the shelf. Stock is claimed
 *before* the card is charged and this path deliberately does not release

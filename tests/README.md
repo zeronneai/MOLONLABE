@@ -74,6 +74,26 @@ a delay, because tokenisation is a network round trip. Every checkout
 test used to stub it synchronously, which left no window to click into —
 so the double-charge bug was structurally impossible to reproduce.
 
+**The double only models what something has used.** Writing `guide`
+found three gaps in one afternoon, all of the same shape — a query form
+the app had used for months and the fixture had never been asked to
+honour. Embedded resources (`select=*,item:items(*)`) came back with no
+embed at all, so every game the app read had the shape of one with a null
+`item_id`. Multi-key ordering was thrown away, because supabase-js sends
+`order=status.asc,created_at.desc` as **one** parameter and the double
+split it on `.`. And `game_spots` had no column defaults, so a game
+created through the admin form — which no other suite does — appeared on
+the front page sold out with nothing sold. None of these could fail a
+suite until a suite asked for them. The lesson is not "fix the double",
+it is that a green run says nothing about the paths nothing exercises.
+
+**A stand-in that says "clean" needs a case where it says "dirty".** The
+guide suite checks that the owner's paid-for words are not in the markup
+of `/featured` or `/games`, and then points the same needle and the same
+helper at the admin form, where they must appear. Without that third
+assertion, two clean results would pass just as happily against a typo in
+the needle, a 404, or a page that failed to render at all.
+
 **A fixture that trips a new guard is the guard working.** Adding the
 early-draw confirmation broke `drawaudit` and `winnernumber` — both have
 deliberately short games, because a partly-sold pool is what makes the
