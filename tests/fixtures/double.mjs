@@ -2,7 +2,7 @@
 // TEST FIXTURE — not shipped code. Everything under test is the app's own.
 
 import http from "node:http";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -97,6 +97,18 @@ const seed = () => ({
   games: [{
     id: GAME, title: "September Rifle Game", item_id: RIFLE, description: null,
     status: "open", winner_note: null, total_spots: 5, spot_price_cents: 3000,
+    // The three guide sections, filled. A game cannot be created without
+    // them, so a seeded game without them would be a state the admin
+    // refuses to produce — and every spot purchase in every suite would
+    // take the "guide could not be built" branch and post an owner
+    // notification that the suite counting notifications did not expect.
+    guide_why:
+      "I have carried one of these for six years and it has never once choked on cheap ammunition.",
+    guide_care:
+      "Strip it every five hundred rounds. Light oil on the rails, nothing in the firing pin channel.",
+    guide_pairs:
+      "A Holosun 507C sits straight on it with no adapter, and a padded case if it lives in a truck.",
+    guide_path: null, guide_fingerprint: null, guide_generated_at: null,
     created_by: null, created_by_name: null, updated_by: null, updated_by_name: null,
     created_at: "2026-08-01T00:00:00Z",
   }],
@@ -129,6 +141,28 @@ let db = seed();
 let failTable = null;
 let mailRefuses = false;
 
+// ---------------------------------------------------------------------
+// Storage
+// ---------------------------------------------------------------------
+// Kept out of `db` on purpose: a built guide is about a megabyte of PDF,
+// and /__dump is read by suites that print what they find. Objects live
+// here and /__storage reports their sizes instead.
+//
+// Buckets are enumerated because "upload to a bucket that does not exist"
+// is a real failure with a distinctive shape — Supabase answers 400 with
+// "Bucket not found" — and it is exactly what happens on a deployment
+// where the bucket was never created. A double that accepts any bucket
+// name would make that untestable.
+const BUCKETS = new Set(["product-images", "game-guides"]);
+let storage = new Map();
+
+const readRaw = (req) =>
+  new Promise((resolve) => {
+    const chunks = [];
+    req.on("data", (c) => chunks.push(c));
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+  });
+
 function test(row, key, value) {
   const negated = value.startsWith("not.");
   const v = negated ? value.slice(4) : value;
@@ -151,16 +185,97 @@ const matches = (row, params) =>
   params.every(([k, val]) =>
     ["select", "order", "limit", "offset", "apikey"].includes(k) ? true : test(row, k, String(val)));
 
+/**
+ * Ordering, the way PostgREST is actually asked for it.
+ *
+ * supabase-js does NOT send one `order` parameter per `.order()` call. It
+ * joins them into one comma-separated value:
+ *
+ *   ?order=status.asc,created_at.desc
+ *
+ * This used to split that whole string on "." and sort by a column called
+ * `status` in a direction called `asc,created_at` — which is to say, it
+ * honoured the first key and silently threw the rest away. `getCurrentGame`
+ * asks for exactly that pair, so with two open games the front page showed
+ * whichever happened to be first in the array rather than the newest.
+ *
+ * Sorted last key first, so the first key wins, as SQL does it.
+ */
 function orderLimit(rows, params) {
-  for (const clause of params.getAll("order")) {
+  const clauses = params
+    .getAll("order")
+    .flatMap((value) => value.split(","))
+    .map((clause) => clause.trim())
+    .filter(Boolean);
+
+  for (const clause of clauses.reverse()) {
     const [col, dir] = clause.split(".");
-    rows = [...rows].sort((a, b) => (a[col] === b[col] ? 0 : (a[col] > b[col] ? 1 : -1) * (dir === "desc" ? -1 : 1)));
+    rows = [...rows].sort((a, b) =>
+      a[col] === b[col] ? 0 : (a[col] > b[col] ? 1 : -1) * (dir === "desc" ? -1 : 1),
+    );
   }
   const limit = params.get("limit");
   return limit ? rows.slice(0, Number(limit)) : rows;
 }
 
 const singular = (req) => (req.headers.accept ?? "").includes("vnd.pgrst.object");
+
+// ---------------------------------------------------------------------
+// Embedded resources
+// ---------------------------------------------------------------------
+// PostgREST resolves `select=*,item:items(*)` into the related row by
+// following the foreign key, and this fixture used to ignore `select`
+// entirely — so every query using that syntax came back with no `item`
+// at all. `getCurrentGame`, `getAllGames` and the guide all ask for it;
+// what they got here was the shape a database with a null item_id would
+// produce, on every game, forever. That is the same class of gap as the
+// schemaless writes: the suite agrees with the code because nothing
+// contradicts it.
+//
+// Only what the app actually uses is modelled: one to-one embed from a
+// foreign key column on the row. Top-level projection is deliberately NOT
+// implemented — this returns whole rows, as it always has — because the
+// app never depends on a column being absent, and half-implementing it is
+// how a fixture starts inventing failures of its own.
+const FOREIGN_KEYS = {
+  games: { items: "item_id" },
+};
+
+/** Parses `item:items(name)` / `items(*)` out of a select clause. */
+function embedsIn(select) {
+  if (!select) return [];
+  const found = [];
+  const re = /(?:([a-z_]+):)?([a-z_]+)\(([^)]*)\)/g;
+  let m;
+  while ((m = re.exec(select))) {
+    found.push({ alias: m[1] ?? m[2], table: m[2], columns: m[3].trim() });
+  }
+  return found;
+}
+
+function withEmbeds(table, rows, select) {
+  const wanted = embedsIn(select);
+  if (wanted.length === 0) return rows;
+  return rows.map((row) => {
+    const out = { ...row };
+    for (const { alias, table: target, columns } of wanted) {
+      const key = FOREIGN_KEYS[table]?.[target];
+      if (!key) continue;
+      const related = (db[target] ?? []).find((r) => r.id === row[key]);
+      if (!related) {
+        out[alias] = null;
+        continue;
+      }
+      out[alias] =
+        columns === "*" || columns === ""
+          ? related
+          : Object.fromEntries(
+              columns.split(",").map((c) => [c.trim(), related[c.trim()]]),
+            );
+    }
+    return out;
+  });
+}
 
 function send(res, status, payload, headers = {}) {
   res.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": "*",
@@ -218,8 +333,27 @@ http.createServer(async (req, res) => {
   const path = url.pathname;
   const params = [...url.searchParams.entries()];
   if (req.method === "OPTIONS") return send(res, 204);
-  if (path === "/__reset") { db = seed(); mailRefuses = false; return send(res, 200, { ok: true }); }
+  if (path === "/__reset") {
+    db = seed();
+    storage = new Map();
+    mailRefuses = false;
+    return send(res, 200, { ok: true });
+  }
   if (path === "/__dump") return send(res, 200, db);
+  // Sizes and types, never the bytes. A suite asserting that a guide was
+  // stored wants to know it is a PDF of plausible size and that it
+  // changed when the game changed; none of that needs a megabyte of
+  // base64 crossing the wire.
+  if (path === "/__storage") {
+    return send(res, 200, [...storage.entries()].map(([key, o]) => ({
+      key,
+      contentType: o.contentType,
+      bytes: o.body.length,
+      // Enough to tell one build from another without shipping either.
+      digest: createHash("sha256").update(o.body).digest("hex").slice(0, 16),
+      at: o.at,
+    })));
+  }
   // Make one table's writes fail, to exercise the paths where the money
   // moved and the database did not keep up.
   if (path === "/__fail") {
@@ -327,6 +461,51 @@ http.createServer(async (req, res) => {
     });
   }
   if (path.startsWith("/auth/v1/")) return send(res, 401, { message: "no session" });
+
+  // Supabase Storage, as storage-js speaks it: one POST/PUT to write an
+  // object and one GET to read it back, both at
+  // /storage/v1/object/<bucket>/<path>.
+  if (path.startsWith("/storage/v1/object/")) {
+    const key = decodeURIComponent(path.slice("/storage/v1/object/".length));
+    const bucket = key.split("/")[0];
+    const notFound = (what) =>
+      send(res, 400, { statusCode: "404", error: "not_found", message: what });
+
+    if (req.method === "POST" || req.method === "PUT") {
+      const body = await readRaw(req);
+      if (!BUCKETS.has(bucket)) return notFound("Bucket not found");
+      // What Supabase answers when an object is already there and the
+      // caller did not ask to overwrite. The app passes upsert, and a
+      // regression that stopped passing it would otherwise show up as a
+      // guide that silently never updates.
+      if (storage.has(key) && req.headers["x-upsert"] !== "true") {
+        return send(res, 409, {
+          statusCode: "409", error: "Duplicate", message: "The resource already exists",
+        });
+      }
+      storage.set(key, {
+        body,
+        contentType: req.headers["content-type"] ?? "application/octet-stream",
+        at: new Date().toISOString(),
+      });
+      return send(res, 200, { Id: randomUUID(), Key: key });
+    }
+
+    if (req.method === "GET") {
+      const object = storage.get(key);
+      if (!object) return notFound("Object not found");
+      res.writeHead(200, {
+        "content-type": object.contentType,
+        "content-length": object.body.length,
+      });
+      return res.end(object.body);
+    }
+
+    if (req.method === "DELETE") {
+      storage.delete(key);
+      return send(res, 200, { message: "Successfully deleted" });
+    }
+  }
 
   if (path.startsWith("/rest/v1/rpc/")) {
     const fn = path.replace("/rest/v1/rpc/", "");
@@ -476,7 +655,11 @@ http.createServer(async (req, res) => {
   // 404 at the bottom, so every count read came back null.
   if (req.method === "HEAD" || req.method === "GET") {
     const matched = db[table].filter((r) => matches(r, params));
-    const rows = orderLimit(matched, url.searchParams);
+    const rows = withEmbeds(
+      table,
+      orderLimit(matched, url.searchParams),
+      url.searchParams.get("select"),
+    );
     // PostgREST returns a count in Content-Range when asked, and returns
     // no body at all for a HEAD-style `head: true` request. Without this
     // the client's `count` comes back null, and any branch that reads it
@@ -513,6 +696,17 @@ http.createServer(async (req, res) => {
       winners: () => ({ drawn_at: new Date().toISOString() }),
       orders: () => ({ created_at: new Date().toISOString() }),
       admin_activity: () => ({ at: new Date().toISOString() }),
+      // `saveGame` lays out the board as {game_id, spot_number} and lets
+      // the column default supply the rest. Without this the rows came
+      // back with no status at all, `game_spots_remaining` counted none
+      // of them as open, and a game created through the admin appeared
+      // on the front page sold out with nothing sold. Every existing
+      // suite missed it because none of them creates a game through the
+      // form — they insert one with the statuses spelled out.
+      game_spots: () => ({
+        status: "open", order_id: null, first_name: null, last_name: null,
+        email: null, phone: null, held_at: null, sold_at: null,
+      }),
     };
     if (DEFAULTS[table] && body) {
       const withDefaults = (r) => ({ ...DEFAULTS[table](), ...r });

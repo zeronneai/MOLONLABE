@@ -73,6 +73,16 @@ export const detachSeededPrize = () =>
 /** Everything the double is currently holding. */
 export const dump = async () => (await fetch(`${DOUBLE}/__dump`)).json();
 
+/**
+ * What is in storage: key, type, size and a digest, never the bytes.
+ *
+ * The digest is what makes "it was rebuilt" and "it was NOT rebuilt"
+ * both assertable. Without it the only evidence of a regeneration is a
+ * timestamp, and a timestamp cannot tell a rebuild from a rewrite of the
+ * same thing.
+ */
+export const storage = async () => (await fetch(`${DOUBLE}/__storage`)).json();
+
 const JSON_HEADERS = { "content-type": "application/json" };
 
 /** POST a row into the double. */
