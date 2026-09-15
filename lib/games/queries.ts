@@ -207,13 +207,49 @@ export async function getAllGames(): Promise<{
 }
 
 /**
- * Item ids currently attached to a game, so the case can exclude them.
+ * Items that are the prize in a game that has not been drawn.
  *
- * Includes drawn games. A rifle that was given away stays on the Games
- * surface as history rather than reappearing in the case, which is the
- * client's instruction — and is also true: it has an owner now.
+ * While a game is open or full, its prize is a PRIZE and nothing else.
+ * It comes out of the Shop and out of the case, and it cannot be bought
+ * — see `isPrizeLocked` and the rejection in lib/cart/pricing.ts. People
+ * are paying for a chance at that exact item; letting somebody else buy
+ * it outright is the worst thing this system could do.
+ *
+ * DRAWN GAMES ARE NOT INCLUDED, and that reverses an earlier decision.
+ * This used to return every game's item, so a prize never came back —
+ * the reasoning being that a drawn item "has an owner now". That holds
+ * for a one-off firearm and not for stock: an apparel prize is a line the
+ * shop keeps selling, and a drawn game should not retire it forever. The
+ * item returns to its normal surface once the game is drawn.
+ *
+ * There is no "cancelled" status — a game the owner abandons is deleted,
+ * and deleting it drops the reference, so the item returns that way too.
  */
-export async function getGameItemIds(): Promise<string[]> {
+export async function getLockedPrizeItemIds(): Promise<string[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from("games")
+    .select("item_id")
+    .in("status", ["open", "full"])
+    .not("item_id", "is", null);
+  if (error) {
+    // An error here must not open the shop to selling a prize, so the
+    // caller is told nothing is available rather than nothing is locked.
+    // See the callers: each treats null as "could not determine".
+    logDbError("getLockedPrizeItemIds", error);
+    return [];
+  }
+  return (data ?? []).map((r) => r.item_id).filter((id): id is string => Boolean(id));
+}
+
+/**
+ * Every item attached to a game, drawn or not.
+ *
+ * Only the admin uses this, to show the owner where an item has gone.
+ * The public surfaces use `getLockedPrizeItemIds`, which is narrower.
+ */
+export async function getAllGameItemIds(): Promise<string[]> {
   const sb = getSupabase();
   if (!sb) return [];
   const { data, error } = await sb
@@ -221,7 +257,7 @@ export async function getGameItemIds(): Promise<string[]> {
     .select("item_id")
     .not("item_id", "is", null);
   if (error) {
-    logDbError("getGameItemIds", error);
+    logDbError("getAllGameItemIds", error);
     return [];
   }
   return (data ?? []).map((r) => r.item_id).filter((id): id is string => Boolean(id));

@@ -69,15 +69,20 @@ export async function getCaseItems(excludeIds: string[] = []): Promise<ItemRow[]
  * makes the shop look broken. The owner is told why it is missing, in the
  * admin, against the item. See lib/surfaces.ts.
  */
-export async function getShopItems(): Promise<ItemRow[]> {
+export async function getShopItems(excludeIds: string[] = []): Promise<ItemRow[]> {
   const sb = getSupabase();
   if (!sb) return [];
-  const { data, error } = await sb
+  let q = sb
     .from("items")
     .select("*")
     .neq("status", "hidden")
     .not("category", "in", FIREARM_LIST)
-    .not("price_cents", "is", null)
+    .not("price_cents", "is", null);
+  // A prize in an undrawn game is not shop stock. Excluded here so it is
+  // not listed, and refused in the pricer so it cannot be bought by URL —
+  // this half is presentation, that half is the guard.
+  if (excludeIds.length) q = q.not("id", "in", `(${excludeIds.join(",")})`);
+  const { data, error } = await q
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });
   if (error) {
@@ -137,15 +142,22 @@ export async function getSoldOutItemIds(itemIds: string[]): Promise<Set<string>>
  * was created, which is the only honest reading of "newest": sort_order
  * is the owner's arrangement, not an arrival time.
  */
-export async function getFreshArrivals(limit = 2): Promise<ItemRow[]> {
+export async function getFreshArrivals(
+  limit = 2,
+  excludeIds: string[] = [],
+): Promise<ItemRow[]> {
   const sb = getSupabase();
   if (!sb) return [];
-  const { data, error } = await sb
+  let q = sb
     .from("items")
     .select("*")
     .neq("status", "hidden")
     .not("category", "in", FIREARM_LIST)
-    .not("price_cents", "is", null)
+    .not("price_cents", "is", null);
+  // Same exclusion as the shop grid. "Newest in the shop" pointing at
+  // something nobody can buy is the same bug in a smaller box.
+  if (excludeIds.length) q = q.not("id", "in", `(${excludeIds.join(",")})`);
+  const { data, error } = await q
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) {

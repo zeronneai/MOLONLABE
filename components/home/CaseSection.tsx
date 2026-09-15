@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import Reveal from "@/components/motion/Reveal";
 import { getCaseItems, itemImages } from "@/lib/db/items";
-import { getGameItemIds } from "@/lib/games/queries";
+import { getLockedPrizeItemIds } from "@/lib/games/queries";
 
 /**
  * The third action: ask about a firearm.
@@ -15,7 +15,7 @@ import { getGameItemIds } from "@/lib/games/queries";
  * Three items, because it is a taste. The case itself is a page.
  */
 export default async function CaseSection() {
-  const inGames = await getGameItemIds();
+  const inGames = await getLockedPrizeItemIds();
   const items = (await getCaseItems(inGames)).slice(0, 3);
 
   return (

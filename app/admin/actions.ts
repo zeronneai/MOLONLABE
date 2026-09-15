@@ -313,6 +313,30 @@ export async function duplicateItem(id: string): Promise<void> {
   if (copy?.id) redirect(`/admin/inventory/${copy.id}`);
 }
 
+/**
+ * The first free slug at or after `base`: base, base-2, base-3…
+ *
+ * Checks against EVERY item including archived ones, because the unique
+ * constraint does — suggesting a slug that is itself taken by something
+ * invisible would be the same dead end one step further along.
+ */
+async function freeSlug(
+  sb: NonNullable<Awaited<ReturnType<typeof getSessionSupabase>>>,
+  base: string,
+): Promise<string> {
+  const { data } = await sb
+    .from("items")
+    .select("slug")
+    .like("slug", `${base}%`);
+  const taken = new Set((data ?? []).map((r) => r.slug));
+  if (!taken.has(base)) return base;
+  for (let n = 2; n < 100; n += 1) {
+    const candidate = `${base}-${n}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+  return `${base}-${Date.now().toString(36)}`;
+}
+
 export async function saveItem(
   _prev: ActionState,
   formData: FormData,
@@ -440,10 +464,36 @@ export async function saveItem(
 
   if (error || !saved) {
     console.error("saveItem:", error?.message);
-    return {
-      status: "error",
-      message: error?.code === "23505" ? "That slug is taken." : "Save failed — try again.",
-    };
+    // "That slug is taken." with nothing else is a dead end: the owner
+    // cannot see WHICH item holds it, and the likeliest holder is an
+    // archived one he cannot see in the list either. So the row is
+    // looked up and named, its status is given, and a free alternative
+    // is offered so there is a way forward rather than a wall.
+    if (error?.code === "23505") {
+      const { data: holder } = await sb
+        .from("items")
+        .select("name, slug, status")
+        .eq("slug", row.slug)
+        .maybeSingle();
+      const suggestion = await freeSlug(sb, row.slug);
+      if (!holder) {
+        return {
+          status: "error",
+          message: `The web address "${row.slug}" is already used by another item. Try "${suggestion}".`,
+        };
+      }
+      const archived = holder.status === ARCHIVED_STATUS;
+      return {
+        status: "error",
+        message:
+          `The web address "${row.slug}" belongs to "${holder.name}"` +
+          (archived
+            ? ", which is archived. Archived items keep their address so old links do not break and so a restore cannot collide. "
+            : ` (${holder.status}). `) +
+          `Use "${suggestion}" instead, or change that item's address first.`,
+      };
+    }
+    return { status: "error", message: "Save failed — try again." };
   }
 
   // Sizes are only synced while the toggle is on. Turning it off leaves

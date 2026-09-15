@@ -4,6 +4,7 @@ import ShopBrowser from "@/components/shop/ShopBrowser";
 import EmptyState from "@/components/ui/EmptyState";
 import Reveal from "@/components/motion/Reveal";
 import { getShopItems, getSoldOutItemIds, itemImages } from "@/lib/db/items";
+import { getLockedPrizeItemIds } from "@/lib/games/queries";
 import { SHOP_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
@@ -16,7 +17,10 @@ export const metadata: Metadata = {
 export const revalidate = 300;
 
 export default async function ShopPage() {
-  const rows = await getShopItems();
+  // A prize in a running game is not shop stock — see
+  // getLockedPrizeItemIds. The cart refuses it too; this only keeps it
+  // off the grid.
+  const rows = await getShopItems(await getLockedPrizeItemIds());
   // Only sized items can be sold out this way; a one-off accessory is
   // governed by its status instead.
   const soldOut = await getSoldOutItemIds(

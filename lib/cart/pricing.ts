@@ -103,6 +103,7 @@ const REJECTION = {
   sizeGone: "That size has sold out.",
   noSizes: "No sizes are in stock.",
   oneGame: "Spots in one game at a time — this cart already holds another.",
+  isPrize: "This is the prize in a game that is running. It is not for sale until the game is drawn.",
   gameClosed: "That game has sold out. Nothing has been charged.",
 } as const;
 
@@ -257,14 +258,37 @@ export async function priceCart(
   }
 
   const itemIds = [...new Set([...wanted.values()].map((w) => w.itemId))];
-  const { data: rows, error } =
-    itemIds.length > 0
-      ? await sb.from("items").select("*").in("id", itemIds)
-      : { data: [], error: null };
+  const [{ data: rows, error }, { data: prizeRows, error: prizeError }] =
+    await Promise.all([
+      itemIds.length > 0
+        ? sb.from("items").select("*").in("id", itemIds)
+        : Promise.resolve({ data: [], error: null }),
+      // Which of these are the prize in a game that has not been drawn.
+      // This is THE guard against buying a prize outright while other
+      // people are paying for a chance at it — the Shop listing merely
+      // hides it, and a direct URL bypasses a listing.
+      itemIds.length > 0
+        ? sb
+            .from("games")
+            .select("item_id")
+            .in("status", ["open", "full"])
+            .in("item_id", itemIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
   if (error) {
     logDbError("priceCart", error);
     return { ...empty, rejected: rejectedSpots };
   }
+  if (prizeError) {
+    // Refuse rather than guess. Not knowing whether something is a prize
+    // and selling it anyway is the failure this exists to prevent, and a
+    // customer told to try again is recoverable.
+    logDbError("priceCart prize check", prizeError);
+    return { ...empty, rejected: rejectedSpots };
+  }
+  const lockedPrizes = new Set(
+    (prizeRows ?? []).map((g) => g.item_id).filter((id): id is string => Boolean(id)),
+  );
 
   const byId = new Map((rows ?? []).map((r) => [r.id, r]));
 
@@ -302,6 +326,13 @@ export async function priceCart(
     }
     if (item.status !== "available") {
       rejected.push({ key, itemId, name: item.name, reason: REJECTION.unavailable });
+      continue;
+    }
+    // Checked before the price, because "this is a prize" is the true
+    // reason and "it has no price" would be a confusing one to show for
+    // an item that plainly had a price yesterday.
+    if (lockedPrizes.has(itemId)) {
+      rejected.push({ key, itemId, name: item.name, reason: REJECTION.isPrize });
       continue;
     }
     if (item.price_cents == null || item.price_cents <= 0) {

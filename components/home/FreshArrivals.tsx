@@ -3,9 +3,10 @@ import Reveal from "@/components/motion/Reveal";
 import EditorialIndex from "@/components/inventory/EditorialIndex";
 import EmptyState from "@/components/ui/EmptyState";
 import { getFreshArrivals, toIndexItem } from "@/lib/db/items";
+import { getLockedPrizeItemIds } from "@/lib/games/queries";
 
 export default async function FreshArrivals() {
-  const items = await getFreshArrivals();
+  const items = await getFreshArrivals(2, await getLockedPrizeItemIds());
 
   return (
     <section className="ground-ink">

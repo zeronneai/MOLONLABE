@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getCaseItems, toIndexItem } from "@/lib/db/items";
-import { getGameItemIds } from "@/lib/games/queries";
+import { getLockedPrizeItemIds } from "@/lib/games/queries";
 import InventoryBrowser from "@/components/inventory/InventoryBrowser";
 import EmptyState from "@/components/ui/EmptyState";
 import { IN_THE_CASE } from "@/content/en";
@@ -18,7 +18,7 @@ export default async function InTheCasePage() {
   // A firearm in a game belongs on the Games surface for as long as
   // the game exists, and stays there as history once it is drawn. It is
   // not in the case any more — it has an owner.
-  const inGames = await getGameItemIds();
+  const inGames = await getLockedPrizeItemIds();
   const items = await getCaseItems(inGames);
 
   return (

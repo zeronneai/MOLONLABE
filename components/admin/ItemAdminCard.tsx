@@ -5,6 +5,7 @@
 
 import { useTransition } from "react";
 import Link from "next/link";
+import { formatUsd } from "@/lib/money";
 import {
   archiveItem,
   duplicateItem,
@@ -70,7 +71,16 @@ export default function ItemAdminCard({ item }: { item: ItemRow }) {
           </div>
           <p className="label mt-1 text-muted">
             {archived && <span className="text-bone">Archived · </span>}
-            {item.category} · {item.price_display ?? "—"}
+            {/* The ONLINE price when there is one, because that is what
+                the customer is charged. This showed price_display only,
+                so a priced shirt read "Call for price" in the admin — the
+                default the form used to put there — while the shop
+                charged $32. Two different answers to "what does this
+                cost" on two screens the same person uses. */}
+            {item.category} ·{" "}
+            {item.price_cents != null
+              ? formatUsd(item.price_cents)
+              : (item.price_display ?? "—")}
           </p>
         </div>
       </div>

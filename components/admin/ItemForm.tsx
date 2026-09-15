@@ -103,15 +103,36 @@ export default function ItemForm({
           <label className="field-label" htmlFor="f-brand">Brand</label>
           <input id="f-brand" name="brand" defaultValue={item?.brand ?? ""} className="field-input" />
         </div>
-        <div>
-          <label className="field-label" htmlFor="f-price">Price display</label>
-          <input
-            id="f-price"
-            name="price_display"
-            defaultValue={item?.price_display ?? "Call for price"}
-            className="field-input"
-          />
-        </div>
+        {/* Only the field that applies to this category is rendered.
+            Both used to show at once with no explanation of which won,
+            and the owner had to guess.
+
+            Which DOES win, for the record: `price_cents`. Every surface
+            prefers it and falls back to the display text only when it is
+            null — so there is no showing one figure and charging another.
+            But an item with both filled had dead text sitting in it,
+            which reads like a setting that does nothing. Now the two
+            cannot both be filled from this form. */}
+        {isFirearmCategory(category) ? (
+          <div>
+            <label className="field-label" htmlFor="f-price">
+              Price to show
+            </label>
+            <input
+              id="f-price"
+              name="price_display"
+              defaultValue={item?.price_display ?? "Call for price"}
+              className="field-input"
+            />
+            <p className="label mt-2 max-w-[44ch] text-muted">
+              Text, not a charge. It appears on the page beside the
+              enquiry button. Nobody is billed from it — a firearm is
+              never sold through the cart.
+            </p>
+          </div>
+        ) : (
+          <input type="hidden" name="price_display" value={item?.price_display ?? ""} />
+        )}
         {/* A firearm has no online price, and is not offered one.
             The surface an item appears on is derived from its category,
             so a priced firearm would not reach the Shop anyway — but
@@ -143,8 +164,9 @@ export default function ItemForm({
               }
               className="field-input"
             />
-            <p className="label mt-2 text-muted">
-              Without a price it stays out of the Shop — there is nothing a
+            <p className="label mt-2 max-w-[44ch] text-muted">
+              This is what the customer is charged. Leave it blank and the
+              item stays out of the Shop — there would be nothing a
               customer could do with it. Tax is added automatically at
               checkout; you do not set it here.
             </p>

@@ -17,6 +17,7 @@ import { ProductJsonLd } from "@/components/seo/StructuredData";
 import TrackView from "@/components/analytics/TrackView";
 import PurchasePanel from "@/components/inventory/PurchasePanel";
 import { getItemVariants } from "@/lib/db/items";
+import { getLockedPrizeItemIds } from "@/lib/games/queries";
 import { needsFirearmDisclaimer } from "@/lib/admin/constants";
 
 
@@ -74,6 +75,11 @@ export default async function ItemPage({ params }: Params) {
   // rather than an omission.
   const variants = item.has_variants ? await getItemVariants(item.id) : [];
 
+  // Is this item the prize in a game that has not been drawn? If so the
+  // page stays reachable and sells nothing. The cart refuses it as well —
+  // this is the explanation, that is the guard.
+  const isPrize = (await getLockedPrizeItemIds()).includes(item.id);
+
   return (
     <div className="lg:flex">
       <ProductJsonLd item={item} image={images[0]} />
@@ -104,15 +110,33 @@ export default async function ItemPage({ params }: Params) {
           {item.brand && <span className="label text-muted">{item.brand}</span>}
         </div>
 
-        <PurchasePanel
-          itemId={item.id}
-          priceCents={item.price_cents}
-          priceDisplay={item.price_display}
-          fulfillment={item.fulfillment_type === "ship" ? "ship" : "pickup"}
-          available={status === "available"}
-          variants={variants}
-          showDisclaimer={needsFirearmDisclaimer(item.category)}
-        />
+        {isPrize ? (
+          /* The prize in a running game. The product page still resolves
+             — an old link should not 404 — but it sells nothing, because
+             somebody buying this outright while others pay for a chance
+             at it is the failure this whole rule exists to prevent. */
+          <div className="mt-8 border-l-2 border-amber pl-5">
+            <p className="display text-2xl">NOT FOR SALE.</p>
+            <p className="mt-3 max-w-[52ch] text-sm text-muted">
+              This is the prize in a game that is running right now. It
+              goes back on sale if the game is drawn without it being won
+              outright.
+            </p>
+            <Link href="/featured" className="cta-secondary mt-5 inline-block">
+              See the game →
+            </Link>
+          </div>
+        ) : (
+          <PurchasePanel
+            itemId={item.id}
+            priceCents={item.price_cents}
+            priceDisplay={item.price_display}
+            fulfillment={item.fulfillment_type === "ship" ? "ship" : "pickup"}
+            available={status === "available"}
+            variants={variants}
+            showDisclaimer={needsFirearmDisclaimer(item.category)}
+          />
+        )}
 
         {item.short_desc && (
           <p className="mt-6 max-w-[60ch] text-muted">{item.short_desc}</p>

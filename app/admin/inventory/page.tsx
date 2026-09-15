@@ -59,13 +59,19 @@ export default async function AdminInventory({
 
   const soldBy = new Map((sold ?? []).map((s) => [s.game_id, s.sold] as const));
 
-  // The item attached to a game is managed from the game, not from here.
-  const inGames = new Set(
-    (games ?? []).map((g) => g.item_id).filter((id): id is string => Boolean(id)),
-  );
+  // An item attached to a game is managed from the game — but it must
+  // still be VISIBLE here. It used to be filtered out of both lists while
+  // the Games section listed games rather than items, so an item put up
+  // as a prize vanished from the admin completely. An item the owner
+  // cannot see is an item he cannot fix.
+  const gameOf = new Map<string, { title: string; status: string; id: string }>();
+  for (const g of games ?? []) {
+    if (g.item_id) gameOf.set(g.item_id, { title: g.title, status: g.status, id: g.id });
+  }
   const rows = items ?? [];
-  const forSale = rows.filter((i) => !isFirearmCategory(i.category) && !inGames.has(i.id));
-  const inCase = rows.filter((i) => isFirearmCategory(i.category) && !inGames.has(i.id));
+  const asPrize = rows.filter((i) => gameOf.has(i.id));
+  const forSale = rows.filter((i) => !isFirearmCategory(i.category) && !gameOf.has(i.id));
+  const inCase = rows.filter((i) => isFirearmCategory(i.category) && !gameOf.has(i.id));
 
   const filtering = Boolean(q || status);
 
@@ -174,6 +180,46 @@ export default async function AdminInventory({
           )}
         </SurfaceSection>
 
+        {/* ------------------------------------------ prizes in games */}
+        {/* Every item lands in exactly one of the four sections. The
+            arithmetic is asserted at the bottom of the page rather than
+            trusted, because the failure mode is silence. */}
+        {asPrize.length > 0 && (
+          <SurfaceSection surface="games" count={asPrize.length}>
+            <p className="mb-4 max-w-[56ch] text-sm text-muted">
+              These are prizes. While their game is open or full they are
+              out of the Shop and out of the case, and they cannot be
+              bought — customers are paying for a chance at them. They go
+              back to normal once the game is drawn.
+            </p>
+            {asPrize.map((item) => {
+              const g = gameOf.get(item.id)!;
+              const locked = g.status === "open" || g.status === "full";
+              return (
+                <div key={item.id} className="border-b hairline py-4">
+                  <div className="flex items-baseline justify-between gap-4">
+                    <Link
+                      href={`/admin/inventory/${item.id}`}
+                      className="min-w-0 flex-1 truncate text-sm"
+                    >
+                      {item.name}
+                    </Link>
+                    <Link
+                      href={`/admin/games/${g.id}`}
+                      className={`label shrink-0 ${locked ? "text-amber" : "text-muted"}`}
+                    >
+                      {locked ? "prize · not for sale" : "was a prize · back on sale"}
+                    </Link>
+                  </div>
+                  <p className="label mt-1 text-muted">
+                    {g.title} · {g.status}
+                  </p>
+                </div>
+              );
+            })}
+          </SurfaceSection>
+        )}
+
         {/* --------------------------------------------- in the case */}
         <SurfaceSection
           surface="case"
@@ -191,6 +237,18 @@ export default async function AdminInventory({
           )}
         </SurfaceSection>
       </div>
+
+      {/* The guarantee, checked rather than assumed: every item the query
+          returned is in one of the sections above. If this ever shows, an
+          item is invisible again and the owner is told so instead of
+          being left to notice. */}
+      {rows.length !== forSale.length + inCase.length + asPrize.length && (
+        <p className="mt-8 border-l-2 border-danger pl-5 text-sm text-danger">
+          {rows.length - (forSale.length + inCase.length + asPrize.length)} item(s)
+          are not shown in any section above. This is a bug — tell Purple
+          Roots, and use the search to reach them meanwhile.
+        </p>
+      )}
 
       {rows.length === 0 && !filtering && (
         <div className="mt-10">
