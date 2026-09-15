@@ -1,5 +1,10 @@
 // Which functions the anonymous key may call.
 //
+// ADDING A FUNCTION? Read docs/function-grants.md first. The short
+// version: every `create function` needs a matching
+// `revoke execute … from public` — naming `anon` alone does nothing —
+// and this suite is what catches it if you forget.
+//
 // WHY THIS EXISTS
 //
 // Six migrations revoked EXECUTE on the money and inventory functions
@@ -27,8 +32,17 @@ const { check, note, report } = suite();
 const scratch = await scratchDatabase("rpcgrants");
 const { sql, trySql } = scratch;
 
-// The only function the public pages call. It returns one integer and
-// changes nothing.
+/**
+ * The allow-list. Every other function in the schema must be
+ * unreachable by `anon`.
+ *
+ * Keep this short and make each entry argue for itself. Adding a name
+ * here is a decision to expose a function to anyone who opens devtools,
+ * because the anon key is in the browser bundle on every page load.
+ *
+ *   game_spots_remaining — takes a game id, returns one integer, writes
+ *     nothing. The game page and the cart pricer call it on every render.
+ */
 const PUBLIC_OK = ["game_spots_remaining"];
 
 try {

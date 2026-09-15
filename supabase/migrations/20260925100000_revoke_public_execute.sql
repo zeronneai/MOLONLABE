@@ -1,5 +1,8 @@
 -- Close the privileged functions to the public key.
 --
+-- The rule this establishes, and what enforces it, is written up for
+-- whoever adds the next function: docs/function-grants.md
+--
 -- WHAT WAS WRONG
 --
 -- Six migrations carefully revoked EXECUTE on the money and inventory

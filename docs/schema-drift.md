@@ -217,6 +217,24 @@ casualties of a cap. A truncated dump therefore fails in the most
 misleading possible direction: it manufactures exactly the symptom you are
 looking for. Use `scripts/check-schema.sql`.
 
+## Function privileges are a separate trap
+
+Nothing in this document would have caught the one that mattered most: a
+`revoke execute … from anon` that reads correctly, runs without error,
+and leaves the function callable by anyone with the public key, because
+the grant is held by PUBLIC rather than by `anon`. Six migrations carried
+that mistake.
+
+It is not a drift problem — the schema was exactly what the chain said it
+should be — so `check-schema.sql` and `baseline.sql` are both silent on
+it by design. See `docs/function-grants.md`, and
+`tests/db/rpcgrants.mjs` for the check that does catch it.
+
+One overlap worth knowing here: changing a function's argument list
+requires a DROP, and a dropped-and-recreated function comes back with the
+default PUBLIC grant. So a migration that looks like a pure rename can
+re-open a function that was closed.
+
 ## What this document does not cover
 
 `baseline.sql` and `check-schema.sql` are verified against stock
