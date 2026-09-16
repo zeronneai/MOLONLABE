@@ -112,6 +112,9 @@ export interface Database {
           guide_path: string | null;
           guide_fingerprint: string | null;
           guide_generated_at: string | null;
+          // What the last build managed. Unequal is shown to the owner.
+          guide_images_wanted: number | null;
+          guide_images_used: number | null;
           created_by: string | null;
           created_by_name: string | null;
           updated_by: string | null;
@@ -133,6 +136,8 @@ export interface Database {
           guide_path?: string | null;
           guide_fingerprint?: string | null;
           guide_generated_at?: string | null;
+          guide_images_wanted?: number | null;
+          guide_images_used?: number | null;
           created_by_name?: string | null;
           updated_by_name?: string | null;
           created_at?: string | null;
@@ -152,6 +157,8 @@ export interface Database {
           guide_path?: string | null;
           guide_fingerprint?: string | null;
           guide_generated_at?: string | null;
+          guide_images_wanted?: number | null;
+          guide_images_used?: number | null;
           created_by_name?: string | null;
           updated_by_name?: string | null;
           created_at?: string | null;

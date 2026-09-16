@@ -316,7 +316,9 @@ create table if not exists public.games (
   guide_pairs text,
   guide_path text,
   guide_fingerprint text,
-  guide_generated_at timestamp with time zone
+  guide_generated_at timestamp with time zone,
+  guide_images_wanted integer,
+  guide_images_used integer
 );
 alter table public.games add column if not exists id uuid default gen_random_uuid();
 do $$ begin
@@ -402,6 +404,8 @@ alter table public.games add column if not exists guide_pairs text;
 alter table public.games add column if not exists guide_path text;
 alter table public.games add column if not exists guide_fingerprint text;
 alter table public.games add column if not exists guide_generated_at timestamp with time zone;
+alter table public.games add column if not exists guide_images_wanted integer;
+alter table public.games add column if not exists guide_images_used integer;
 
 create table if not exists public.inquiries (
   id uuid default gen_random_uuid() not null,
@@ -2381,6 +2385,8 @@ CREATE TRIGGER settings_stamp_authorship BEFORE INSERT OR UPDATE ON public.setti
 comment on view public.game_scoreboard is 'Sold count per game, for every surface including the anonymous one. Frozen to winners.entry_total once drawn. Exposes no buyer data — a count cannot identify anyone — so it is safe to grant to anon, which counting from game_spots is not.';
 comment on column public.games.guide_care is 'Owner: maintenance and handling notes. Printed in the guide.';
 comment on column public.games.guide_fingerprint is 'Hash of everything the PDF is rendered from. Mismatch = rebuild.';
+comment on column public.games.guide_images_used is 'Photographs that actually reached the page. Fewer than wanted = say so.';
+comment on column public.games.guide_images_wanted is 'Photographs the item had when the guide was last built.';
 comment on column public.games.guide_pairs is 'Owner: what he would pair with it. Printed in the guide.';
 comment on column public.games.guide_why is 'Owner: why this particular piece was chosen. Printed in the guide.';
 comment on column public.games.total_spots is 'Fixed at creation. The spots rows are created with the game and the
