@@ -89,6 +89,16 @@ rather than in `npm test`, because the thing it guards only exists once
 the code has been bundled, and because a check somebody has to remember
 is the same as no check. See `docs/guides.md`.
 
+**A fixture in the wrong format tests nothing.** The guide suite's
+photograph was a PNG. It proved the image path end to end — fetch,
+decode, embed — and it proved it about a format the catalogue does not
+contain. Every real product photograph is WebP, which react-pdf cannot
+read, so every deployed guide came out with blank space where the
+pictures should be while the assertion stayed green. The fixture is a
+real WebP now, and the assertion looks for `/DCTDecode` in the PDF
+rather than for "an image", because "there is an image in here" is
+exactly what passed the whole time.
+
 **The double only models what something has used.** Writing `guide`
 found three gaps in one afternoon, all of the same shape — a query form
 the app had used for months and the fixture had never been asked to

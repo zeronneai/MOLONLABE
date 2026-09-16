@@ -183,6 +183,67 @@ in `lib/guides/theme.ts` is the only thing that has to change — swap
 
 ---
 
+## Photographs
+
+### The catalogue is WebP, and the renderer cannot read WebP
+
+The admin compresses product photographs client side before uploading
+them to Supabase Storage, and the result is `.webp`. `@react-pdf/renderer`
+reads JPEG and PNG and nothing else. So **every photograph the shop has
+ever uploaded was undecodable**, and the first deployed guides came out
+with blank space where the pictures should have been.
+
+`lib/guides/images.ts` fetches the bytes and converts them with **sharp**
+before the renderer sees them: resized to 1400px, flattened onto the page
+colour so a transparent cut-out does not lose its edges on a dark page,
+and written out as JPEG at quality 82.
+
+The alternative was changing the admin to upload JPEG. It was rejected,
+and the reasoning is worth keeping:
+
+- **It fixes nothing that exists.** The owner is not re-uploading his
+  catalogue, so every photograph already in the bucket stays broken.
+- **It makes the site worse to fix the PDF.** WebP is the right format for
+  the pages people browse and the wrong one for a PDF. The conversion
+  belongs at the point of use, not at the point of storage.
+
+sharp comes with Next already; it is named in `package.json` so that stays
+deliberate rather than lucky. It also reads AVIF, HEIF, TIFF and GIF —
+more than the `product-images` bucket will ever accept — so this is not a
+fix for WebP specifically, it is a fix for "whatever the catalogue holds".
+
+**sharp resolves its native binary the same dangerous way pdfkit resolves
+its fonts** — ``require(`@img/sharp-${platform}/sharp.node`)`` — so it is
+covered by `check:bundle` below.
+
+### A guide with no pictures is the worst thing this can produce
+
+Worse than one that fails, because it looks finished. The guide opens,
+the type is right, the sections are right, the legal text is right, and
+the photographs are simply absent. Nobody finds out until a customer who
+paid for it does — which is exactly how it shipped.
+
+So the shortfall is data, not a log line. Every build records
+`guide_images_wanted` and `guide_images_used` on the game, and when they
+disagree three things happen:
+
+1. **The admin says so against that game**, in danger red: "The last guide
+   came out with 1 of 3 photographs. It reads correctly and has blank
+   space where the pictures should be."
+2. **There is a Build it again link** beside the preview. This is not
+   decoration: a guide is only rebuilt when its inputs change, and a
+   photograph that failed to fetch leaves the inputs identical, so without
+   it nothing would ever try again. It clears the fingerprint and the next
+   read rebuilds.
+3. **The owner is told once per rebuild** — `guide_missing_images`, at
+   `attention` rather than `urgent`. Once per *rebuild*, not per purchase,
+   because a guide whose inputs have not moved is not rebuilt.
+
+It does **not** refuse to generate. A prize with no photographs at all is
+legitimate — the three written sections are what is being sold — and
+refusing would trade "a guide with no pictures" for "no guide", which is
+worse for somebody who has already paid.
+
 ## The deployment bug, and the check that exists because of it
 
 The first deployment of the guide failed on a live purchase:

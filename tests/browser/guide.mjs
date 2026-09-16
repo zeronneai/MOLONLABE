@@ -35,7 +35,16 @@ const { check, note, report } = suite();
 
 const SEEDED_GAME = "55555555-5555-4555-8555-555555555555";
 const PRIZE = "99999999-9999-4999-8999-999999999999";
-const PHOTO = `${DOUBLE}/storage/v1/object/product-images/guide-test.png`;
+// WEBP, not PNG, and that is the whole point of the fixture.
+//
+// The admin compresses client side before uploading to Supabase Storage,
+// so every product photograph the shop has ever uploaded is a .webp —
+// and react-pdf reads JPEG and PNG. The first deployed guide came out
+// with no pictures in it at all, looking otherwise perfect. A PNG fixture
+// passed that whole time.
+const PHOTO = `${DOUBLE}/storage/v1/object/product-images/guide-test.webp`;
+// A URL in the bucket with nothing behind it, for the shortfall below.
+const MISSING_PHOTO = `${DOUBLE}/storage/v1/object/product-images/gone.webp`;
 
 const GUIDE = {
   why: "I put this one up because it is the rifle I hand people when they ask what to buy once and never think about again.",
@@ -55,7 +64,17 @@ async function shopper() {
   return page;
 }
 
-/** A small valid PNG, so the image path is exercised rather than skipped. */
+/** A real WebP, made the way the admin makes one. */
+async function webpBytes(width = 600, height = 400) {
+  const sharp = (await import("sharp")).default;
+  return sharp({
+    create: { width, height, channels: 3, background: { r: 40, g: 60, b: 90 } },
+  })
+    .webp()
+    .toBuffer();
+}
+
+/** A small valid PNG, kept so both decode paths stay exercised. */
 function pngBytes(width = 600, height = 400) {
   const raw = Buffer.alloc((width * 3 + 1) * height);
   let o = 0;
@@ -101,10 +120,15 @@ await reset();
 // A prize worth writing about: brand, description, specifications and a
 // photograph, so the assembled half of the guide is exercised and not
 // just the three typed sections.
+const photoBytes = await webpBytes();
+check("the fixture photograph really is a WebP",
+  photoBytes.subarray(0, 4).toString() === "RIFF" &&
+    photoBytes.subarray(8, 12).toString() === "WEBP",
+  `${photoBytes.subarray(8, 12).toString()}, ${photoBytes.length} bytes`);
 await fetch(PHOTO, {
   method: "POST",
-  headers: { "content-type": "image/png", "x-upsert": "true" },
-  body: pngBytes(),
+  headers: { "content-type": "image/webp", "x-upsert": "true" },
+  body: photoBytes,
 });
 await insert("items", {
   id: PRIZE,
@@ -223,11 +247,25 @@ check("and the attorney's disclaimer, verbatim",
   has(text, "transferred through a federally licensed firearms dealer"));
 note(`the guide is ${pdfPageCount(previewBody)} pages, ${previewBody.length} bytes`);
 
-// The photograph. A missing one is dropped silently by design, so the
-// only way to know it was embedded is to look for the image object.
-check("the photograph is embedded",
-  previewBody.toString("latin1").includes("/Subtype /Image"),
-  "looked for an image XObject");
+// The photograph, which went in as WebP and has to come out as JPEG —
+// react-pdf reads JPEG and PNG, and the catalogue is all WebP. Looking
+// for DCTDecode rather than just an image object, because "there is an
+// image in here" would pass on a PNG fixture and that is exactly what it
+// did while every real guide came out blank.
+const previewRaw = previewBody.toString("latin1");
+check("the WebP photograph is embedded, converted to JPEG",
+  previewRaw.includes("/Subtype /Image") && previewRaw.includes("/DCTDecode"),
+  previewRaw.includes("/Subtype /Image")
+    ? previewRaw.includes("/DCTDecode")
+      ? "image XObject, DCTDecode"
+      : "an image, but NOT a JPEG"
+    : "NO image XObject at all");
+
+// And the shop has a record of what it managed, not just a log line.
+const built = (await dump()).games.find((g) => g.id === game.id);
+check("the build records how many photographs it got",
+  built?.guide_images_wanted === 1 && built?.guide_images_used === 1,
+  `${built?.guide_images_used} of ${built?.guide_images_wanted}`);
 
 // The wording. The guide is about the piece and says nothing about what
 // the purchase entitles anybody to — that wording is the attorney's and
@@ -490,7 +528,75 @@ check("a game with no prize tells the owner why, rather than 500ing",
 // Checked against the raw HTML rather than the rendered text, because
 // serialised props are in the source and not on the screen.
 // =====================================================================
-// 13. The money path does not import the renderer
+// 13. A guide that came out short says so
+// =====================================================================
+// The worst outcome this system can produce is a guide that renders
+// beautifully with blank space where the photographs should be: it looks
+// finished, so nobody finds out until a customer who paid for it does.
+// It shipped that way once. The shortfall is now recorded against the
+// game and shown to the owner.
+//
+// It is NOT a refusal. A prize with no photographs at all is legitimate
+// — the three written sections are what is being sold — and refusing
+// would trade "a guide with no pictures" for "no guide", which is worse
+// for somebody who has already paid.
+{
+  // Two photographs, one of which is not there.
+  await update("items", `id=eq.${PRIZE}`, { images: [PHOTO, MISSING_PHOTO] });
+
+  const short = await owner.request.get(`${APP}/admin/games/${game.id}/guide.pdf`);
+  check("a guide with an unreachable photograph is still produced",
+    short.status() === 200 && isPdf(Buffer.from(await short.body())),
+    `${short.status()}`);
+
+  const row = (await dump()).games.find((g) => g.id === game.id);
+  check("and the shortfall is recorded against the game",
+    row?.guide_images_wanted === 2 && row?.guide_images_used === 1,
+    `${row?.guide_images_used} of ${row?.guide_images_wanted}`);
+
+  await owner.goto(`${APP}/admin/games/${game.id}`, { waitUntil: "networkidle" });
+  const adminText = await owner.locator("body").innerText();
+  check("and the admin says so where the owner will see it",
+    /1 of 2\s+photographs/i.test(adminText.replace(/\s+/g, " ")),
+    (adminText.match(/[^\n]*came out with[^\n]*/i) ?? ["NOT SAID"])[0].slice(0, 90),
+  );
+  check("and offers a way to try again",
+    (await owner.getByRole("link", { name: /build it again/i }).count()) > 0);
+
+  // Now put the missing photograph where it belongs. The item's image
+  // URLs have NOT changed, so the fingerprint is identical and an
+  // ordinary open would serve the short guide for ever — which is the
+  // whole reason the rebuild link exists.
+  await fetch(MISSING_PHOTO, {
+    method: "POST",
+    headers: { "content-type": "image/webp", "x-upsert": "true" },
+    body: await webpBytes(400, 300),
+  });
+
+  await owner.request.get(`${APP}/admin/games/${game.id}/guide.pdf`);
+  const stillShort = (await dump()).games.find((g) => g.id === game.id);
+  check("opening it again does NOT pick the photograph up — inputs unchanged",
+    stillShort?.guide_images_used === 1,
+    `${stillShort?.guide_images_used} of ${stillShort?.guide_images_wanted}`);
+
+  await owner.request.get(`${APP}/admin/games/${game.id}/guide.pdf?rebuild=1`);
+  const rebuilt = (await dump()).games.find((g) => g.id === game.id);
+  check("rebuilding does",
+    rebuilt?.guide_images_wanted === 2 && rebuilt?.guide_images_used === 2,
+    `${rebuilt?.guide_images_used} of ${rebuilt?.guide_images_wanted}`);
+
+  await owner.goto(`${APP}/admin/games/${game.id}`, { waitUntil: "networkidle" });
+  const afterText = await owner.locator("body").innerText();
+  check("and the warning is gone",
+    !has(afterText, "came out with"),
+    (afterText.match(/[^\n]*Last built[^\n]*/i) ?? ["no line at all"])[0].slice(0, 60));
+
+  // Put the item back for anything after this.
+  await update("items", `id=eq.${PRIZE}`, { images: [PHOTO] });
+}
+
+// =====================================================================
+// 14. The money path does not import the renderer
 // =====================================================================
 // Read from the source, because this cannot be observed from the outside
 // and it is the guard that a live checkout already paid for.

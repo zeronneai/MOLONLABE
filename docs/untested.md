@@ -368,31 +368,33 @@ one is the moment to run `check:bundle`, not the deploy afterwards.
 ## Added by the guide (2026-09-15)
 
 See `docs/guides.md`. The document itself is asserted on end to end — the
-PDF is decoded and its words read back — but three things about it can
-only be settled on real infrastructure.
+PDF is decoded and its words read back — but some of it can only be
+settled on real infrastructure, and the first item below is the one that
+already went wrong.
 
-### ☐ Cloudinary photographs actually embedding
+### ✅ Photographs embed — 2026-09-16, the hard way
 
-**The largest of the three.** Every outbound host is blocked from the
-sandbox this was built in, so no guide produced here has ever contained a
-Cloudinary image. The suite proves the path works by serving a PNG from
-the local double, which exercises the fetch, the format sniff and the
-embed — but not Cloudinary's own behaviour.
+Found in production, not here. The photographs were never a Cloudinary
+problem: the catalogue moved to Supabase Storage and the admin uploads
+WebP, which the renderer cannot read, so **every** guide came out with
+blank space where the pictures should be. Fixed by converting with sharp
+at the point of use — see `docs/guides.md`.
 
-Two specific things to look at on a real deployment:
+Two things this cost that are worth remembering. The suite's image
+fixture was a PNG, so it asserted the embed path worked while the only
+format the catalogue actually contains was failing; it is a real WebP
+now, and the assertion looks for `/DCTDecode` rather than merely "an
+image", because "there is an image in here" is what passed all along.
+And the failure was silent by design — one line per image on a server
+log — which is why the shortfall is now recorded on the game, shown in
+the admin, and sent to the owner.
 
-- The transform. `guideImageUrl` rewrites `/upload/` to
-  `/upload/f_jpg,q_auto:good,w_1000/`. `f_jpg` rather than `f_auto`
-  deliberately: `f_auto` negotiates from the Accept header and would
-  cheerfully return WebP to a server-side fetch that sends none, and the
-  renderer's decoders handle JPEG and PNG only.
-- A photograph whose URL already carries a transform. The rewrite tries
-  to detect one and leave it alone; a stacked transform is a 400 from
-  Cloudinary, which shows up as a guide with no picture in it.
-
-**How to tell it failed:** the guide renders perfectly, with no
-photographs and no error on the page. The reason is on the server
-console, one line per image, starting `guide image`.
+**Still open on a real deployment:** the Cloudinary path. The legacy
+catalogue shots are still Cloudinary URLs and no guide produced here has
+ever contained one, because every outbound host is blocked from this
+sandbox. sharp copes with whatever comes back, so the remaining risk is
+narrow — a stacked transform returning a 400. If a guide is ever short a
+photograph, the admin now says so.
 
 ### ☐ The bucket, created for real
 

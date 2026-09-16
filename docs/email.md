@@ -223,15 +223,14 @@ that line.
 
 ### `order_error` → the shop, urgently
 
-Four cases, with a `failure` field naming which. **Read `failure`, not
+Five cases, with a `failure` field naming which. **Read `failure`, not
 `message`** — the message is prose and the payloads differ in shape.
 
 `severity` is `"urgent"` for the three where money or stock is in an
-unresolved state and somebody is needed now. The fourth,
-`guide_not_built`, carries `"attention"`: nothing is lost and nothing is
-held, a deliverable is simply missing, and it can wait until the shop
-opens. A notification that shouts about everything gets read as
-furniture.
+unresolved state and somebody is needed now. The two about guides carry
+`"attention"`: nothing is lost and nothing is held, a deliverable is
+missing or incomplete, and it can wait until the shop opens. A
+notification that shouts about everything gets read as furniture.
 
 ```json
 {
@@ -259,6 +258,7 @@ furniture.
 | `lines_not_saved` | The order exists with totals but no line items | — |
 | `spots_not_sold` | Spots were paid for and are still sitting as held, so they are not in the draw and release themselves in 15 minutes | `email`, `spot_numbers`, `game` |
 | `guide_not_built` | The order is fine; the guide that came with it could not be produced, so the customer's link will not open yet | `email`, `game` |
+| `guide_missing_images` | Worse in one way, because it looks fine: the guide opens and reads correctly with blank space where the photographs should be | `email`, `game`, `images_used`, `images_wanted` |
 
 The third row used to read `entries_not_awarded`, which was the
 entry-program model the fixed-pool rebuild replaced. It is `spots_not_sold`
