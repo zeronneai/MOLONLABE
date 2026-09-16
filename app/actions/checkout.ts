@@ -701,7 +701,32 @@ export async function submitCheckout(
       try {
         const { refreshGuide } = await import("@/lib/guides/build");
         const guide = await refreshGuide(sb, gameId);
-        if (guide.ok) return;
+
+        // A guide that renders perfectly with blank space where the
+        // photographs should be is the worst outcome this produces —
+        // it looks finished, so nobody finds out until a customer who
+        // paid for it does. Told once per REBUILD, not per purchase:
+        // a guide whose inputs have not moved is not rebuilt, so this
+        // does not repeat itself for every spot sold.
+        if (guide.ok) {
+          if (guide.rebuilt && guide.imagesUsed < guide.imagesWanted) {
+            console.error(
+              `Order ${number}: guide for ${gameId} has ${guide.imagesUsed} of ${guide.imagesWanted} photographs`,
+            );
+            await notifyOwner({
+              kind: "order_error",
+              severity: "attention",
+              failure: "guide_missing_images",
+              message: guide.dropped.join(", "),
+              order_number: number,
+              email: data.customer.email,
+              game: gameTitle,
+              images_used: guide.imagesUsed,
+              images_wanted: guide.imagesWanted,
+            });
+          }
+          return;
+        }
         console.error(`Order ${number}: guide not built for ${gameId} — ${guide.message}`);
         await notifyOwner({
           kind: "order_error",

@@ -82,14 +82,18 @@ export type OwnerNotification =
        * wear the same word.
        */
       severity: "urgent" | "attention";
-      /** Which of the four failures. `charged_not_saved` is the bad one. */
+      /** Which of the five failures. `charged_not_saved` is the bad one. */
       failure:
         | "charged_not_saved"
         | "lines_not_saved"
         | "spots_not_sold"
         // The money and the spots are fine; the guide the customer paid
         // for could not be produced, so their link will not open.
-        | "guide_not_built";
+        | "guide_not_built"
+        // Worse in one way than the one above, because it looks fine: the
+        // guide opens, reads correctly, and has blank space where the
+        // photographs should be.
+        | "guide_missing_images";
       message: string;
       order_number: string;
       transaction_id?: string;
@@ -108,6 +112,9 @@ export type OwnerNotification =
        * on the site forever, which is why the recovery steps name it.
        */
       held?: HeldItem[];
+      /** `guide_missing_images`: how many made it, out of how many. */
+      images_used?: number;
+      images_wanted?: number;
     };
 
 export type HeldItem = {
@@ -380,6 +387,32 @@ function orderErrorSummary(
     ].join("\n");
   }
 
+  if (n.failure === "guide_missing_images") {
+    return [
+      "A GUIDE WENT OUT WITHOUT ITS PHOTOGRAPHS.",
+      "",
+      `It has ${n.images_used ?? 0} of ${n.images_wanted ?? 0}. The order is fine and the`,
+      "guide opens and reads correctly — it simply has blank space where",
+      "the pictures of the piece should be, which is the kind of fault a",
+      "customer notices and nobody else does.",
+      "",
+      ...facts,
+      ...(n.game ? [`Game: ${n.game}`] : []),
+      ...(n.message ? ["", `What was left out: ${n.message}`] : []),
+      "",
+      "WHAT TO DO",
+      "",
+      "1. Open the game in the admin. It says the same thing there, and",
+      "   there is a button to build it again.",
+      "2. If rebuilding does not fix it, the photographs on the item are",
+      "   the problem — re-upload them and rebuild.",
+      "3. Nothing needs refunding. The customer's link keeps working and",
+      "   picks up the new version once it is built.",
+      "",
+      `${AGENCY_NAME}: ${AGENCY_CONTACT}`,
+    ].join("\n");
+  }
+
   if (n.failure === "guide_not_built") {
     return [
       "A GUIDE COULD NOT BE PRODUCED.",
@@ -464,6 +497,7 @@ export function subjectFor(n: OwnerNotification): string {
         // Not urgent in the same sense — nothing is lost and nothing is
         // held — so the subject does not shout. It still names the order.
         guide_not_built: `Guide not produced for order ${n.order_number}`,
+        guide_missing_images: `Guide went out with ${n.images_used ?? 0} of ${n.images_wanted ?? 0} photographs — ${n.game ?? n.order_number}`,
       }[n.failure];
   }
 }

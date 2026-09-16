@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
  * authenticated role, which is the one thing that bucket must not have.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
@@ -32,6 +32,19 @@ export async function GET(
 
   const sb = getServiceSupabase();
   if (!sb) return new NextResponse("Storage is not configured.", { status: 503 });
+
+  // `?rebuild=1` — the remedy for a guide that came out short.
+  //
+  // A guide is only rebuilt when its inputs change, which is right for
+  // the ordinary case and useless for this one: a photograph that failed
+  // to fetch leaves the inputs identical, so nothing would ever try
+  // again. Clearing the fingerprint is what makes the next read build it.
+  //
+  // Only the owner can reach this, and it does not delete anything: the
+  // stored guide keeps serving until a new one replaces it.
+  if (new URL(request.url).searchParams.get("rebuild") === "1") {
+    await sb.from("games").update({ guide_fingerprint: null }).eq("id", id);
+  }
 
   const guide = await readGuide(sb, id);
   if (!guide.ok) {

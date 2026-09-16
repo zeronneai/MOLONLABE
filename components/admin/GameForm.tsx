@@ -92,6 +92,14 @@ export default function GameForm({
   const guideErrors = guideFieldErrors(guide);
   const guideReady = Object.keys(guideErrors).length === 0;
 
+  // What the last build managed, when there has been one. Null on a game
+  // whose guide has never been produced, which is not a fault and is not
+  // reported as one.
+  const wanted = game?.guide_images_wanted ?? null;
+  const used = game?.guide_images_used ?? null;
+  const shortOfImages = wanted !== null && used !== null && used < wanted;
+  const builtCleanly = wanted !== null && used !== null && used === wanted && wanted > 0;
+
   return (
     <form action={action} className="max-w-2xl">
       {game && <input type="hidden" name="id" value={game.id} />}
@@ -204,14 +212,57 @@ export default function GameForm({
               shows the edit. Only offered once the game exists — there
               is nothing to render before that. */}
           {editing && (
-            <a
-              href={`/admin/games/${game!.id}/guide.pdf`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="control control-sm mt-8 inline-block"
-            >
-              Open the guide as a customer sees it
-            </a>
+            <>
+              {/* What the last build actually managed.
+                  A guide that renders perfectly with blank space where
+                  the photographs should be is the worst thing this can
+                  produce: it looks finished. It went out that way once,
+                  because the whole catalogue is WebP and the renderer
+                  reads JPEG and PNG. It is said here, against the game,
+                  rather than left on a server log. */}
+              {shortOfImages && (
+                <p className="mt-8 border-l-2 border-danger pl-5 text-sm leading-relaxed text-danger">
+                  The last guide came out with{" "}
+                  <strong>
+                    {game!.guide_images_used} of {game!.guide_images_wanted}
+                  </strong>{" "}
+                  {game!.guide_images_wanted === 1 ? "photograph" : "photographs"}.
+                  It reads correctly and has blank space where the pictures
+                  should be. Build it again below; if that does not fix it,
+                  the photographs on the item are the problem.
+                </p>
+              )}
+              {builtCleanly && (
+                <p className="label mt-8 text-muted">
+                  Last built with {game!.guide_images_used} of{" "}
+                  {game!.guide_images_wanted}{" "}
+                  {game!.guide_images_wanted === 1 ? "photograph" : "photographs"}
+                </p>
+              )}
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                <a
+                  href={`/admin/games/${game!.id}/guide.pdf`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="control control-sm"
+                >
+                  Open the guide as a customer sees it
+                </a>
+                {/* A guide is rebuilt when its inputs change, and a
+                    photograph that failed to fetch leaves the inputs
+                    identical — so without this there is nothing that
+                    would ever try again. */}
+                <a
+                  href={`/admin/games/${game!.id}/guide.pdf?rebuild=1`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`control control-sm ${shortOfImages ? "tone-acid" : ""}`}
+                >
+                  Build it again
+                </a>
+              </div>
+            </>
           )}
         </div>
 
