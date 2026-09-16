@@ -28,7 +28,14 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { priceCart } from "@/lib/cart/pricing";
 import { getPaymentProvider } from "@/lib/payments";
 import { renderOrderConfirmation } from "@/lib/email/orderConfirmation";
-import { refreshGuide } from "@/lib/guides/build";
+// Aliased, because there is already a local `after` in this file holding
+// the game's state once the spots are sold, and a silent shadow of one by
+// the other is exactly the kind of thing that only shows up in production.
+import { after as afterResponse } from "next/server";
+// NOT `lib/guides/build`. That module imports the PDF renderer, and this
+// is the file that moves money — see the note at the warm-up below, and
+// the one at the top of lib/guides/availability.ts.
+import { guideSubject } from "@/lib/guides/availability";
 import { sendEmail } from "@/lib/email/send";
 import { notifyOwner } from "@/lib/notify";
 import { logDbError } from "@/lib/db/log";
@@ -510,43 +517,22 @@ export async function submitCheckout(
     revalidatePath("/featured");
   }
 
-  // The guide, built now so the first buyer's link is already warm.
+  // Whether there is a guide to promise. This ASKS THE ROW, and renders
+  // nothing — see lib/guides/availability.ts, which is a separate module
+  // from the renderer for a reason worth reading before merging them.
   //
-  // Lazy on purpose — a game nobody buys into never costs a render — but
-  // "lazy" must not mean "while the customer waits with the email open",
-  // so the first purchase pays for it and every purchase after that is
-  // a fingerprint comparison and nothing else.
-  //
-  // It cannot fail the order. The card has been charged; a PDF that will
-  // not render is not a reason to tell somebody their payment went wrong.
-  // The link self-heals too — /guide rebuilds on demand — so the worst
-  // case here is a customer who follows the link before the owner has
-  // read the message below.
-  //
-  // The email names the guide only when one exists. A link in the
-  // customer's copy that does not open is worse than no link: the
-  // receipt page carries it too, and that page is rendered fresh every
-  // time, so a guide that is fixed an hour later still reaches them.
-  let guideFor: string | null = null;
-  if (cart.spotGame && claimedSpots.length > 0) {
-    const guide = await refreshGuide(sb, cart.spotGame.id);
-    if (guide.ok) {
-      guideFor = guide.itemName;
-    } else {
-      console.error(
-        `Order ${number}: guide not built for ${cart.spotGame.id} — ${guide.message}`,
-      );
-      await notifyOwner({
-        kind: "order_error",
-        severity: "attention",
-        failure: "guide_not_built",
-        message: guide.message,
-        order_number: number,
-        email: data.customer.email,
-        game: cart.spotGame.title,
-      });
-    }
-  }
+  // Building it here was the first version and it was wrong. Not because
+  // the build failed — it did, on the first deployment, when pdfkit's
+  // standard fonts had not been traced into the bundle — but because of
+  // where the failure landed. Importing the renderer throws unhandled
+  // promise rejections at module scope when those files are missing, so
+  // the danger was never in the call: it was in the import, in the module
+  // graph of the one action that moves money. The build now happens after
+  // the response, behind a dynamic import, at the bottom of this file.
+  const guideFor =
+    cart.spotGame && claimedSpots.length > 0
+      ? await guideSubject(sb, cart.spotGame.id)
+      : null;
 
   // Shipped goods are done; collected goods stay reserved until the
   // background check clears at the counter, because a check that fails
@@ -683,6 +669,59 @@ export async function submitCheckout(
   revalidatePath("/games");
   revalidatePath("/in-the-case");
   revalidatePath("/featured");
+
+  // The guide, warmed AFTER the response.
+  //
+  // Everything above has happened: the card is charged, the order and its
+  // lines are written, the spots are sold, the email has gone, the owner
+  // has been told, and the idempotency key is settled. Nothing below can
+  // change any of it, and that is the whole point of it being here rather
+  // than in the middle.
+  //
+  // Three guards, because one was not enough last time:
+  //
+  //   `afterResponse` runs the callback once the response has been sent,
+  //   so even a process that dies in here dies holding a receipt the
+  //   customer already has.
+  //
+  //   The import is DYNAMIC. @react-pdf/renderer is not in this action's
+  //   module graph, so it cannot throw while the graph loads — which is
+  //   what it does when pdfkit's font files are missing, out of band,
+  //   where no catch can reach it.
+  //
+  //   The catch is around both the import and the call.
+  //
+  // And if all three fail, nothing is lost: /guide builds on demand, so
+  // the customer's link produces the document the first time they follow
+  // it. This is a warm-up, not the delivery.
+  if (cart.spotGame && claimedSpots.length > 0) {
+    const gameId = cart.spotGame.id;
+    const gameTitle = cart.spotGame.title;
+    afterResponse(async () => {
+      try {
+        const { refreshGuide } = await import("@/lib/guides/build");
+        const guide = await refreshGuide(sb, gameId);
+        if (guide.ok) return;
+        console.error(`Order ${number}: guide not built for ${gameId} — ${guide.message}`);
+        await notifyOwner({
+          kind: "order_error",
+          severity: "attention",
+          failure: "guide_not_built",
+          message: guide.message,
+          order_number: number,
+          email: data.customer.email,
+          game: gameTitle,
+        });
+      } catch (error) {
+        // Reached only if the renderer could not even be loaded. Logged
+        // rather than notified: at that point the guides are broken for
+        // every game, not for this order, and one message per purchase
+        // would bury the one that says so.
+        console.error(`Order ${number}: guide warm-up threw —`, error);
+      }
+    });
+  }
+
   return { ok: true, orderNumber: number, token };
 }
 

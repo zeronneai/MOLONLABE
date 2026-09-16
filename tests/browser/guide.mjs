@@ -21,8 +21,10 @@
 // would pass just as well on a blank one.
 
 import zlib from "node:zlib";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { chromium } from "playwright";
-import { APP, CHROMIUM, DOUBLE } from "../lib/config.mjs";
+import { APP, CHROMIUM, DOUBLE, ROOT } from "../lib/config.mjs";
 import {
   suite, reset, dump, storage, insert, update,
   page as newPage, adminPage, acceptStub, has,
@@ -295,6 +297,20 @@ check("a section cannot be emptied after the fact",
 // =====================================================================
 // 6. The buyer's copy
 // =====================================================================
+// Put back to the state a never-built guide is in, so that the guide
+// turning up after the purchase below is evidence the WARM-UP ran, and
+// not evidence that section 3 already built one.
+await fetch(`${DOUBLE}/storage/v1/object/game-guides/${game.id}.pdf`, {
+  method: "DELETE",
+});
+await update("games", `id=eq.${game.id}`, {
+  guide_path: null,
+  guide_fingerprint: null,
+});
+check("the guide is cleared before the purchase",
+  (await storage()).filter((o) => o.key.startsWith("game-guides/")).length === 0,
+  JSON.stringify((await storage()).map((o) => o.key)));
+
 const buyer = await shopper();
 await buyer.goto(`${APP}/featured`, { waitUntil: "networkidle" });
 await buyer.waitForTimeout(400);
@@ -319,6 +335,17 @@ const paid = await buyer
   .then(() => true)
   .catch(() => false);
 check("the purchase completed", paid);
+
+// The warm-up. It runs AFTER the response, so the receipt is already on
+// screen — poll rather than assume, and keep the window short enough
+// that "it eventually happened" cannot pass for "it happened".
+let warmed = [];
+for (let i = 0; i < 20 && warmed.length === 0; i++) {
+  warmed = (await storage()).filter((o) => o.key.startsWith("game-guides/"));
+  if (warmed.length === 0) await buyer.waitForTimeout(250);
+}
+check("buying warms the guide without anybody opening a link",
+  warmed.length === 1, warmed.map((o) => `${o.key} ${o.bytes}b`).join(", ") || "never appeared");
 
 const receipt = await buyer.locator("body").innerText();
 check("the receipt offers the guide",
@@ -462,6 +489,43 @@ check("a game with no prize tells the owner why, rather than 500ing",
 // component would put the paid content in the markup of a free page.
 // Checked against the raw HTML rather than the rendered text, because
 // serialised props are in the source and not on the screen.
+// =====================================================================
+// 13. The money path does not import the renderer
+// =====================================================================
+// Read from the source, because this cannot be observed from the outside
+// and it is the guard that a live checkout already paid for.
+//
+// Importing @react-pdf/renderer is not inert: when pdfkit's font files
+// are missing from a deployment it throws four unhandled promise
+// rejections at module scope, attached to no promise anybody can await.
+// No try/catch reaches that, and a serverless runtime may kill the
+// invocation over it — which is why the one action that charges cards
+// must not have the renderer in its module graph at all. The warm-up
+// uses a dynamic import, after the response.
+{
+  const source = readFileSync(join(ROOT, "app/actions/checkout.ts"), "utf8");
+  const staticImports = [...source.matchAll(/^import[^;]*?from\s+"([^"]+)"/gm)].map(
+    (m) => m[1],
+  );
+  const offenders = staticImports.filter(
+    (m) => m.includes("guides/build") || m.includes("react-pdf"),
+  );
+  check("checkout has no static import of the PDF renderer",
+    offenders.length === 0, offenders.join(", ") || "clean");
+  check("and reaches it through a dynamic import instead",
+    /await import\(\s*"@\/lib\/guides\/build"\s*\)/.test(source),
+    (source.match(/await import\([^)]*\)/) ?? ["NOT FOUND"])[0]);
+  check("and only after the response has gone",
+    /afterResponse\(/.test(source),
+    (source.match(/[^\n]*afterResponse\([^\n]*/) ?? ["NOT DEFERRED"])[0].trim().slice(0, 50));
+  // The same search, pointed at a file that DOES import it, so a clean
+  // result above cannot come from a broken regex.
+  const route = readFileSync(join(ROOT, "app/guide/[order]/route.ts"), "utf8");
+  check("the same search finds the import where it belongs",
+    /^import[^;]*?from\s+"@\/lib\/guides\/build"/m.test(route),
+    "app/guide/[order]/route.ts");
+}
+
 const NEEDLE = GUIDE.why.slice(0, 60);
 for (const path of ["/featured", "/games"]) {
   const html = await (await fetch(`${APP}${path}`)).text();
