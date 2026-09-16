@@ -389,12 +389,18 @@ And the failure was silent by design — one line per image on a server
 log — which is why the shortfall is now recorded on the game, shown in
 the admin, and sent to the owner.
 
-**Still open on a real deployment:** the Cloudinary path. The legacy
-catalogue shots are still Cloudinary URLs and no guide produced here has
-ever contained one, because every outbound host is blocked from this
+**Still open on a real deployment:** the Cloudinary path. The older
+catalogue entries still point at Cloudinary and no guide produced here
+has ever contained one, because every outbound host is blocked from this
 sandbox. sharp copes with whatever comes back, so the remaining risk is
-narrow — a stacked transform returning a 400. If a guide is ever short a
-photograph, the admin now says so.
+narrow — a dead asset, or a stacked transform returning a 400.
+
+`npm run audit:cloudinary` lists which items are affected, prizes first,
+because an item that is not a prize never reaches a guide. `--check`
+fetches each one **with the transform the guide would ask for**, so a
+stacked transform fails there rather than as a blank space in a PDF three
+weeks later. Nothing about it is automatic: it needs live credentials and
+it answers a question that is asked once.
 
 ### ☐ The bucket, created for real
 

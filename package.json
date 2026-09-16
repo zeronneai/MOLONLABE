@@ -9,6 +9,7 @@
     "lint": "next lint",
     "check:schema": "node scripts/check-schema.mjs",
     "check:bundle": "node scripts/check-bundle.mjs",
+    "audit:cloudinary": "node scripts/cloudinary-audit.mjs",
     "walkthrough:capture": "node scripts/walkthrough/capture.mjs",
     "walkthrough:build": "node scripts/walkthrough/build.mjs",
     "test": "node tests/run.mjs",

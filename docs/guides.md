@@ -216,6 +216,31 @@ fix for WebP specifically, it is a fix for "whatever the catalogue holds".
 its fonts** — ``require(`@img/sharp-${platform}/sharp.node`)`` — so it is
 covered by `check:bundle` below.
 
+### Which photographs are still on Cloudinary
+
+The older catalogue entries predate the move to Supabase Storage and
+still point at Cloudinary. They are the only URLs in the guide's path
+that nothing in the test suite has ever been able to reach.
+
+```
+$ npm run audit:cloudinary            # list them, prizes first
+$ npm run audit:cloudinary -- --check # and fetch each one
+```
+
+Prizes first because an item that is not a prize never reaches a guide,
+and the list is much shorter once you know which is which. `--check`
+asks for each URL **with the transform the guide would ask for**, so a
+stacked transform shows up as a 400 there rather than as blank space in
+a PDF. Exit 1 when anything needs looking at.
+
+The same question as SQL, for the Supabase editor, is in the script's
+header comment.
+
+Note that the Cloudinary URLs in `lib/brand.ts`, `lib/hero/`,
+`lib/game/assets.ts` and `components/home/ShopStory.tsx` are the logo,
+the hero video and the arcade art. None of them is an item photograph,
+so none of them can reach a guide.
+
 ### A guide with no pictures is the worst thing this can produce
 
 Worse than one that fails, because it looks finished. The guide opens,
