@@ -118,18 +118,42 @@ const RENDERER = "node_modules/@react-pdf/renderer/";
 
 const REQUIRED = [
   {
-    at: "lib/guides/fonts/Archivo-Regular.ttf",
+    label: "lib/guides/fonts/Archivo-Regular.ttf",
+    matches: (at) => at === "lib/guides/fonts/Archivo-Regular.ttf",
     why: "lib/guides/fonts.ts reads it from process.cwd() at render time",
   },
-  { at: "lib/guides/fonts/Archivo-SemiBold.ttf", why: "same" },
-  { at: "lib/guides/fonts/Archivo-ExtraBold.ttf", why: "same" },
   {
-    at: "node_modules/pdfkit/js/standard-fonts/Helvetica.cjs",
+    label: "lib/guides/fonts/Archivo-SemiBold.ttf",
+    matches: (at) => at === "lib/guides/fonts/Archivo-SemiBold.ttf",
+    why: "same",
+  },
+  {
+    label: "lib/guides/fonts/Archivo-ExtraBold.ttf",
+    matches: (at) => at === "lib/guides/fonts/Archivo-ExtraBold.ttf",
+    why: "same",
+  },
+  {
+    label: "node_modules/pdfkit/js/standard-fonts/Helvetica.cjs",
+    matches: (at) => at.includes("pdfkit/js/standard-fonts/Helvetica.cjs"),
     why: "pdfkit requires it through a runtime createRequire; react-pdf loads it on import",
   },
   {
-    at: "node_modules/pdfkit/js/standard-fonts/chunks/",
+    label: "node_modules/pdfkit/js/standard-fonts/chunks/",
+    matches: (at) => at.includes("pdfkit/js/standard-fonts/chunks/"),
     why: "every standard font requires a shared chunk from here",
+  },
+  {
+    // Matched as a pattern, not a path, for two reasons. The platform is
+    // in the package name — darwin-arm64 on the machine this may be run
+    // on, linux-x64 on the one it deploys to — and the name sharp asks
+    // for is not the name on disk: it requires
+    // `@img/sharp-${platform}/sharp.node`, which that package's `exports`
+    // map resolves to `lib/sharp-${platform}.node`. Asserting the string
+    // from sharp's source fails against a bundle that is perfectly fine,
+    // which is how a check gets deleted. It did, on the first run here.
+    label: "a native sharp binary for this platform",
+    matches: (at) => /@img\/sharp-[^/]+\/lib\/[^/]+\.node$/.test(at),
+    why: "sharp resolves it with require(`@img/sharp-${platform}/sharp.node`) — the same runtime-computed require that cost us the fonts",
   },
 ];
 
@@ -144,10 +168,10 @@ check(
   carriers.length ? `${carriers.length} of ${entries.length}` : "NONE — is this check still needed?",
 );
 
-for (const { at, why } of REQUIRED) {
-  const missing = carriers.filter((e) => !has(e, at));
+for (const { label, matches, why } of REQUIRED) {
+  const missing = carriers.filter((e) => !e.files.some((f) => matches(f.at)));
   check(
-    `every entry carrying the renderer also carries ${at}`,
+    `every entry carrying the renderer also carries ${label}`,
     carriers.length > 0 && missing.length === 0,
     missing.length ? `missing from ${missing.map((e) => e.name).join(", ")}` : why,
   );
@@ -187,7 +211,14 @@ check(
 const relevant = (entry) =>
   entry.files
     .map((f) => f.at)
-    .filter((at) => at.includes("pdfkit/") || at.includes("@react-pdf/") || at.includes("lib/guides/fonts/"))
+    .filter(
+      (at) =>
+        at.includes("pdfkit/") ||
+        at.includes("@react-pdf/") ||
+        at.includes("lib/guides/fonts/") ||
+        at.includes("/sharp") ||
+        at.includes("@img/"),
+    )
     .sort()
     .join("\n");
 
@@ -202,6 +233,17 @@ const PROBE = `
   let rejections = [];
   process.on("unhandledRejection", (e) => rejections.push(String(e && e.message || e)));
   (async () => {
+    // sharp first: it is the other dependency that resolves a file by a
+    // path built at runtime, and the guide's photographs all go through
+    // it. A webp round trip is the exact work the catalogue needs.
+    const sharp = require("sharp");
+    const webp = await sharp({ create: { width: 32, height: 32, channels: 3, background: { r: 1, g: 2, b: 3 } } }).webp().toBuffer();
+    const jpeg = await sharp(webp).jpeg().toBuffer();
+    if (jpeg[0] !== 0xff || jpeg[1] !== 0xd8) {
+      console.error("RESULT: sharp did not produce a JPEG from a WebP");
+      process.exit(1);
+    }
+
     const React = require("react");
     const { Document, Page, Text, Font, renderToBuffer } = await import("@react-pdf/renderer");
     Font.register({
@@ -226,7 +268,7 @@ const PROBE = `
       console.error("RESULT: not a PDF");
       process.exit(1);
     }
-    console.log("RESULT: rendered " + buf.length + " bytes, no rejections");
+    console.log("RESULT: webp->jpeg ok, rendered " + buf.length + " bytes, no rejections");
   })().catch((e) => {
     console.error("RESULT: threw — " + (e && e.message));
     process.exit(1);

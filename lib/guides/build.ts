@@ -53,6 +53,11 @@ export type GuideOutcome =
       rebuilt: boolean;
       /** The piece the guide is about. The email names it. */
       itemName: string;
+      /** Photographs the item had, and how many reached the page. */
+      imagesWanted: number;
+      imagesUsed: number;
+      /** The URLs that did not make it. Empty on a clean build. */
+      dropped: string[];
     }
   | { ok: false; reason: "no-item" | "incomplete" | "render" | "storage"; message: string };
 
@@ -121,14 +126,31 @@ async function loadGame(sb: Service, gameId: string): Promise<GameWithItem | nul
  * lib/guides/images.ts for why the renderer is not allowed to fetch them
  * itself.
  */
-export async function renderGuide(game: GameWithItem): Promise<Buffer | null> {
+export type RenderedGuide = {
+  bytes: Buffer;
+  wanted: number;
+  used: number;
+  dropped: string[];
+};
+
+export async function renderGuide(
+  game: GameWithItem,
+): Promise<RenderedGuide | null> {
   const base = guideData(game);
   if (!base) return null;
   try {
-    const images = await fetchGuideImages(
+    const fetched = await fetchGuideImages(
       game.item ? itemImages(game.item) : [],
     );
-    return await renderToBuffer(GuideDocument({ ...base, images }));
+    const bytes = await renderToBuffer(
+      GuideDocument({ ...base, images: fetched.images }),
+    );
+    return {
+      bytes,
+      wanted: fetched.wanted,
+      used: fetched.images.length,
+      dropped: fetched.dropped,
+    };
   } catch (error) {
     console.error(`guide render failed for game ${game.id}:`, error);
     return null;
@@ -170,14 +192,24 @@ export async function refreshGuide(
   const want = fingerprint(game);
   const path = guideObjectPath(gameId);
   if (game.guide_path === path && game.guide_fingerprint === want) {
-    return { ok: true, path, rebuilt: false, itemName: game.item.name };
+    return {
+      ok: true,
+      path,
+      rebuilt: false,
+      itemName: game.item.name,
+      // From the row, not from a recount: this describes the stored
+      // document, and the item may have gained photographs since.
+      imagesWanted: game.guide_images_wanted ?? 0,
+      imagesUsed: game.guide_images_used ?? 0,
+      dropped: [],
+    };
   }
 
-  const bytes = await renderGuide(game);
-  if (!bytes) {
+  const rendered = await renderGuide(game);
+  if (!rendered) {
     return { ok: false, reason: "render", message: "The guide could not be rendered." };
   }
-  const stored = await putGuide(sb, path, bytes);
+  const stored = await putGuide(sb, path, rendered.bytes);
   if (!stored.ok) {
     console.error(`guide upload failed for game ${gameId}: ${stored.message}`);
     return { ok: false, reason: "storage", message: stored.message };
@@ -192,11 +224,27 @@ export async function refreshGuide(
       guide_path: path,
       guide_fingerprint: want,
       guide_generated_at: new Date().toISOString(),
+      guide_images_wanted: rendered.wanted,
+      guide_images_used: rendered.used,
     })
     .eq("id", gameId);
   if (error) logDbError("guide record", error);
 
-  return { ok: true, path, rebuilt: true, itemName: game.item.name };
+  if (rendered.dropped.length > 0) {
+    console.error(
+      `guide for game ${gameId} came out with ${rendered.used} of ${rendered.wanted} photographs. Left out: ${rendered.dropped.join(", ")}`,
+    );
+  }
+
+  return {
+    ok: true,
+    path,
+    rebuilt: true,
+    itemName: game.item.name,
+    imagesWanted: rendered.wanted,
+    imagesUsed: rendered.used,
+    dropped: rendered.dropped,
+  };
 }
 
 /** The bytes, built first if they need building. */
