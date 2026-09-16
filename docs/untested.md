@@ -346,11 +346,18 @@ source would ever have found. That is the real lesson: the question is not
 contain". `npm run check:bundle` answers the second one by running the
 assembled bundle with the repository out of reach.
 
-### ☐ Run `check:bundle` in CI, or at least before every deploy
+### ✅ The check runs itself — 2026-09-16
 
-Right now it is a command somebody has to remember. It takes about ninety
-seconds. Until it runs automatically, the guard is a habit rather than a
-check — and habits are what this whole document exists to distrust.
+It was a command somebody had to remember, which is the same as no check.
+It is now the second half of `npm run build`, so a bundle missing a file
+it loads by path fails the build and the deployment does not happen. It
+costs about 1.7 seconds on a 40-second build. Verified by putting the bug
+back twice, both ways, both exiting 1 — see `docs/guides.md`.
+
+What this does **not** cover: it proves the files are in the bundle and
+that the renderer runs from them. It says nothing about whether the
+deployed function behaves once real requests, real storage and real
+network are involved. That is still the gap below.
 
 ### ☐ The same question for anything added later
 

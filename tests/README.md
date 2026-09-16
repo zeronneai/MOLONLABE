@@ -80,10 +80,14 @@ is present whether or not the build traced it into the deployed function.
 A file loaded by a path computed at runtime — pdfkit's standard fonts,
 reached through a `createRequire` built at runtime — was missing from the
 first deployment of the guide and took down a live checkout, with a green
-suite behind it. `npm run check:bundle` is the answer to that specific
-blindness: it assembles the deployed file set and renders a page from
-inside it. It is not part of `npm test` because it needs its own build;
-run it before deploying. See `docs/guides.md`.
+suite behind it. The answer to that specific blindness is not another
+suite — it is `scripts/check-bundle.mjs`, which runs as the second half
+of `npm run build`: it reads what the build traced, assembles one entry's
+files on disk, and renders from inside them. A missing file fails the
+build, so the deployment never happens. It is deliberately in the build
+rather than in `npm test`, because the thing it guards only exists once
+the code has been bundled, and because a check somebody has to remember
+is the same as no check. See `docs/guides.md`.
 
 **The double only models what something has used.** Writing `guide`
 found three gaps in one afternoon, all of the same shape — a query form

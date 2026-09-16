@@ -259,33 +259,82 @@ does so inside `afterResponse` — and points the same search at
 `app/guide/[order]/route.ts`, where the import must be found, so a clean
 result cannot come from a broken regex.
 
-### `npm run check:bundle`
+### The check runs in the build, not on anybody's memory
+
+```json
+"build": "next build && node scripts/check-bundle.mjs"
+```
 
 The browser suite runs against the repository, where every file is present
-whether or not the build traced it. It is structurally blind to this. So
-there is a separate check:
+whether or not the build traced it, so it is structurally blind to this.
+The check is therefore part of the build itself. A missing file exits
+non-zero, `npm run build` fails, and **the deployment does not happen** —
+which is the only version of this that survives a busy week. There is no
+CI in this repository and no `vercel.json`; the build command is the hook,
+and it is the one every deployment goes through.
 
 ```
-$ npm run check:bundle
-· building (standalone output)…
-PASS bundle carries lib/guides/fonts/Archivo-Regular.ttf
+$ npm run build
 …
-PASS all fourteen standard fonts are there, not just the one we name — 14 of 14
-PASS every entry that traces Archivo also traces pdfkit's standard fonts — 38 entries
-PASS the renderer works from inside the bundle, with the repo out of reach — RESULT: rendered 3498 bytes, no rejections
+PASS the build has entry points carrying the PDF renderer — 3 of 38
+PASS every entry carrying the renderer also carries node_modules/pdfkit/js/standard-fonts/chunks/
+PASS all fourteen standard fonts travel, not just the one we name — 14 in each
+PASS the renderer works from (site)/checkout/page's files alone — RESULT: rendered 3498 bytes, no rejections
+PASS the renderer works from admin/games/[id]/guide.pdf/route's files alone — …
+
+bundle check: 9 passed, 0 failed
 ```
 
-It builds with `output: "standalone"`, which materialises exactly the
-traced file set into one directory, and then renders a page from a process
-whose working directory is that directory — so `process.cwd()` resolves as
-it does in `/var/task` and the repository's `node_modules` is off the
-resolution path. **Run it before deploying.**
+It costs **about 1.7 seconds** on a 40-second build. That number is the
+point: a check that noticeably slowed the build is a check somebody
+eventually takes out of it.
 
-The last assertion is the one that matters, and the reason is worth
-keeping: the first fix shipped the fourteen font files and still failed,
-because each of them requires a shared chunk from a `chunks/`
-subdirectory beside it and the glob only went one level deep. Counting
-traced files said everything was present. Running the code said otherwise.
+`npm run check:bundle` runs the same thing against an existing build,
+without rebuilding, for when you are iterating on the trace list.
+
+#### How it works, and why not `output: "standalone"`
+
+`.next/server/**/*.nft.json` is the list of files the build decided each
+entry point needs — and it is the same list a serverless platform
+assembles that function from, one function at a time. The check reads
+those lists, asserts what must be in them, then **materialises one entry's
+files into a temporary directory and renders a page from inside it**, with
+the working directory set to that directory so `process.cwd()` resolves as
+it does in `/var/task` and the repository's `node_modules` is off the
+resolution path.
+
+Per entry, from the trace, rather than one `output: "standalone"` build of
+everything: it is closer to what actually gets deployed, it needs no
+second build, and it can tell one entry from another. It did, immediately
+— removing the Archivo line from `outputFileTracingIncludes` fails the
+checkout entry and **passes** the guide route, because the tracer's static
+analysis can follow `join(process.cwd(), "lib", "guides", "fonts")` in a
+directly imported module but not through the dynamic import checkout uses.
+A whole-bundle check would have called that fine.
+
+Nothing here is keyed on a list of route names. "The entries that carry
+the renderer" is derived from what each trace contains, because a
+hand-kept list of routes goes stale in silence — the same disease as the
+bug it is guarding. There is one assertion whose only job is to fail if
+that derivation ever finds nothing, so the check cannot quietly stop
+checking.
+
+#### Why reading the trace is not enough on its own
+
+The probe is the assertion that matters. The first fix shipped all
+fourteen standard fonts and still failed on the deployment, because each
+of them requires a shared chunk from a `chunks/` subdirectory beside it
+and the glob only went one level deep. Counting traced files said
+everything was present. Running the code said otherwise.
+
+Both failure modes are verified by putting the bug back:
+
+| Sabotage | What the build says |
+|---|---|
+| glob back to one level | `FAIL … carries standard-fonts/chunks/` and `RESULT: threw — Cannot find module './chunks/standardGlyphNames-…'` |
+| Archivo line removed | `FAIL … carries Archivo-Regular.ttf — missing from (site)/checkout/page` and `RESULT: threw — ENOENT … Archivo-Regular.ttf` |
+
+Both exit 1.
 
 ## Two traps found the hard way
 

@@ -1,19 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // `npm run check:bundle` sets this.
-  //
-  // A standalone build materialises exactly the traced file set into one
-  // directory — the same list, assembled the same way, that a serverless
-  // deployment unpacks into /var/task. Running the app out of that
-  // directory is the only local test that can see a file the tracer
-  // missed, because everything else runs against the repository, where
-  // every file is present whether or not it was traced.
-  //
-  // It is off by default: it doubles build time and the deployment does
-  // its own assembly.
-  ...(process.env.NEXT_BUNDLE_CHECK ? { output: "standalone" as const } : {}),
-
   // The PDF renderer runs in Node and is left out of the bundle.
   //
   // It carries pdfkit and fontkit, which read files and reach for Node
@@ -62,9 +49,12 @@ const nextConfig: NextConfig = {
   // Both extensions, because the two resolve differently: the trace
   // picked pdfkit's .mjs entry and the runtime required the .cjs fonts.
   //
-  // `npm run check:bundle` is what holds this honest. It assembles the
-  // bundle and renders a page from inside it, with the repository out of
+  // `scripts/check-bundle.mjs` is what holds this honest, and it runs as
+  // the second half of `npm run build` rather than on anybody's memory.
+  // It reads what the build traced, assembles one entry's files on disk,
+  // and renders a page from inside them with the repository out of
   // reach — the only local check that can see a file this list forgot.
+  // A missing file fails the build, so the deployment never happens.
   outputFileTracingIncludes: {
     "**": [
       "./lib/guides/fonts/*.ttf",
