@@ -230,6 +230,145 @@ export function pdfFlatText(buffer) {
   return pdfText(buffer).replace(/\s+/g, " ").trim();
 }
 
+// ---------------------------------------------------------------------
+// Images, and where they were actually drawn
+// ---------------------------------------------------------------------
+// "There is a JPEG in the file" is not the same claim as "the customer
+// can see a photograph", and the difference is where this whole feature
+// keeps failing. An image embedded at zero size, drawn off the page, or
+// painted under the background rectangle all produce a document that
+// contains the bytes and shows nothing.
+//
+// A PDF draws an image by mapping the UNIT SQUARE through the current
+// transformation matrix and then saying `/Im0 Do`. So the drawn size is
+// not a property of the image at all — it is a property of the matrix in
+// force at that moment. That is what this reads.
+
+/** Multiply two PDF matrices, given as [a b c d e f]. */
+const mul = (m, n) => [
+  m[0] * n[0] + m[1] * n[2],
+  m[0] * n[1] + m[1] * n[3],
+  m[2] * n[0] + m[3] * n[2],
+  m[2] * n[1] + m[3] * n[3],
+  m[4] * n[0] + m[5] * n[2] + n[4],
+  m[4] * n[1] + m[5] * n[3] + n[5],
+];
+
+/** Where the unit square lands, as a bounding box in page coordinates. */
+function placedBox(ctm) {
+  const corner = (x, y) => [
+    ctm[0] * x + ctm[2] * y + ctm[4],
+    ctm[1] * x + ctm[3] * y + ctm[5],
+  ];
+  const points = [corner(0, 0), corner(1, 0), corner(0, 1), corner(1, 1)];
+  const xs = points.map((p) => p[0]);
+  const ys = points.map((p) => p[1]);
+  return {
+    x: Math.min(...xs),
+    y: Math.min(...ys),
+    width: Math.max(...xs) - Math.min(...xs),
+    height: Math.max(...ys) - Math.min(...ys),
+  };
+}
+
+/** The image XObjects a page's resources name, with their pixel sizes. */
+function imageXObjects(objects, pageDict) {
+  const found = new Map();
+  let resources = pageDict;
+  const resourceRef = pageDict.match(/\/Resources\s+(\d+)\s+0\s+R/);
+  if (resourceRef) resources = objects.get(Number(resourceRef[1]))?.dict ?? "";
+
+  let block = resources.match(/\/XObject\s*<<([\s\S]*?)>>/)?.[1];
+  const ref = resources.match(/\/XObject\s+(\d+)\s+0\s+R/);
+  if (!block && ref) block = objects.get(Number(ref[1]))?.dict ?? "";
+  if (!block) return found;
+
+  for (const [, name, id] of block.matchAll(/\/(\w+)\s+(\d+)\s+0\s+R/g)) {
+    const object = objects.get(Number(id));
+    if (!object || !/\/Subtype\s*\/Image/.test(object.dict)) continue;
+    found.set(name, {
+      pixelWidth: Number(object.dict.match(/\/Width\s+(\d+)/)?.[1] ?? 0),
+      pixelHeight: Number(object.dict.match(/\/Height\s+(\d+)/)?.[1] ?? 0),
+      // DCTDecode is JPEG. Anything else here is a format react-pdf
+      // could not have been given by our own conversion step.
+      jpeg: /\/DCTDecode/.test(object.dict),
+    });
+  }
+  return found;
+}
+
+/**
+ * Every image actually painted, page by page, with its drawn rectangle.
+ *
+ * Each entry: `{ page, name, x, y, width, height, pixelWidth,
+ * pixelHeight, jpeg, insidePage }`. Sizes are in points — 72 to the
+ * inch, so a photograph across a Letter page is around 500.
+ */
+export function pdfImages(buffer) {
+  const objects = parseObjects(buffer);
+  const out = [];
+  let pageNumber = 0;
+
+  for (const [, object] of objects) {
+    if (!/\/Type\s*\/Page\b/.test(object.dict)) continue;
+    pageNumber++;
+
+    const media = object.dict.match(
+      /\/MediaBox\s*\[\s*([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)/,
+    );
+    const box = media
+      ? { x0: +media[1], y0: +media[2], x1: +media[3], y1: +media[4] }
+      : { x0: 0, y0: 0, x1: 612, y1: 792 };
+
+    const images = imageXObjects(objects, object.dict);
+    if (images.size === 0) continue;
+
+    const contents = [
+      ...object.dict.matchAll(/\/Contents\s+(?:(\d+)\s+0\s+R|\[([^\]]*)\])/g),
+    ].flatMap((m) =>
+      m[1] ? [Number(m[1])] : [...m[2].matchAll(/(\d+)\s+0\s+R/g)].map((r) => Number(r[1])),
+    );
+
+    for (const id of contents) {
+      const stream = objects.get(id)?.data;
+      if (!stream) continue;
+      const content = stream.toString("latin1");
+
+      let ctm = [1, 0, 0, 1, 0, 0];
+      const stack = [];
+      const token =
+        /(?:^|\s)q(?=\s)|(?:^|\s)Q(?=\s)|([\d.eE+-]+)\s+([\d.eE+-]+)\s+([\d.eE+-]+)\s+([\d.eE+-]+)\s+([\d.eE+-]+)\s+([\d.eE+-]+)\s+cm(?=\s)|\/(\w+)\s+Do(?=\s|$)/g;
+
+      for (const m of content.matchAll(token)) {
+        const text = m[0].trim();
+        if (text === "q") {
+          stack.push([...ctm]);
+        } else if (text === "Q") {
+          ctm = stack.pop() ?? [1, 0, 0, 1, 0, 0];
+        } else if (m[1] !== undefined) {
+          ctm = mul([+m[1], +m[2], +m[3], +m[4], +m[5], +m[6]], ctm);
+        } else if (m[7] !== undefined && images.has(m[7])) {
+          const rect = placedBox(ctm);
+          out.push({
+            page: pageNumber,
+            name: m[7],
+            ...rect,
+            ...images.get(m[7]),
+            insidePage:
+              rect.width > 0 &&
+              rect.height > 0 &&
+              rect.x + rect.width > box.x0 &&
+              rect.y + rect.height > box.y0 &&
+              rect.x < box.x1 &&
+              rect.y < box.y1,
+          });
+        }
+      }
+    }
+  }
+  return out;
+}
+
 /** How many pages, without decoding any of them. */
 export function pdfPageCount(buffer) {
   return (buffer.toString("latin1").match(/\/Type\s*\/Page\b/g) ?? []).length;

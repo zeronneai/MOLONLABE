@@ -90,11 +90,27 @@ specifications and photograph URLs, and `GUIDE_VERSION` in
 read rebuilds. Nothing has to remember to invalidate anything, which is
 the only version of this that stays true.
 
-Two consequences worth knowing:
+### The fingerprint covers the renderer, not just its inputs
 
-**Change the document and you must bump `GUIDE_VERSION`.** It is part of
-the fingerprint. Without a bump, a redesign applies only to games created
-afterwards and the shop hands out two different documents.
+`GUIDE_RENDERER_VERSION` in `lib/guides/version.ts` is a hash of every
+source file that decides what a guide looks like — `Document.tsx`,
+`theme.ts`, `images.ts`, `fonts.ts`, `build.ts` — plus the installed
+versions of `@react-pdf/renderer`, `sharp` and `pdfkit`. It is generated
+by `scripts/gen-guide-version.mjs`, which runs as the first step of
+`npm run build`, and it is committed so a test run and a deployment agree
+about what the current renderer is.
+
+**This was a hand-typed `GUIDE_VERSION = "1"` and it cost two
+deployments.** The WebP fix changed `images.ts` and nothing else, so
+every already-built guide kept its fingerprint, `refreshGuide` returned
+early, and the old blank PDF kept coming out of storage. Nothing
+rendered, so there was nothing in the log either — the fix deployed
+twice, changed nothing, and looked like a rendering bug. There was a
+documented instruction to bump the constant. It was not bumped, because a
+constant somebody has to remember is the same as no constant.
+
+Two ways it is now held honest: `npm run build` regenerates it, and the
+suite fails if the committed file is stale, naming the command to fix it.
 
 **A photograph replaced at the same URL will not be noticed.** The hash
 covers image URLs, not image bytes — hashing the bytes would mean
@@ -404,6 +420,37 @@ hand-kept list of routes goes stale in silence — the same disease as the
 bug it is guarding. There is one assertion whose only job is to fail if
 that derivation ever finds nothing, so the check cannot quietly stop
 checking.
+
+### The pattern behind all three
+
+Three fixes verified here and failed on the deployment: the missing font
+files, the WebP photographs, and the stale fingerprint. The individual
+bugs are what testing is for. The repetition is not, and it has one
+cause.
+
+**Every check asserted the mechanism that had just been written, under
+conditions chosen to suit it — not the artifact the customer receives,
+under the conditions the shop actually has.**
+
+| | What was asserted | What the customer got |
+|---|---|---|
+| Fonts | the renderer runs | a 500, then nothing |
+| WebP | an image embeds (from a PNG fixture) | a guide with blank space |
+| Stale cache | a *fresh* build contains a photograph | the *stored* build, unchanged |
+
+Note the third: no bundle check could have caught it. The bundle was
+correct, the code was correct, and it never ran. Reaching for the bundle
+check there is reaching for the wrong tool.
+
+The assertion that would have caught all three is one assertion, and it
+is now in the suite: **at the end of a real purchase, fetch the document
+the customer is handed and confirm it contains a photograph drawn at a
+visible size inside the page.** Not "a JPEG is present" — `pdfImages` in
+`tests/lib/pdf.mjs` follows the content stream's transformation matrices,
+because a PDF draws an image by mapping the unit square through the
+current matrix, so the drawn size is a property of that matrix and not of
+the image. Zero size, off-page and behind-the-background all look
+identical to anything that only counts bytes.
 
 #### Why reading the trace is not enough on its own
 

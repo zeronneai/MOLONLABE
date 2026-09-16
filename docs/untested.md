@@ -372,7 +372,22 @@ PDF is decoded and its words read back — but some of it can only be
 settled on real infrastructure, and the first item below is the one that
 already went wrong.
 
-### ✅ Photographs embed — 2026-09-16, the hard way
+### ✅ Photographs embed — 2026-09-16, after three attempts
+
+The third one is the one worth reading. The WebP conversion was correct
+and deployed, and the guides stayed blank, because the fingerprint that
+decides whether to rebuild covered the guide's INPUTS and not the code
+that renders them. Every already-built guide kept serving out of
+storage. Nothing rendered, so there was nothing in the log — which made
+it look like a rendering bug and cost another round.
+
+The version is derived from the renderer's own source now, so there is
+nothing to remember. The lasting change is the assertion: the suite
+fetches the document a customer is handed at the end of a real purchase
+and checks that a photograph is drawn at a visible size inside the page.
+Not that a JPEG is present — that was true in all three failures.
+
+### The original write-up — 2026-09-16
 
 Found in production, not here. The photographs were never a Cloudinary
 problem: the catalogue moved to Supabase Storage and the admin uploads

@@ -89,6 +89,19 @@ rather than in `npm test`, because the thing it guards only exists once
 the code has been bundled, and because a check somebody has to remember
 is the same as no check. See `docs/guides.md`.
 
+**Assert the artifact, not the pipeline.** Three separate fixes for the
+guide's photographs verified here and failed on the deployment — missing
+font files, an undecodable WebP, and a stale cache that meant nothing
+rendered at all. Every check asserted the mechanism just written, under
+conditions chosen to suit it. None asserted the document the customer is
+actually handed. There is now one that does: at the end of a real
+purchase the suite fetches the buyer's PDF and confirms it contains a
+photograph **drawn at a visible size inside the page**, using
+`pdfImages`, which follows the content stream's transformation matrices.
+"There is a JPEG in the file" is a different claim — an image at zero
+size, off the page, or behind the background satisfies it completely.
+That one assertion would have caught all three.
+
 **A fixture in the wrong format tests nothing.** The guide suite's
 photograph was a PNG. It proved the image path end to end — fetch,
 decode, embed — and it proved it about a format the catalogue does not

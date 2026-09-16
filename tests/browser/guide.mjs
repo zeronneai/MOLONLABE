@@ -29,7 +29,7 @@ import {
   suite, reset, dump, storage, insert, update,
   page as newPage, adminPage, acceptStub, has,
 } from "../lib/harness.mjs";
-import { pdfFlatText, pdfPageCount, isPdf } from "../lib/pdf.mjs";
+import { pdfFlatText, pdfImages, pdfPageCount, isPdf } from "../lib/pdf.mjs";
 
 const { check, note, report } = suite();
 
@@ -261,6 +261,32 @@ check("the WebP photograph is embedded, converted to JPEG",
       : "an image, but NOT a JPEG"
     : "NO image XObject at all");
 
+// WHERE THE PHOTOGRAPH WAS ACTUALLY DRAWN.
+//
+// "There is a JPEG in the file" and "the customer can see a photograph"
+// are different claims, and every failure this feature has had lived in
+// the gap between them: no file, wrong format, stale cache. A PDF draws
+// an image by mapping the unit square through the current matrix, so the
+// drawn size is a property of that matrix and not of the image — an
+// embed at zero size, or off the page, looks exactly like success to
+// anything that only counts bytes.
+const plates = pdfImages(previewBody);
+check("the photograph is drawn at a visible size, inside the page",
+  plates.length === 1 &&
+    plates[0].width > 100 &&
+    plates[0].height > 100 &&
+    plates[0].insidePage,
+  plates.length
+    ? plates
+        .map((p) => `p${p.page} ${Math.round(p.width)}x${Math.round(p.height)}pt at ` +
+          `${Math.round(p.x)},${Math.round(p.y)} ${p.insidePage ? "on" : "OFF"} page`)
+        .join("; ")
+    : "NOTHING DRAWN",
+);
+check("and it is the JPEG our conversion produced",
+  plates.every((p) => p.jpeg && p.pixelWidth > 0 && p.pixelHeight > 0),
+  plates.map((p) => `${p.pixelWidth}x${p.pixelHeight}px ${p.jpeg ? "jpeg" : "NOT JPEG"}`).join("; "));
+
 // And the shop has a record of what it managed, not just a log line.
 const built = (await dump()).games.find((g) => g.id === game.id);
 check("the build records how many photographs it got",
@@ -406,6 +432,28 @@ check("the link opens the guide with no session of any kind",
 check("it is served as a PDF, inline, with a readable filename",
   (customerCopy.headers.get("content-disposition") ?? "").includes("daniel-defense"),
   customerCopy.headers.get("content-disposition"));
+// THE ONE ASSERTION THAT WOULD HAVE CAUGHT ALL THREE FAILURES.
+//
+// Not "a guide was produced", not "the pipeline ran", not "the files are
+// in the bundle" — the document the customer is actually handed, at the
+// end of a real purchase, has a photograph in it that is drawn at a
+// visible size inside the page. Missing font files, an undecodable WebP
+// and a stale cache all produced a guide that passed every other check
+// in this suite and arrived blank.
+{
+  const seen = pdfImages(customerBytes);
+  check("THE CUSTOMER'S GUIDE HAS A VISIBLE PHOTOGRAPH IN IT",
+    seen.length > 0 &&
+      seen.every((p) => p.jpeg && p.width > 100 && p.height > 100 && p.insidePage),
+    seen.length
+      ? seen
+          .map((p) => `p${p.page} ${Math.round(p.width)}x${Math.round(p.height)}pt ` +
+            `${p.insidePage ? "on" : "OFF"} page, ${p.pixelWidth}x${p.pixelHeight}px ` +
+            `${p.jpeg ? "jpeg" : "NOT JPEG"}`)
+          .join("; ")
+      : "NO IMAGE DRAWN — this is what shipped, three times");
+}
+
 check("the customer's copy is the same document the owner previewed",
   pdfFlatText(customerBytes).includes("collects carbon"));
 
@@ -609,6 +657,28 @@ check("a game with no prize tells the owner why, rather than 500ing",
 // must not have the renderer in its module graph at all. The warm-up
 // uses a dynamic import, after the response.
 {
+  // The fingerprint has to cover the RENDERER, not just its inputs.
+  //
+  // It did not. The WebP conversion changed images.ts and nothing else,
+  // so every already-built guide kept its fingerprint, kept returning
+  // early out of the cache, and kept serving a blank PDF. The fix
+  // deployed twice and changed nothing. There was a GUIDE_VERSION
+  // constant for exactly this and a documented instruction to bump it;
+  // it was not bumped, because a constant somebody has to remember is
+  // the same as no constant.
+  const version = readFileSync(join(ROOT, "lib/guides/version.ts"), "utf8");
+  const generated = (await import("../../scripts/gen-guide-version.mjs"))
+    .guideRendererVersion?.();
+  check("the renderer version is current, not stale",
+    Boolean(generated) && version.includes(`"${generated}"`),
+    generated
+      ? `${generated} — ${version.includes(`"${generated}"`) ? "matches" : "COMMITTED FILE IS STALE, run scripts/gen-guide-version.mjs"}`
+      : "could not compute one");
+  const buildSource = readFileSync(join(ROOT, "lib/guides/build.ts"), "utf8");
+  check("and it is what the fingerprint is built from",
+    /version:\s*GUIDE_RENDERER_VERSION/.test(buildSource),
+    (buildSource.match(/version:[^\n,]*/) ?? ["NOT USED"])[0].trim());
+
   const source = readFileSync(join(ROOT, "app/actions/checkout.ts"), "utf8");
   const staticImports = [...source.matchAll(/^import[^;]*?from\s+"([^"]+)"/gm)].map(
     (m) => m[1],
