@@ -145,6 +145,7 @@ export default async function AdminInventory({
         <SurfaceSection
           surface="games"
           count={games?.length ?? 0}
+          unit="game"
           add={{ href: "/admin/games/new", label: "+ New game" }}
         >
           {games && games.length > 0 ? (
@@ -181,17 +182,23 @@ export default async function AdminInventory({
         </SurfaceSection>
 
         {/* ------------------------------------------ prizes in games */}
-        {/* Every item lands in exactly one of the four sections. The
+        {/* Same ground as Games above, and a heading of its own.
+            The colour ties it to the green band customers see, which is
+            the point of the ground — but this is a list of ITEMS and the
+            one above is a list of GAMES, and two headings both reading
+            "Games" made them look like one thing shown twice.
+
+            Every item lands in exactly one of the four sections. The
             arithmetic is asserted at the bottom of the page rather than
             trusted, because the failure mode is silence. */}
         {asPrize.length > 0 && (
-          <SurfaceSection surface="games" count={asPrize.length}>
-            <p className="mb-4 max-w-[56ch] text-sm text-muted">
-              These are prizes. While their game is open or full they are
-              out of the Shop and out of the case, and they cannot be
-              bought — customers are paying for a chance at them. They go
-              back to normal once the game is drawn.
-            </p>
+          <SurfaceSection
+            surface="games"
+            id="prizes"
+            heading="Items used as prizes"
+            blurb="These are prizes. While their game is open or full they are out of the Shop and out of the case, and they cannot be bought — customers are paying for a chance at them. They go back to normal once the game is drawn."
+            count={asPrize.length}
+          >
             {asPrize.map((item) => {
               const g = gameOf.get(item.id)!;
               const locked = g.status === "open" || g.status === "full";

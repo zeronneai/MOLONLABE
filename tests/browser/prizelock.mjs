@@ -143,6 +143,25 @@ async function shopper() {
   check("ADMIN: no item is missing from every section",
     !/are not shown in any section/i.test(text),
     (text.match(/[^\n]*not shown in any section[^\n]*/i) ?? ["all accounted for"])[0].slice(0, 70));
+
+  // The two sections sit on the same green ground on purpose — it is the
+  // ground customers see for the same surface — and they hold different
+  // things: one lists GAMES, one lists ITEMS that are prizes. Both were
+  // headed "GAMES", which read as one list shown twice.
+  const headings = await admin.locator("section.admin-surface h2").allInnerTexts();
+  check("ADMIN: no two sections share a heading",
+    new Set(headings).size === headings.length, headings.join(" / "));
+  check("ADMIN: the prize list says it is a list of items",
+    headings.some((h) => /items used as prizes/i.test(h)), headings.join(" / "));
+
+  // Two sections on the same surface used to emit the same DOM id, so
+  // the second one's aria-labelledby resolved to the first one's
+  // heading — a screen reader would announce both as "Games".
+  const ids = await admin.locator("section.admin-surface h2").evaluateAll(
+    (nodes) => nodes.map((n) => n.id),
+  );
+  check("ADMIN: and no two share a DOM id either",
+    new Set(ids).size === ids.length, ids.join(" / "));
   await admin.context().close();
 }
 
