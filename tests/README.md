@@ -74,6 +74,17 @@ a delay, because tokenisation is a network round trip. Every checkout
 test used to stub it synchronously, which left no window to click into —
 so the double-charge bug was structurally impossible to reproduce.
 
+**This suite cannot see a bundling failure, and one has already
+shipped.** Every suite here runs against the repository, where every file
+is present whether or not the build traced it into the deployed function.
+A file loaded by a path computed at runtime — pdfkit's standard fonts,
+reached through a `createRequire` built at runtime — was missing from the
+first deployment of the guide and took down a live checkout, with a green
+suite behind it. `npm run check:bundle` is the answer to that specific
+blindness: it assembles the deployed file set and renders a page from
+inside it. It is not part of `npm test` because it needs its own build;
+run it before deploying. See `docs/guides.md`.
+
 **The double only models what something has used.** Writing `guide`
 found three gaps in one afternoon, all of the same shape — a query form
 the app had used for months and the fixture had never been asked to

@@ -183,6 +183,110 @@ in `lib/guides/theme.ts` is the only thing that has to change — swap
 
 ---
 
+## The deployment bug, and the check that exists because of it
+
+The first deployment of the guide failed on a live purchase:
+
+```
+Error: Cannot find module '/var/task/node_modules/pdfkit/js/standard-fonts/Helvetica.cjs'
+code: MODULE_NOT_FOUND
+```
+
+### Why nothing saw it coming
+
+`@react-pdf/renderer` carries pdfkit, and pdfkit reaches its standard
+fonts like this:
+
+```js
+const require$1 = module.createRequire(pathToFileURL(__filename));
+registerStdFontLoaders({
+  Helvetica: () => require$1('#standard-fonts/Helvetica'),
+  …
+});
+```
+
+A require built at runtime, of a `#`-prefixed subpath resolved through
+pdfkit's own `package.json` `imports` map. There is no import statement to
+follow and no literal path to see, so Next's file tracer does not ship the
+files. The build succeeds, the bundle is short, and it fails deployed.
+
+`serverExternalPackages: ["@react-pdf/renderer"]` was already set and did
+not help. It stops the package being bundled; it does not make the tracer
+find files nothing points at. The fix is `outputFileTracingIncludes`.
+
+### The part that made it dangerous
+
+react-pdf loads those fonts **eagerly, when the module is imported**:
+
+```
+$ node -e "import('@react-pdf/renderer')"
+import resolved
+UNHANDLED REJECTION: MODULE_NOT_FOUND … pdfkit/js/standard-fonts/Helvetica.cjs
+UNHANDLED REJECTION: MODULE_NOT_FOUND …
+UNHANDLED REJECTION: MODULE_NOT_FOUND …
+UNHANDLED REJECTION: MODULE_NOT_FOUND …
+```
+
+Four rejections attached to no promise. No `try`/`catch` downstream can
+reach them; the import itself resolves cleanly. Next's dev and standalone
+servers install a handler and log `⨯ unhandledRejection`, which is why
+this is invisible locally. A serverless runtime is entitled to kill the
+invocation instead.
+
+So the danger was never in the call — it was in **which module graph the
+import sat in**. `app/actions/checkout.ts` imported it, so the one action
+that charges cards could be taken down by a font file.
+
+### What changed
+
+The guide is no longer built during the transaction. `checkout.ts`:
+
+- imports `lib/guides/availability.ts`, which reads the row and renders
+  nothing, to decide whether to promise a guide in the email;
+- builds the guide in `after()`, **behind a dynamic import**, once the
+  response has gone and after `finish_checkout` has settled the
+  idempotency key;
+- wraps that in a `try`/`catch`, and treats failure as a notification
+  rather than an error.
+
+If all of that fails, nothing is lost: `/guide` builds on demand, so the
+customer's link produces the document the first time they follow it. The
+warm-up is a convenience, not the delivery.
+
+`tests/browser/guide.mjs` asserts from the source that checkout has no
+static import of the renderer, that it reaches it dynamically, and that it
+does so inside `afterResponse` — and points the same search at
+`app/guide/[order]/route.ts`, where the import must be found, so a clean
+result cannot come from a broken regex.
+
+### `npm run check:bundle`
+
+The browser suite runs against the repository, where every file is present
+whether or not the build traced it. It is structurally blind to this. So
+there is a separate check:
+
+```
+$ npm run check:bundle
+· building (standalone output)…
+PASS bundle carries lib/guides/fonts/Archivo-Regular.ttf
+…
+PASS all fourteen standard fonts are there, not just the one we name — 14 of 14
+PASS every entry that traces Archivo also traces pdfkit's standard fonts — 38 entries
+PASS the renderer works from inside the bundle, with the repo out of reach — RESULT: rendered 3498 bytes, no rejections
+```
+
+It builds with `output: "standalone"`, which materialises exactly the
+traced file set into one directory, and then renders a page from a process
+whose working directory is that directory — so `process.cwd()` resolves as
+it does in `/var/task` and the repository's `node_modules` is off the
+resolution path. **Run it before deploying.**
+
+The last assertion is the one that matters, and the reason is worth
+keeping: the first fix shipped the fourteen font files and still failed,
+because each of them requires a shared chunk from a `chunks/`
+subdirectory beside it and the glob only went one level deep. Counting
+traced files said everything was present. Running the code said otherwise.
+
 ## Two traps found the hard way
 
 **A `render` prop plus a `lineHeight` produces nothing.** `render` makes

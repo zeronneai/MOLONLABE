@@ -320,6 +320,44 @@ The fix is asserted against the double and against stock PostgreSQL.
 Nobody has loaded the real home page since. `test` should read 5 of 5 and
 `PRUEBA` 12 of 100.
 
+## Anything loaded by a path at runtime (2026-09-16)
+
+**This class has now cost one live checkout.** See `docs/guides.md` for
+the failure; this entry is the audit it prompted.
+
+The build only ships what it can trace, and it traces imports. Anything
+reached by a path assembled at runtime is invisible to it, present
+locally, and absent once deployed.
+
+**In code we wrote, there is exactly one**, and it is covered:
+
+| Where | What | Shipped by |
+|---|---|---|
+| `lib/guides/fonts.ts` | three Archivo TTFs, read from `process.cwd()` | `outputFileTracingIncludes` |
+
+Everything else in `app/`, `lib/` and `components/` imports what it needs.
+`content/en.ts` is a normal module. `next/font` is Next's own problem.
+There is no other `readFileSync`, `createRequire`, `__dirname` or
+`process.cwd()` in shipped code — checked, not assumed.
+
+**The one that bit us was in a dependency**, which no audit of our own
+source would ever have found. That is the real lesson: the question is not
+"what does our code load by path", it is "what does the bundle actually
+contain". `npm run check:bundle` answers the second one by running the
+assembled bundle with the repository out of reach.
+
+### ☐ Run `check:bundle` in CI, or at least before every deploy
+
+Right now it is a command somebody has to remember. It takes about ninety
+seconds. Until it runs automatically, the guard is a habit rather than a
+check — and habits are what this whole document exists to distrust.
+
+### ☐ The same question for anything added later
+
+`sharp`, `canvas`, `puppeteer`, ICU data, WASM binaries and font libraries
+all do this. Any new dependency that opens a file is a candidate. Adding
+one is the moment to run `check:bundle`, not the deploy afterwards.
+
 ## Added by the guide (2026-09-15)
 
 See `docs/guides.md`. The document itself is asserted on end to end — the
