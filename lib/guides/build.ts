@@ -10,6 +10,7 @@ import { GuideDocument, type GuideData } from "./Document";
 import { guideFieldErrors } from "./fields";
 import { fetchGuideImages } from "./images";
 import { getGuide, guideObjectPath, putGuide } from "./storage";
+import { GUIDE_RENDERER_VERSION } from "./version";
 
 // Building the guide, and deciding when it needs building.
 //
@@ -35,14 +36,15 @@ import { getGuide, guideObjectPath, putGuide } from "./storage";
 // charged a card, and the buyer's link self-heals on the next request —
 // see app/guide/[order]/route.ts, which builds on demand.
 
-/**
- * Bump this when the document changes shape.
- *
- * It is part of the fingerprint, so bumping it rebuilds every guide on
- * next read. Without it, a redesign would apply only to games created
- * afterwards and the shop would be handing out two different documents.
- */
-export const GUIDE_VERSION = "1";
+// GUIDE_VERSION was a hand-typed "1" here, with a line in the docs
+// saying to bump it whenever the document changed. It was not bumped
+// when the WebP conversion landed — a change to images.ts and nothing
+// else — so every guide that had already been built kept its
+// fingerprint, kept returning early out of the cache, and kept serving
+// the old blank PDF. The fix deployed twice and changed nothing, and
+// looked for all the world like a rendering bug.
+//
+// It is derived now. See scripts/gen-guide-version.mjs.
 
 export type GameWithItem = GameRow & { item: ItemRow | null };
 
@@ -98,7 +100,7 @@ export function fingerprint(game: GameWithItem): string {
   const hash = createHash("sha256");
   hash.update(
     JSON.stringify({
-      version: GUIDE_VERSION,
+      version: GUIDE_RENDERER_VERSION,
       data,
       images: game.item ? itemImages(game.item) : [],
     }),

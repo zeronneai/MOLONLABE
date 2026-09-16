@@ -4,11 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && node scripts/check-bundle.mjs",
+    "build": "node scripts/gen-guide-version.mjs && next build && node scripts/check-bundle.mjs",
     "start": "next start",
     "lint": "next lint",
     "check:schema": "node scripts/check-schema.mjs",
     "check:bundle": "node scripts/check-bundle.mjs",
+    "check:guide-version": "node scripts/gen-guide-version.mjs --check",
     "audit:cloudinary": "node scripts/cloudinary-audit.mjs",
     "walkthrough:capture": "node scripts/walkthrough/capture.mjs",
     "walkthrough:build": "node scripts/walkthrough/build.mjs",
