@@ -33,3 +33,8 @@ next-env.d.ts
 # artifact worth keeping.
 .walkthrough-build/
 docs/walkthrough-frames/
+
+# Emitted by scripts/gen-schema-index.mjs --write. Nothing reads it yet,
+# so it is not committed; a generated file with no consumer goes stale
+# in silence. See that script for what is still to do.
+lib/db/schema.generated.ts
