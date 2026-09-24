@@ -49,7 +49,7 @@ export default function BuySpots({
       <div className="mt-10 border-l-2 border-amber pl-5">
         <p className="display text-2xl">SOLD OUT.</p>
         <p className="mt-3 max-w-[52ch] text-sm text-muted">
-          Every spot is gone. The draw happens next — the winner is posted
+          Every guide is sold. The draw happens next. The winner is posted
           here and announced on Instagram.
         </p>
       </div>
@@ -60,8 +60,8 @@ export default function BuySpots({
     <div className="mt-10">
       <div className="flex flex-wrap items-end gap-x-8 gap-y-5">
         <div>
-          <label className="field-label" htmlFor="spot-count">
-            How many spots
+          <label className="field-label" htmlFor="guide-count">
+            How many guides
           </label>
           <div className="mt-2 flex items-center gap-2">
             <button
@@ -74,7 +74,7 @@ export default function BuySpots({
               −
             </button>
             <input
-              id="spot-count"
+              id="guide-count"
               inputMode="numeric"
               value={clamped}
               onChange={(e) => {
@@ -109,12 +109,12 @@ export default function BuySpots({
       {remaining <= LOW_SPOTS && (
         <p className="label mt-4 text-amber">
           {remaining === 1
-            ? "One spot left."
-            : `Only ${remaining} spots left — that is all you can take.`}
+            ? "One guide left."
+            : `Only ${remaining} guides left. That is all you can take.`}
         </p>
       )}
       {remaining > LOW_SPOTS && clamped === cap && (
-        <p className="label mt-4 text-amber">That is every spot left.</p>
+        <p className="label mt-4 text-amber">That is every guide left.</p>
       )}
 
       <button
@@ -125,7 +125,7 @@ export default function BuySpots({
         }}
         className="cta-primary control-go mt-8 w-full sm:w-auto"
       >
-        {`Take ${clamped === 1 ? "a spot" : `${clamped} spots`}`}
+        {clamped === 1 ? "Get your guide" : `Get ${clamped} guides`}
       </button>
 
       {/* The button no longer becomes "In your cart" and stop there. It
@@ -136,7 +136,7 @@ export default function BuySpots({
       {inCart !== null && (
         <p role="status" className="mt-4 text-sm">
           <span className="text-acid">
-            {inCart === 1 ? "1 spot" : `${inCart} spots`} in your cart.
+            {inCart === 1 ? "1 guide" : `${inCart} guides`} in your cart.
           </span>{" "}
           <a href="/cart" className="underline">
             Go to cart

@@ -37,9 +37,9 @@ export default function SweepstakesRulesPage() {
       </h1>
 
       <p className="mt-8 max-w-[58ch] leading-relaxed text-muted">
-        These rules apply to every game run by {SHOP_NAME} in El Paso,
-        Texas. They describe exactly how a game works, how the winner is
-        picked, and what happens next. Read them before you buy a spot.
+        These rules apply to every featured drop run by {SHOP_NAME} in El
+        Paso, Texas. They describe exactly how a drop works, how the winner
+        is picked, and what happens next. Read them before you buy a guide.
       </p>
 
       <div className="mt-14 border-t hairline">
@@ -93,6 +93,21 @@ export default function SweepstakesRulesPage() {
                           </span>
                         </p>
                       )}
+
+                      {clause.attorney && (
+                        /* Legal wording the attorney has not returned
+                           since the terminology ruling. Says what the
+                           clause covers and nothing more: the words are
+                           his to write, not ours. */
+                        <p data-awaiting-attorney className="text-amber">
+                          <span className="label">
+                            Awaiting the attorney&apos;s wording ·{" "}
+                          </span>
+                          <span className="leading-relaxed">
+                            {clause.attorney}
+                          </span>
+                        </p>
+                      )}
                     </div>
                   </li>
                 );
@@ -115,7 +130,7 @@ export default function SweepstakesRulesPage() {
 
       <div className="mt-12 flex flex-wrap items-center gap-4">
         <Link href="/games" className="cta-primary">
-          See the games
+          See the drops
         </Link>
         <a href={SHOP_PHONE_HREF} className="cta-secondary">
           Call {SHOP_PHONE_DISPLAY}

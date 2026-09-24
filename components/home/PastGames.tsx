@@ -38,7 +38,7 @@ export default async function PastGames() {
     <section className="ground-neutral">
       <div className="px-page py-24">
         <Reveal>
-          <p className="label">Past games</p>
+          <p className="label">Past drops</p>
           <h2 className="display mt-6 max-w-3xl text-[clamp(2rem,4vw,3.5rem)]">
             ALREADY DRAWN
           </h2>
@@ -48,9 +48,9 @@ export default async function PastGames() {
           <Reveal delay={60}>
             <div className="mt-12 max-w-[52ch] border-l-2 border-acid pl-6">
               <p className="text-muted">
-                No game has been drawn yet. When one fills and the winner is
-                picked, it lands here — the prize, how many spots sold, and
-                the date.
+                No drop has been drawn yet. When one sells out and the winner
+                is picked, it lands here: the featured piece, how many guides
+                sold, and the date.
               </p>
               <p className="mt-4 text-muted">
                 This section fills itself. Nothing needs doing.
@@ -107,7 +107,7 @@ export default async function PastGames() {
             </Reveal>
             <div className="mt-10">
               <Link href="/games" className="cta-secondary">
-                All games →
+                All drops →
               </Link>
             </div>
           </>

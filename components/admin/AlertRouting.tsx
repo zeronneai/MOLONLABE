@@ -16,12 +16,12 @@ const GROUPS = [
   {
     key: "problems",
     title: "Problems with an order",
-    body: "A card charged and not recorded, an order saved without its items, spots paid for and not sold, a guide that did not build. Somebody has to act, so this list should include whoever is running the shop.",
+    body: "A card charged and not recorded, an order saved without its items, guides paid for and not recorded as sold, a guide that did not build. Somebody has to act, so this list should include whoever is running the shop.",
   },
   {
     key: "routine",
     title: "Everything else",
-    body: "New orders, inquiries and transfer requests, and a game selling out.",
+    body: "New orders, inquiries and transfer requests, and a drop selling out.",
   },
 ] as const;
 

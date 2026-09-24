@@ -13,7 +13,7 @@ const tabs = [
   // where a game is created and drawn, and dropping it left that page
   // reachable only by typing the URL.
   { href: "/admin/inventory", label: "What you sell" },
-  { href: "/admin/games", label: "Games" },
+  { href: "/admin/games", label: "Drops" },
   { href: "/admin/orders", label: "Orders" },
   { href: "/admin/inquiries", label: "Inquiries" },
   { href: "/admin/game", label: "Arcade & Offer" },

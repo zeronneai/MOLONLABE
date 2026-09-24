@@ -71,7 +71,7 @@ async function shopper() {
   check("ITEM PAGE: still resolves — an old link should not 404",
     res.status() < 400, String(res.status()));
   check("ITEM PAGE: says it is not for sale", /not for sale/i.test(text));
-  check("ITEM PAGE: explains why", /prize in a game/i.test(text));
+  check("ITEM PAGE: explains why", /featured piece in a drop/i.test(text));
   check("ITEM PAGE: has NO add-to-cart control",
     (await page.getByRole("button", { name: /add to cart|pick a size/i }).count()) === 0,
     `${await page.getByRole("button", { name: /add to cart|pick a size/i }).count()} found`);

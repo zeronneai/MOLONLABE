@@ -35,10 +35,10 @@ export default function SpotLedger({
   return (
     <section className="mt-14 border-t hairline pt-8">
       <div className="flex items-baseline justify-between gap-4">
-        <h2 className="label text-muted">Spots sold</h2>
+        <h2 className="label text-muted">Guides sold</h2>
         {owner ? (
           <a
-            href={`/admin/games/${gameId}/spots.csv`}
+            href={`/admin/games/${gameId}/guides.csv`}
             className="label text-muted hover:text-bone"
           >
             Download CSV
@@ -53,7 +53,7 @@ export default function SpotLedger({
 
       {held.length > 0 && (
         <p className="label mt-4 text-amber">
-          {held.length} {held.length === 1 ? "spot is" : "spots are"} mid-checkout.
+          {held.length} {held.length === 1 ? "guide is" : "guides are"} mid-checkout.
           They go back on sale by themselves if the payment never lands.
         </p>
       )}
@@ -63,8 +63,8 @@ export default function SpotLedger({
       ) : (
         <>
           <p className="mt-4 max-w-[60ch] text-sm text-muted">
-            Buyer details, for you only. Nothing on this list is public —
-            the game page shows how many spots remain and nothing else.
+            Buyer details, for staff only. Nothing on this list is public.
+            The drop page shows how many guides remain and nothing else.
           </p>
           <div className="mt-6 border-t hairline">
             {shown.map((s) => (

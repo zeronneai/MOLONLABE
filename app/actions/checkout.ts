@@ -248,14 +248,14 @@ export async function submitCheckout(
       await releaseClaims(sb, claims);
       return {
         ok: false,
-        message: "Accept the game terms before we can take payment.",
+        message: "Accept the terms of this drop before we can take payment.",
       };
     }
     const { data: spots, error } = await sb.rpc("claim_game_spots", {
       p_game: cart.spotGame.id,
       p_qty: cart.spotCount,
     });
-    if (error) logDbError("checkout claim spots", error);
+    if (error) logDbError("checkout claim_game_spots", error);
     claimedSpots = spots ?? [];
     if (claimedSpots.length !== cart.spotCount) {
       await releaseClaims(sb, claims);
@@ -263,12 +263,12 @@ export async function submitCheckout(
         ok: false,
         message:
           cart.spotCount === 1
-            ? "That spot went while you were checking out. Nothing has been charged."
-            : `There aren't ${cart.spotCount} spots left any more. Nothing has been charged.`,
+            ? "That guide went while you were checking out. Nothing has been charged."
+            : `There aren't ${cart.spotCount} guides left any more. Nothing has been charged.`,
       };
     }
     claims.push({
-      kind: "spots",
+      kind: "spots", // copy-check: internal discriminant, never displayed
       gameId: cart.spotGame.id,
       spots: claimedSpots,
     });
@@ -437,9 +437,10 @@ export async function submitCheckout(
         ...(cart.spotGame && claimedSpots.length > 0
           ? [
               {
-                name: `${cart.spotGame.title} — ${claimedSpots.length === 1 ? "spot" : "spots"} ${claimedSpots.join(", ")}`,
+                name: `${cart.spotGame.title} — ${claimedSpots.length === 1 ? "guide number" : "guide numbers"} ${claimedSpots.join(", ")}`,
                 size: null,
                 quantity: claimedSpots.length,
+                // copy-check: internal payload value the Apps Script reads (docs/email.md); the summary says it in words
                 hold: "spot" as const,
               },
             ]
@@ -502,12 +503,12 @@ export async function submitCheckout(
       // Opt-in. False unless the box was ticked, never inferred.
     });
     if (error) {
-      logDbError("checkout sell spots", error);
+      logDbError("checkout sell_game_spots", error);
       await notifyOwner({
         kind: "order_error",
         severity: "urgent",
         failure: "spots_not_sold",
-        message: `Order ${number} paid for ${claimedSpots.length} spots that were not recorded as sold.`,
+        message: `Order ${number} paid for ${claimedSpots.length} guides that were not recorded as sold.`,
         order_number: number,
         email: data.customer.email,
         spot_numbers: claimedSpots,
@@ -787,12 +788,12 @@ async function releaseClaims(
     if (error) logDbError("checkout release", error);
   }
   for (const claim of claims) {
-    if (claim.kind === "spots") {
+    if (claim.kind === "spots") { // copy-check: internal discriminant, never displayed
       const { error } = await sb.rpc("release_game_spots", {
         p_game: claim.gameId,
         p_spots: claim.spots,
       });
-      if (error) logDbError("checkout release spots", error);
+      if (error) logDbError("checkout release_game_spots", error);
       continue;
     }
     if (claim.kind !== "variant") continue;

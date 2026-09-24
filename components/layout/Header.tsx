@@ -12,7 +12,7 @@ const nav = [
   // "Featured" is gone from the top level: it is one game, and Games is
   // the page that holds all of them.
   { href: "/shop", label: "Shop" },
-  { href: "/games", label: "Games" },
+  { href: "/games", label: "Drops" },
   { href: "/in-the-case", label: "In the case" },
   { href: "/transfers", label: "Transfers" },
   { href: "/services", label: "Services" },

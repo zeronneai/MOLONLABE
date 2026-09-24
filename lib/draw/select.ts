@@ -138,7 +138,7 @@ export function verifyDraw(audit: DrawAudit): Verification {
   if (audit.pool.length !== audit.total)
     return {
       ok: false,
-      reason: `The recorded pool holds ${audit.pool.length} spots but the recorded total is ${audit.total}.`,
+      reason: `The recorded pool holds ${audit.pool.length} guides but the recorded total is ${audit.total}.`,
     };
 
   const replay = selectWinner(
@@ -157,13 +157,13 @@ export function verifyDraw(audit: DrawAudit): Verification {
   if (!winner)
     return {
       ok: false,
-      reason: "The re-run picked a spot that is not in the recorded pool.",
+      reason: "The re-run picked a guide number that is not in the recorded pool.",
     };
 
   if (winner.spot_number !== audit.ticket)
     return {
       ok: false,
-      reason: `Re-running the seed picked spot ${winner.spot_number}, but spot ${audit.ticket} was announced.`,
+      reason: `Re-running the seed picked guide #${winner.spot_number}, but guide #${audit.ticket} was announced.`,
     };
 
   return { ok: true, spotNumber: winner.spot_number, spotId: winner.spot_id };

@@ -245,7 +245,7 @@ check("MANAGER can open the presentation", presentation?.status() === 200,
 // ------------------------------------------- what he cannot, on screen
 t = await visit(m, "/admin/games");
 check("the spot export shows as owner only on the games list", has(t, "CSV · owner only"));
-const csv = await m.request.get(`${APP}/admin/games/${GAME}/spots.csv`);
+const csv = await m.request.get(`${APP}/admin/games/${GAME}/guides.csv`);
 check("and the export itself is refused by the server",
   csv.status() === 403 && has(await csv.text(), OWNER_ONLY), `${csv.status()}`);
 
@@ -407,7 +407,7 @@ check("and the owner is told it went to the script's usual address",
 check("the draw's log line names the game",
   (await dump()).admin_activity.some((r) => r.action === "draw" && r.entity_label === "September Rifle Game"));
 
-const ownerCsv = await o.request.get(`${APP}/admin/games/${GAME}/spots.csv`);
+const ownerCsv = await o.request.get(`${APP}/admin/games/${GAME}/guides.csv`);
 check("OWNER can still export the spot list", ownerCsv.status() === 200 &&
   has(await ownerCsv.text(), "ana1@example.com"), String(ownerCsv.status()));
 

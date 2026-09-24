@@ -53,7 +53,7 @@ const browser = await chromium.launch({ executablePath: CHROMIUM });
     `${(await dump()).winners.length} winners after the first confirm`);
   check("ADMIN: a second confirmation names the shortfall",
     new RegExp(`${unsold}\\s*of\\s*${TOTAL}`, "i").test(body),
-    (body.match(/\d+ OF \d+ SPOTS UNSOLD[^\n]*/i) ?? ["NOT NAMED"])[0]);
+    (body.match(/\d+ OF \d+ GUIDES UNSOLD[^\n]*/i) ?? ["NOT NAMED"])[0]);
   check("ADMIN: and says why it matters, not just 'are you sure'",
     /against the terms/i.test(body));
 

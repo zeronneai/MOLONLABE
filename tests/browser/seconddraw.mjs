@@ -102,7 +102,7 @@ check("REPLAY: it is the SAME row — not a new draw that agreed by luck",
 
 const stageAfter = await page.locator("body").innerText();
 check("REPLAY: the screen shows the original spot number",
-  new RegExp(`Spot ${first.ticket}\\b`, "i").test(stageAfter),
+  new RegExp(`Guide #${first.ticket}\\b`, "i").test(stageAfter),
   (stageAfter.match(/Spot \d+[^\n]{0,50}/i) ?? ["NOT SHOWN"])[0]);
 check("REPLAY: and the original seed, so the record on camera is unchanged",
   stageAfter.includes(first.seed), first.seed);

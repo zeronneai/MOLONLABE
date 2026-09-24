@@ -86,7 +86,7 @@ export default async function AdminGamePage() {
         <h2 className="label text-acid">Difficulty</h2>
         <p className="mt-2 max-w-[52ch] text-[11px] text-muted">
           Watch the win rate next to each mode after a change instead of
-          guessing. Roughly 30% is the sweet spot.
+          guessing. Roughly 30% is about right.
         </p>
         <div className="mt-6 space-y-10">
           <DifficultyForm

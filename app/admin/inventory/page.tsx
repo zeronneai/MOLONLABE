@@ -145,8 +145,8 @@ export default async function AdminInventory({
         <SurfaceSection
           surface="games"
           count={games?.length ?? 0}
-          unit="game"
-          add={{ href: "/admin/games/new", label: "+ New game" }}
+          unit="drop"
+          add={{ href: "/admin/games/new", label: "+ New drop" }}
         >
           {games && games.length > 0 ? (
             <ul>
@@ -161,7 +161,7 @@ export default async function AdminInventory({
                       <span className="min-w-0">
                         <span className="block truncate text-sm">{g.title}</span>
                         <span className="label mt-1 block">
-                          {g.status} · {formatUsd(g.spot_price_cents)} a spot
+                          {g.status} · {formatUsd(g.spot_price_cents)} a guide
                         </span>
                       </span>
                       <span className="display shrink-0 text-lg">
@@ -175,8 +175,8 @@ export default async function AdminInventory({
             </ul>
           ) : (
             <p className="py-8 text-sm text-muted">
-              No games yet. A game needs a prize, how many spots, and what a
-              spot costs.
+              No drops yet. A drop needs a featured piece, how many guides,
+              and what a guide costs.
             </p>
           )}
         </SurfaceSection>
@@ -196,7 +196,7 @@ export default async function AdminInventory({
             surface="games"
             id="prizes"
             heading="Items used as prizes"
-            blurb="These are prizes. While their game is open or full they are out of the Shop and out of the case, and they cannot be bought — customers are paying for a chance at them. They go back to normal once the game is drawn."
+            blurb="These are the featured pieces in drops. While their drop is open or sold out they are out of the Shop and out of the case, and they cannot be bought outright: customers are buying guides to them, with entry into the drawing. They go back to normal once the drop is drawn."
             count={asPrize.length}
           >
             {asPrize.map((item) => {

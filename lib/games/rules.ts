@@ -53,10 +53,47 @@ export const RULES_NEEDS_SHOP = {
     "Any limit by state or residency beyond the age requirement — the shop to confirm.",
 } as const;
 
+/**
+ * Clauses waiting on the attorney since the terminology ruling.
+ *
+ * The ruling: what a customer buys is a guide to the featured piece, and
+ * entry into the drawing comes with it. Every clause below that used one
+ * of the old words ("spot", "ticket") was legal wording, frozen until the
+ * attorney returns it, so it has NOT been reworded here. Each is replaced
+ * by a line saying what the clause covers and that its wording is
+ * awaited. Nothing on this list is a statement of the rules.
+ *
+ * The previous text of each, for the attorney to work from, is in
+ * docs/wording.md. It is not kept here because it is exactly the wording
+ * that may no longer be shown, and scripts/check-copy.mjs would rightly
+ * refuse it.
+ */
+export const RULES_NEEDS_ATTORNEY = {
+  age: "Minimum age to buy a guide and to win.",
+  fixedPool: "How many guides a drop offers and at what price, and that neither changes while it runs.",
+  purchase: "That buying a guide is a purchase, and how sales tax applies to it.",
+  finalSale: "Refunds, exchanges and transfers.",
+  limits: "Limits on how many guides one person or one order may buy.",
+  numbering: "How guide numbers are assigned.",
+  cartMerge: "Adding more guides to a cart that already holds some from the same drop.",
+  holds: "Guide numbers held during checkout, and released if the payment does not complete.",
+  noFreeRoute: "Whether there is any way to enter the drawing without buying a guide.",
+  duration: "How long a drop runs.",
+  earlyDraw: "Holding the drawing before every guide is sold.",
+  pool: "Which guides are in the drawing.",
+  odds: "Each guide's chance of winning.",
+  seed: "The recorded random seed, and how a drawing can be checked afterwards.",
+  contact: "How the shop contacts the winner, and keeping contact details current.",
+  publicNames: "Whether buyers' names appear anywhere public.",
+  summaryFinalSale: "Final-sale sentence",
+} as const;
+
 export type RuleClause = {
   text: string;
   /** Rendered inline, marked as outstanding. */
   pending?: string;
+  /** Rendered inline, marked as waiting on the attorney's wording. */
+  attorney?: string;
   /** Set for the attorney's wording, which is never reflowed or edited. */
   verbatim?: boolean;
 };
@@ -89,9 +126,7 @@ export const RULES: RuleSection[] = [
   {
     heading: "Who can take part",
     clauses: [
-      {
-        text: "You must be 21 or older to buy a spot or to win a prize.",
-      },
+      { text: "", attorney: RULES_NEEDS_ATTORNEY.age },
       {
         text: "You must be able to receive a firearm lawfully under federal, state and local law. If you cannot, you cannot take part.",
       },
@@ -102,66 +137,41 @@ export const RULES: RuleSection[] = [
     ],
   },
   {
-    heading: "How spots work",
+    heading: "How guides work",
     clauses: [
+      { text: "", attorney: RULES_NEEDS_ATTORNEY.fixedPool },
+      { text: "", attorney: RULES_NEEDS_ATTORNEY.purchase },
+      { text: "", attorney: RULES_NEEDS_ATTORNEY.finalSale },
       {
-        text: "Each game offers a fixed number of spots at a fixed price. Both are set when the game opens and neither changes while it runs.",
+        // Fact for the attorney: there is no limit per person or per
+        // order. The only bound is how many guides are left.
+        text: "",
+        attorney: RULES_NEEDS_ATTORNEY.limits,
       },
+      { text: "", attorney: RULES_NEEDS_ATTORNEY.numbering },
+      { text: "", attorney: RULES_NEEDS_ATTORNEY.cartMerge },
+      { text: "", attorney: RULES_NEEDS_ATTORNEY.holds },
       {
-        text: `Buying a spot is a purchase, not an entry fee. Texas sales tax is added at checkout at the rate in force at the time — currently ${SALES_TAX_DISPLAY}. The total shown at checkout is the amount you pay.`,
-      },
-      {
-        text: "Spot purchases are final. No refunds, no exchanges, no transfers. This applies whether or not you win.",
-      },
-      {
-        // No number here, because there is no limit to state. There used
-        // to be one — 25 an order — and it was in these rules as though
-        // it were policy while being something I picked while building
-        // the quantity control. The only real limit is how many spots
-        // are left, so that is what the clause says.
-        text: "You may buy as many spots as you like, up to however many are left in the game. There is no limit per person and no limit per order.",
-      },
-      {
-        text: "Spot numbers are assigned when you buy — you do not choose them. You get the lowest numbers still free, so if spots 2 and 4 have gone and you take three, you get 1, 3 and 5.",
-      },
-      {
-        text: "Adding more spots to your cart for the same game adds to what is already there. Your cart shows the running total before you pay.",
-      },
-      {
-        text: "Your spots are held while you check out and are released back to the game if the payment does not complete. A spot is only yours once payment succeeds.",
-      },
-      {
-        // Stated as fact rather than left out. A rules page that simply
-        // says nothing about a free route reads as an oversight; the
-        // shop made this decision deliberately and the terms should show
-        // that it was made. See the note in lib/legal.ts.
-        text: "A spot can only be bought. There is no free or alternative way to get one.",
+        // Fact for the attorney: there is no free or alternative route.
+        // The shop decided that deliberately; see lib/legal.ts.
+        text: "",
+        attorney: RULES_NEEDS_ATTORNEY.noFreeRoute,
       },
     ],
   },
   {
     heading: "When a game closes",
     clauses: [
-      {
-        text: "A game runs until every spot is sold. There is no end date and no countdown.",
-      },
-      {
-        text: "The shop may hold the drawing before every spot is sold, at its sole discretion. Where that happens, the number of spots left unsold is recorded and shown on the game.",
-      },
+      { text: "", attorney: RULES_NEEDS_ATTORNEY.duration },
+      { text: "", attorney: RULES_NEEDS_ATTORNEY.earlyDraw },
     ],
   },
   {
     heading: "How the winner is chosen",
     clauses: [
-      {
-        text: "One spot is drawn at random from the spots that have sold. Unsold spots are not in the drawing.",
-      },
-      {
-        text: "Every sold spot has the same chance. Someone holding five spots therefore has five times the chance of someone holding one.",
-      },
-      {
-        text: "The drawing uses a recorded random seed. The shop keeps that seed, the winning spot number and the number of spots sold, so the drawing can be run again from the record and checked against the result that was announced.",
-      },
+      { text: "", attorney: RULES_NEEDS_ATTORNEY.pool },
+      { text: "", attorney: RULES_NEEDS_ATTORNEY.odds },
+      { text: "", attorney: RULES_NEEDS_ATTORNEY.seed },
       {
         text: "A game is drawn once. A game that already has a winner cannot be drawn again.",
       },
@@ -170,9 +180,7 @@ export const RULES: RuleSection[] = [
   {
     heading: "Claiming a prize",
     clauses: [
-      {
-        text: "The shop contacts the winner directly, using the name, email address and phone number given when the spots were bought. Keep those details current — they are the only way the shop has to reach you.",
-      },
+      { text: "", attorney: RULES_NEEDS_ATTORNEY.contact },
       {
         text: "",
         pending: RULES_NEEDS_SHOP.claimWindow,
@@ -201,9 +209,7 @@ export const RULES: RuleSection[] = [
   {
     heading: "Your name and details",
     clauses: [
-      {
-        text: "Spots are anonymous on the public board by default. A first name and last initial appear only if you ticked the box at checkout asking for that. Your email address and phone number are never shown.",
-      },
+      { text: "", attorney: RULES_NEEDS_ATTORNEY.publicNames },
       {
         text: "A winner is published the same way — first name and last initial, nothing more.",
       },
@@ -220,4 +226,4 @@ export const RULES: RuleSection[] = [
  * lawful-possession requirement — and there is one copy of it.
  */
 export const ELIGIBILITY_SUMMARY =
-  "Open to entrants 21 or older who may lawfully take possession of a firearm under federal, state and local law. Spot purchases are final. Void where prohibited.";
+  "Open to entrants 21 or older who may lawfully take possession of a firearm under federal, state and local law. [Final-sale sentence: awaiting the attorney's wording.] Void where prohibited.";

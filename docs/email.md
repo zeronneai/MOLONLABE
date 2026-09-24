@@ -128,26 +128,37 @@ then the item if there is one, then the message.
 present as keys, never absent. `item_id` and `item_slug` are set only for
 an enquiry raised from a product page.
 
-### `entry` → the shop
+### `entry`
 
-A free entry was submitted.
+No longer sent. It belonged to the free-entry model the fixed-pool
+rebuild replaced, and nothing in the site produces it.
+
+### `game_full` → the shop
+
+The last guide in a drop sold. Routine list.
 
 ```json
 {
-  "kind": "entry",
-  "name": "Marco Peña",
-  "email": "marco.pena@example.com",
-  "phone": "915-555-0188",
-  "campaign": "September Rifle Giveaway",
-  "method": "free",
-  "summary": "FREE ENTRY — September Rifle Giveaway\nMarco Peña · marco.pena@example.com · (915) 555-0188\n\nNo purchase. One entry.",
-  "submitted_at": "2026-09-09T22:00:08.108Z"
+  "kind": "game_full",
+  "game": "September Rifle Drop",
+  "game_id": "55555555-5555-4555-8555-555555555555",
+  "total_spots": 5,
+  "item": "SIG MPX Carbon",
+  "notify_group": "routine",
+  "subject": "September Rifle Drop has SOLD OUT — ready to draw",
+  "summary": "SOLD OUT — September Rifle Drop\nAll 5 guides are sold. …",
+  "submitted_at": "…"
 }
 ```
 
-`name` is already joined into one string. `campaign` is the title, not an
-id. `method` is always `"free"` — purchase entries are reported by the
-`order` kind instead, so nothing is counted twice.
+`game` and `total_spots` are field names kept for compatibility; the
+script shows them in the sheet as `drop` and `total_guides`.
+
+### `test_alert` → whichever list it names
+
+Sent by "Send a test" in Team & alerts. `group` is `problems` or
+`routine`; `requested_by` is who pressed it. The script answers with
+`delivered_to`, which the admin shows.
 
 ### `order` → the shop
 
@@ -175,9 +186,10 @@ why it can report whether that worked.
   "pickup_lines": [
     { "name": "SIG MPX Carbon", "size": null, "quantity": 1, "line_total_cents": 219900 }
   ],
-  "entries_awarded": 2231,
-  "campaign": "September Rifle Giveaway",
+  "spot_numbers": [],
+  "game": null,
   "confirmation_emailed": true,
+  "notify_group": "routine",
   "summary": "NEW ORDER — MLF-FB259M\nDana Ruiz · …",
   "submitted_at": "2026-09-10T14:52:53.864Z"
 }
@@ -198,8 +210,6 @@ SHIPS
 Subtotal $2,231.00 · Tax $184.06 · Shipping $10.00
 Total $2,425.06 · Visa ending 1111
 
-Earned 2231 entries in September Rifle Giveaway.
-
 Background check due at pickup.
 ```
 
@@ -209,7 +219,7 @@ Background check due at pickup.
 | `phone` | **As the customer typed it.** The summary formats it; the field is raw, so the sheet keeps what was actually entered |
 | `ships` / `collects` | Item names only. Unchanged, for the sheet columns that already exist |
 | `ship_lines` / `pickup_lines` | The same lines with size, quantity and price. What the summary is built from |
-| `entries_awarded` | This order only, not the running total |
+| `spot_numbers` / `game` | Guide numbers bought in this order and the drop's title; empty and null on a plain sale. Field names kept for compatibility; the script writes them to the sheet as `guide_numbers` and `drop` |
 | `confirmation_emailed` | `false` means the customer has no copy. The summary says so in words too |
 
 `ships`/`collects` duplicate what is in `ship_lines`/`pickup_lines` and
@@ -301,6 +311,11 @@ Every owner-facing payload now carries `notify_group`, and carries
 `notify_to` (an array of addresses) **only when that group's list is not
 empty**. An empty list sends exactly the payload the script has always
 received, so nothing changes until an address is entered.
+
+**The complete script is in [`docs/apps-script/Code.gs`](apps-script/Code.gs)**:
+paste it over the project's Code.gs, set `DEFAULT_TO`, and redeploy the
+existing deployment as a new version. `tests/browser/appsscript.mjs`
+runs it against the payloads the site really sends.
 
 **The script has to be updated to honour it.** The site cannot choose who
 Apps Script emails; it can only ask. Until the script reads `notify_to`,

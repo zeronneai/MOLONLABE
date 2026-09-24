@@ -307,12 +307,12 @@ export default function DrawStage({
       "",
       reveal.name,
       "",
-      `Winning spot ${reveal.ticket}`,
-      `${reveal.total} ${reveal.total === 1 ? "spot" : "spots"} sold to ${activeEntrants} ${activeEntrants === 1 ? "buyer" : "buyers"}`,
+      `Winning guide #${reveal.ticket}`,
+      `${reveal.total} ${reveal.total === 1 ? "guide" : "guides"} sold to ${activeEntrants} ${activeEntrants === 1 ? "buyer" : "buyers"}`,
       `Drawn ${stamp(reveal.drawnAt)} MT`,
       `Seed ${reveal.seed}`,
       "",
-      `Every spot was one ticket. ${SHOP_SHORT_NAME}`,
+      `Every guide was one entry. ${SHOP_SHORT_NAME}`,
     ].join("\n");
   }, [reveal, prizeName, activeEntrants]);
 
@@ -386,7 +386,7 @@ export default function DrawStage({
 
             <dl className="draw-stats">
               <div>
-                <dt className="label">Spots sold</dt>
+                <dt className="label">Guides sold</dt>
                 <dd>{activeEntries.toLocaleString()}</dd>
               </div>
               <div>
@@ -401,8 +401,8 @@ export default function DrawStage({
 
             {alreadyDrawn && !rehearsal && (
               <p className="draw-note">
-                This game already has a winner. Starting replays the
-                recorded result — it will not draw again.
+                This drop already has a winner. Starting replays the
+                recorded result. It will not draw again.
               </p>
             )}
 
@@ -410,9 +410,9 @@ export default function DrawStage({
               <div className="draw-note draw-note-caution">
                 <p>
                   <strong>{unsoldSpots}</strong> of{" "}
-                  <strong>{unsoldSpots + activeEntries}</strong> spots are
-                  unsold. The terms buyers agreed to say the game runs until
-                  every spot sells, so drawing now goes against them. It will
+                  <strong>{unsoldSpots + activeEntries}</strong> guides are
+                  unsold. The terms buyers agreed to say the drop runs until
+                  every guide sells, so drawing now goes against them. It will
                   be recorded on the result.
                 </p>
                 <label className="draw-note-ack">
@@ -421,7 +421,7 @@ export default function DrawStage({
                     checked={earlyAccepted}
                     onChange={(e) => setEarlyAccepted(e.target.checked)}
                   />
-                  <span>I understand — draw this game short.</span>
+                  <span>I understand. Draw this drop short.</span>
                 </label>
               </div>
             )}
@@ -442,7 +442,7 @@ export default function DrawStage({
                 {busy
                   ? "Drawing…"
                   : activeEntries === 0
-                    ? "No spots sold"
+                    ? "No guides sold"
                     : rehearsal
                       ? "Start rehearsal"
                       : alreadyDrawn
@@ -524,7 +524,7 @@ export default function DrawStage({
             {poolView.hidden > 0 && (
               <p className="draw-pool-note label">
                 showing {poolView.tiles.length.toLocaleString()} of{" "}
-                {poolView.total.toLocaleString()} spots
+                {poolView.total.toLocaleString()} guides
               </p>
             )}
           </>
@@ -553,9 +553,9 @@ export default function DrawStage({
                 20-spot game with 12 sold and spot 16 drawn rendered
                 "Entry 16 of 12" on the screen being filmed. */}
             <p>
-              Spot <strong>{reveal.ticket.toLocaleString()}</strong> ·{" "}
+              Winning guide <strong>#{reveal.ticket.toLocaleString()}</strong> ·{" "}
               {reveal.total.toLocaleString()}{" "}
-              {reveal.total === 1 ? "spot" : "spots"} sold ·{" "}
+              {reveal.total === 1 ? "guide" : "guides"} sold ·{" "}
               {stamp(reveal.drawnAt)} MT
             </p>
             <p>seed {reveal.seed}</p>
@@ -582,7 +582,7 @@ export default function DrawStage({
                 this there was no way off the screen once a winner was up
                 except the browser's own back button. */}
             <a href={`/admin/games/${gameId}`} className="control control-sm">
-              Back to the game
+              Back to the drop
             </a>
           </div>
         )}

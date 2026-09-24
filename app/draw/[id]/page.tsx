@@ -71,7 +71,7 @@ export default async function DrawPresentation({
   // database.
   const pool: PoolMember[] = (spots ?? []).map((sp) => ({
     id: sp.id,
-    name: `Spot ${sp.spot_number}`,
+    name: `Guide #${sp.spot_number}`,
     weight: 1,
   }));
 
@@ -83,7 +83,7 @@ export default async function DrawPresentation({
       gameId={game.id}
       prizeName={item?.name ?? game.title}
       prizeImage={prizeImage}
-      closesLabel={`${pool.length} of ${game.total_spots} spots sold`}
+      closesLabel={`${pool.length} of ${game.total_spots} guides sold`}
       pool={pool}
       entries={pool.length}
       entrants={new Set((spots ?? []).map((sp) => sp.spot_number)).size}

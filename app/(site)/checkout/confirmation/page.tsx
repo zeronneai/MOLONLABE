@@ -205,15 +205,15 @@ export default async function ConfirmationPage({
         {spots && (
           <div className="mt-8 border-l-2 border-acid pl-5">
             <p className="text-sm text-acid">
-              {spots.numbers.length === 1 ? "Spot" : "Spots"}{" "}
+              {spots.numbers.length === 1 ? "Guide number" : "Guide numbers"}{" "}
               <span className="font-extrabold tracking-[-0.02em]">
                 {spots.numbers.join(", ")}
               </span>{" "}
               of {spots.totalSpots} in {spots.game}.
             </p>
             <p className="mt-2 max-w-[56ch] text-sm text-muted">
-              The draw happens once the last spot sells. There is no end
-              date — the game runs until it fills.{" "}
+              The draw happens once the last guide sells. There is no end
+              date. The drop runs until it sells out.{" "}
               <Link href="/featured" className="underline hover:text-bone">
                 Watch the board
               </Link>

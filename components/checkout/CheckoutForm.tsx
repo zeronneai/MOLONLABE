@@ -178,7 +178,7 @@ export default function CheckoutForm({
     setFieldErrors({});
 
     if (buyingSpots && !gameTerms) {
-      setError("Accept the game terms before we can take payment.");
+      setError("Accept the terms of this drop before we can take payment.");
       return;
     }
     if (!accepted) {
@@ -430,7 +430,7 @@ export default function CheckoutForm({
         {buyingSpots && (
           <section className="mt-12 border-t hairline pt-8">
             <h2 className="label text-amber">
-              Terms of this game
+              Terms of this drop
             </h2>
             <ul className="mt-4 max-w-[62ch] space-y-2">
               {GAME_TERMS.map((line) => (
@@ -506,10 +506,10 @@ export default function CheckoutForm({
 
           {buyingSpots && (
             <p className="mt-5 border-t hairline pt-5 text-sm text-acid">
-              {cart.spotCount} {cart.spotCount === 1 ? "spot" : "spots"} in{" "}
+              {cart.spotCount} {cart.spotCount === 1 ? "guide" : "guides"} from{" "}
               {cart.spotGame!.title}.{" "}
               <span className="text-muted">
-                Numbers are assigned when you pay.
+                Guide numbers are assigned when you pay.
               </span>
             </p>
           )}

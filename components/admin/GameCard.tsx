@@ -34,7 +34,7 @@ export default function GameCard({
         <div className="min-w-0">
           <p className="display truncate text-lg">{game.title.toUpperCase()}</p>
           <p className="label mt-1 text-muted">
-            {itemName ?? "No prize set"} · {formatUsd(game.spot_price_cents)} a spot
+            {itemName ?? "No featured piece set"} · {formatUsd(game.spot_price_cents)} a guide
           </p>
         </div>
         <div className="shrink-0 text-right">
@@ -65,7 +65,7 @@ export default function GameCard({
         <div className="ml-auto flex items-center gap-2">
           {owner ? (
             <a
-              href={`/admin/games/${game.id}/spots.csv`}
+              href={`/admin/games/${game.id}/guides.csv`}
               className="label flex h-11 items-center px-3 text-muted hover:text-bone"
             >
               CSV

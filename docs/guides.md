@@ -93,9 +93,16 @@ the only version of this that stays true.
 ### The fingerprint covers the renderer, not just its inputs
 
 `GUIDE_RENDERER_VERSION` in `lib/guides/version.ts` is a hash of every
-source file that decides what a guide looks like — `Document.tsx`,
-`theme.ts`, `images.ts`, `fonts.ts`, `build.ts` — plus the installed
-versions of `@react-pdf/renderer`, `sharp` and `pdfkit`. It is generated
+source file the renderer imports, found by following its imports from
+`build.ts` and `Document.tsx` rather than listed by hand, plus the
+installed versions of `@react-pdf/renderer`, `sharp` and `pdfkit`.
+`node scripts/gen-guide-version.mjs --list` prints the files.
+
+It used to be a hand-kept list of five, and it missed the three files
+that put words on the page: `fields.ts` (section headings), `lib/brand.ts`
+(the shop's name, address and phone) and `lib/legal.ts` (the firearm
+disclaimer). A wording change in any of them would have left every guide
+already sold printing the old text. It is generated
 by `scripts/gen-guide-version.mjs`, which runs as the first step of
 `npm run build`, and it is committed so a test run and a deployment agree
 about what the current renderer is.

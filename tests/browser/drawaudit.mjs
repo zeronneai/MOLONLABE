@@ -209,7 +209,7 @@ check("verifyDraw rejects a record with no pool at all",
 
 // --------------------------------------- and the screen agrees with it
 check("the screen names the spot that was actually drawn",
-  new RegExp(`Spot ${row.ticket}\\b`).test(screen),
+  new RegExp(`Guide #${row.ticket}\\b`).test(screen),
   (screen.match(/Spot \d+[^\n]*/) ?? ["not shown"])[0]);
 // The name is uppercased in CSS, so match case-insensitively — what
 // matters is that it is a given name plus a single initial and that no

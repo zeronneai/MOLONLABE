@@ -24,15 +24,16 @@ sold in person through the counter.
 **Item page.** Photographs, description, specifications, and either an
 add-to-cart control or an enquiry form depending on which surface the
 item belongs to. Apparel shows a size picker and greys out sizes that are
-out of stock. An item that is currently a prize in a running game shows
-"NOT FOR SALE" instead of either.
+out of stock. An item that is currently the featured piece in a running drop
+shows "NOT FOR SALE" instead of either.
 
-**The game (featured).** The game currently running: what the prize is,
-what a spot costs, how many are left, and a control to take one or more
-spots. A sold-out game says so and says the draw is next. Past winners
-are listed underneath by first name and last initial.
+**The featured drop.** The drop currently running: the featured piece,
+what a guide costs, how many guides are left, and a control to get one
+or more. Each guide comes with entry into the drawing. A sold-out drop
+says so and says the draw is next. Past winners are listed underneath by
+first name and last initial.
 
-**Games.** Every game in three groups: open now, sold out and awaiting
+**Drops.** Every drop in three groups: open now, sold out and awaiting
 the draw, and finished with the winner shown.
 
 **Cart.** What the visitor has picked, split into things that ship and
@@ -44,16 +45,16 @@ complete a firearm sale.
 and card details. The card goes straight from the browser to
 Authorize.net and never touches the shop's server. Tax and shipping are
 calculated by the site, not typed in. The visitor must tick the firearms
-disclaimer, and a second box for the game terms when the cart holds
-spots.
+disclaimer, and a second box for the drop's terms when the cart holds
+guides.
 
-**Order confirmation.** What was bought, what was paid, the spot numbers
-if any, the guide that came with a spot purchase, and the exact terms
+**Order confirmation.** What was bought, what was paid, the guide
+numbers if any, the link to the guide, and the exact terms
 that were accepted. Reachable later from the link in the confirmation
 email, for one year.
 
-**The guide.** A PDF about the prize, produced for each game, given to
-anyone who buys a spot. Linked from the confirmation page and the
+**The guide.** A PDF about the featured piece, produced for each drop,
+given to anyone who buys a guide. Linked from the confirmation page and the
 confirmation email. Contains the piece's name, brand, specifications and
 description, its photographs, and three sections the owner writes.
 
@@ -110,29 +111,29 @@ specifications, price, how it is fulfilled, sizes and stock for apparel,
 photographs, and a video link. The form shows only the price field that
 applies to the category.
 
-**Games.** Every game with how many spots have sold.
+**Drops.** Every drop with how many guides have sold.
 
-**New game.** Pick the prize, set how many spots and what a spot costs,
-and write the three guide sections. The two numbers are permanent once
-the game exists. The screen shows what the game takes if it sells out
-against what the prize is worth. **The game cannot be created until all
+**New drop.** Pick the featured piece, set how many guides and what a
+guide costs, and write the three guide sections. The two numbers are
+permanent once the drop exists. The screen shows what the drop takes if
+it sells out against what the prize is worth. **The drop cannot be created until all
 three guide sections are written**, because that is what the customer is
 paying for.
 
-**Edit a game.** The title, description, the three guide sections and the
-note shown after the draw. The spot count and price cannot be changed. A
+**Edit a drop.** The title, description, the three guide sections and the
+note shown after the draw. The number of guides and the price cannot be changed. A
 button opens the guide exactly as a customer sees it, and another rebuilds
 it. If the last guide came out with fewer photographs than the item has,
 the screen says so in red.
 
-**Spot ledger.** Who holds which spot, with an export to a spreadsheet.
+**Guides sold.** Who holds which guide number, with an export to a spreadsheet.
 The export is owner only.
 
 **Draw a winner.** Two ways: a full-screen presentation at a separate
 address for filming, or a plain button. Drawing twice returns the same
-winner rather than picking a second one. Drawing before a game sells out
+winner rather than picking a second one. Drawing before a drop sells out
 asks for confirmation and records that it was early. After the draw the
-game page shows the winner's name, email, phone, spot and order number,
+drop's page shows the winner's name, email, phone, guide number and order number,
 so whoever ran the draw can contact them.
 
 **Orders.** Every order with what was bought, what was paid, and the card
@@ -173,8 +174,9 @@ reached. Owner only.
    manager role, in that order and after step 1. `docs/roles.md`,
    "Creating the manager's account". Then sign in as him once and check
    that Tax & Shipping is greyed out.
-3. Update the Apps Script to send to the `notify_to` list, as shown in
-   `docs/email.md`, "Who receives an alert". Until then the recipient
+3. Replace the Apps Script with `docs/apps-script/Code.gs`, set its
+   `DEFAULT_TO`, run `setupCheck()` once in the editor, and redeploy the
+   existing deployment as a new version. Until then the recipient
    lists in Team & alerts do nothing. Then put the manager's address in
    the problems list and press Send a test for both lists.
 4. Turn off "Allow new users to sign up" in Supabase Authentication.
@@ -196,8 +198,8 @@ reached. Owner only.
 12. Put the agency's real phone number in `AGENCY_CONTACT`. It currently
    reads "(number to be supplied)" and is printed in the alert the owner
    gets if a card is charged and the order fails to save.
-13. Buy one real spot on the live site with a real card, confirm the
-    order, the email, the spot numbers and the guide, then refund it.
+13. Buy one real guide on the live site with a real card, confirm the
+    order, the email, the guide numbers and the guide, then refund it.
 14. Run one declined card (`4000 0000 0000 0002` in sandbox) and confirm
     a second attempt with a good card succeeds.
 15. Run `npm run audit:cloudinary -- --check` and re-upload anything it
@@ -248,19 +250,21 @@ reached. Owner only.
 3. Approve or rewrite the refund line.
 4. Approve or rewrite the pickup notice, which says that paying online
    does not complete a firearm sale. That wording is ours.
-5. Confirm the final wording for what is being sold, which is still open.
-   The site says "spots" today and the terms are frozen until this is
-   settled.
+5. Return wording for the sixteen rules clauses and the final-sale line
+   now showing "Awaiting the attorney's wording" on the rules page. Each
+   is listed with its previous text in `docs/wording.md`. The site follows
+   the terminology ruling everywhere else.
+6. Confirm the checkout terms, which were changed by word substitution
+   only (spot to guide, game to drop). They are stored on every order.
 
 ---
 
 ## 3. Open questions
 
-1. What is the final public wording for what a customer buys? The
-   attorney approved "the customer buys a guide and entry into the
-   drawing comes with it", but the site, the admin and the terms still
-   say "spot". Renaming is one consistent pass, held until the wording is
-   final.
+1. Five places where "guide" reads worse, listed in `docs/wording.md`:
+   buying several copies of one guide, "your guide" twice in the email,
+   "five guides, five chances", "guide" meaning both the document and
+   the purchase in the admin, and held guide numbers in the alerts.
 2. How long does a winner have to respond before the prize is forfeit?
 3. What happens to an unclaimed prize: redrawn, rolled into the next
    game, or kept by the shop?
@@ -364,6 +368,14 @@ reached. Owner only.
   while the unrecorded order sits there. The owner is emailed, and that
   email is the only thing standing between that state and somebody else
   buying the same spots.
+- **The owner's own words are not checked.** The build refuses the old
+  words in the site's copy, but a drop title or description the owner
+  types is shown as written. "September Rifle Game" is a title, not ours
+  to change.
+- **Orders placed before the rename keep their wording.** Order lines
+  stored as "…, 3 spots" and the terms text those buyers accepted are
+  records of what they saw, and show on their receipts and in Orders as
+  stored.
 - **A manager can read what he cannot export.** He sees every buyer's
   name and email on a game's spot list, because he needs them to run
   the draw. Only the spreadsheet download is refused. Anything he can

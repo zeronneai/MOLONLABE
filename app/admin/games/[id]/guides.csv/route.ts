@@ -29,7 +29,7 @@ export async function GET(
   const who = await getStaff();
   if (!who.ok) return new NextResponse("Not signed in", { status: 401 });
   if (who.staff.role !== "owner") {
-    console.warn(`Refused for a manager (${who.staff.name}): spot list export`);
+    console.warn(`Refused for a manager (${who.staff.name}): buyer list export`);
     return new NextResponse(OWNER_ONLY, {
       status: 403,
       headers: { "content-type": "text/plain; charset=utf-8" },
@@ -47,8 +47,11 @@ export async function GET(
       .order("spot_number"),
   ]);
 
+  // Seven headings over six values used to put "Sold at" under "On
+  // public board", a column left behind when the board opt-in was
+  // removed. One heading per value now.
   const header = [
-    "Spot", "First name", "Last name", "Email", "Phone", "On public board", "Sold at",
+    "Guide number", "First name", "Last name", "Email", "Phone", "Sold at",
   ];
   const rows = (spots ?? []).map((s) => [
     s.spot_number,
@@ -63,7 +66,7 @@ export async function GET(
     .map((r) => r.map(csvCell).join(","))
     .join("\r\n");
 
-  const slug = (game?.title ?? "game")
+  const slug = (game?.title ?? "drop")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
@@ -71,7 +74,7 @@ export async function GET(
   return new NextResponse(csv, {
     headers: {
       "content-type": "text/csv; charset=utf-8",
-      "content-disposition": `attachment; filename="${slug}-spots.csv"`,
+      "content-disposition": `attachment; filename="${slug}-guides.csv"`,
       "cache-control": "no-store",
     },
   });

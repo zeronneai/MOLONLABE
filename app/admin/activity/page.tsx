@@ -55,7 +55,7 @@ function describe(row: ActivityRow): string {
         return `set sales tax to ${Number(row.after_value) / 100}% (was ${Number(row.before_value ?? 0) / 100}%)`;
       return `set ${row.field === "shipping_oversize_cents" ? "oversize" : "standard"} postage to ${money(row.after_value)} (was ${money(row.before_value)})`;
     case "difficulty":
-      return `retuned the game (${row.field})`;
+      return `retuned the arcade (${row.field})`;
     case "draw":
       return `drew the winner for ${label}`;
     case "photos":
@@ -177,7 +177,7 @@ export default async function AdminActivity({
           <EmptyState
             label="Activity"
             headline={chosen ? `Nothing by ${chosen.display_name} yet` : "Nothing recorded yet"}
-            body="Every change made in this admin lands here: items, photos, sizes and stock, games, draws, inquiries, and settings."
+            body="Every change made in this admin lands here: items, photos, sizes and stock, drops, draws, inquiries, and settings."
           />
         </div>
       ) : (

@@ -13,7 +13,7 @@ export default async function Featured() {
     return (
       <section className="ground-acid px-page flex min-h-[40vh] flex-col justify-center py-20">
         <Reveal>
-          <p className="label">Games</p>
+          <p className="label">Featured drop</p>
           <h2 className="display mt-6 max-w-2xl text-[clamp(2rem,4vw,3.5rem)]">
             NOTHING ON THE BLOCK RIGHT NOW.
           </h2>
@@ -48,7 +48,7 @@ export default async function Featured() {
       <div className="pl-page order-2 flex flex-col justify-center py-16 pr-8 lg:order-1 lg:py-24">
         <Reveal>
           <p className="label">
-            {awaiting ? "Sold out — awaiting the draw" : "Open game"}
+            {awaiting ? "Sold out — awaiting the draw" : "Featured drop"}
           </p>
           <h2 className="display mt-6 text-[clamp(2.25rem,4.5vw,4.5rem)]">
             {name.toUpperCase()}
@@ -69,7 +69,7 @@ export default async function Featured() {
                 <span className="text-muted">/{counts.total}</span>
               </div>
               <div className="label mt-2 text-muted">
-                {awaiting ? "Every spot taken" : "Spots left"}
+                {awaiting ? "Every guide sold" : "Guides left"}
               </div>
             </div>
           </div>
@@ -83,8 +83,8 @@ export default async function Featured() {
             {awaiting ? (
               <>
                 <p className="max-w-md text-muted">
-                  Nothing left to buy. The draw happens next — the winner
-                  is posted on the game and announced on Instagram.
+                  Nothing left to buy. The draw happens next. The winner
+                  is posted on the drop and announced on Instagram.
                 </p>
                 <Link href="/featured" className="cta-secondary mt-6">
                   See the board →
@@ -92,7 +92,7 @@ export default async function Featured() {
               </>
             ) : (
               <Link href="/featured" className="cta-primary">
-                Take a spot
+                Get your guide
               </Link>
             )}
           </div>

@@ -39,12 +39,12 @@ page.on("pageerror", (e) => bad.push(`PAGE ERROR ${e.message}`));
 // ------------------------------------------------- the scoreboard
 await page.goto(`${APP}/featured`, { waitUntil: "networkidle" });
 let text = await page.locator("body").innerText();
-check("the spots-left count is on the page", has(text, "Spots left"));
+check("the spots-left count is on the page", has(text, "Guides left"));
 check("it reads as a scoreboard, out of the total", /5\s*\/\s*5/.test(text.replace(/\s+/g, " ")),
   (text.match(/\d+\s*\/\s*\d+/) ?? ["none"])[0]);
 check("the price per spot is shown", has(text, "$30.00"));
 check("the terms sit next to the buy control, not only in the rules",
-  has(text, "runs until all spots are sold") &&
+  has(text, "runs until every guide is sold") &&
   has(text, "There is no end date") &&
   has(text, "purchases are final"));
 // The board is gone. The count IS the public view of the game now, so
@@ -55,8 +55,8 @@ check("there is no board on the page",
 // ------------------------------------------------------- buy three
 async function buySpots(qty, { acceptTerms = true } = {}) {
   await page.goto(`${APP}/featured`, { waitUntil: "networkidle" });
-  await page.fill("#spot-count", String(qty));
-  await page.getByRole("button", { name: /^Take/ }).click();
+  await page.fill("#guide-count", String(qty));
+  await page.getByRole("button", { name: /^Get/ }).click();
   await page.waitForTimeout(500);
   await page.goto(`${APP}/checkout`, { waitUntil: "networkidle" });
   for (const [k, v] of [
@@ -83,7 +83,7 @@ async function buySpots(qty, { acceptTerms = true } = {}) {
     await pay.isDisabled());
 
   const summary = await page.locator("body").innerText();
-  check("checkout prices three spots", has(summary, "3 spots"));
+  check("checkout prices three spots", has(summary, "3 guides"));
   // 3 × $30 = $90, tax 8.25% = $7.43, total $97.43. No postage: a spot
   // is neither shipped nor collected.
   check("tax is charged on spots", has(summary, "$7.43"), (summary.match(/\$7\.\d\d/) ?? [""])[0]);
@@ -185,7 +185,7 @@ check("the game is now full", d2.games[0].status === "full", d2.games[0].status)
 await page.goto(`${APP}/featured`, { waitUntil: "networkidle" });
 text = await page.locator("body").innerText();
 check("the page says sold out", has(text, "SOLD OUT"));
-check("and stops offering spots", !has(text, "How many spots"));
+check("and stops offering spots", !has(text, "How many guides"));
 check("the owner is told the game filled",
   d2.notifications.some((n) => n.kind === "game_full"),
   d2.notifications.map((n) => n.kind).join(", "));

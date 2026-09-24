@@ -62,26 +62,46 @@ check("does not describe itself as unreviewed",
   !/has not been reviewed|needs? an? (lawyer|attorney)/i.test(text));
 
 // ------------------------------------------------- the operative clauses
-const must = [
-  [/21 or older/i, "the age requirement, matching the age gate"],
-  [/fixed number of spots/i, "fixed pool"],
-  [/8\.25%/, "the sales tax rate"],
-  [/final\./i, "purchases are final"],
-  [/no end date/i, "no end date"],
-  [/sole discretion/i, "the early-draw permission"],
-  [/at random/i, "random selection"],
-  [/recorded random seed/i, "the recorded seed"],
+// Since the terminology ruling, every clause that used "spot" is legal
+// wording waiting on the attorney, and shows a placeholder naming its
+// subject instead (lib/games/rules.ts, RULES_NEEDS_ATTORNEY). What is
+// still stated as written is checked as written; what is waiting is
+// checked as waiting, by subject, so a clause cannot quietly vanish.
+const stated = [
   [/federally licensed firearms dealer/i, "the FFL transfer condition"],
   [/first name and last initial/i, "how a winner is published"],
-  [/only be bought/i, "purchase-only, stated rather than omitted"],
-  [/no limit per person and no limit per order/i,
-    "that there is NO cap — the 25-an-order one was invented and is gone"],
-  [/lowest numbers still free/i, "that numbers are assigned, not chosen"],
-  [/adds to what is already there/i, "that a second add merges"],
+  [/cannot be drawn again/i, "a drop is drawn once"],
 ];
-for (const [re, what] of must) {
+for (const [re, what] of stated) {
   check(`states ${what}`, re.test(text),
     (text.match(re) ?? ["MISSING"])[0].toString().slice(0, 50));
+}
+const waiting = [
+  "Minimum age to buy a guide and to win",
+  "How many guides a drop offers",
+  "how sales tax applies",
+  "Refunds, exchanges and transfers",
+  "Limits on how many guides",
+  "How guide numbers are assigned",
+  "Adding more guides to a cart",
+  "held during checkout",
+  "any way to enter the drawing without buying",
+  "How long a drop runs",
+  "Holding the drawing before every guide is sold",
+  "Which guides are in the drawing",
+  "chance of winning",
+  "recorded random seed",
+  "How the shop contacts the winner",
+  "names appear anywhere public",
+];
+const placeholders = await page.locator("[data-awaiting-attorney]").allInnerTexts();
+check("sixteen clauses are marked as awaiting the attorney's wording",
+  placeholders.length === 16, `${placeholders.length}`);
+for (const topic of waiting) {
+  check(`awaiting the attorney: ${topic}`,
+    placeholders.some((p) => p.toLowerCase().includes(topic.toLowerCase()) &&
+      /awaiting the attorney/i.test(p)),
+    placeholders.find((p) => p.toLowerCase().includes(topic.toLowerCase()))?.slice(0, 80) ?? "MISSING");
 }
 
 // ------------------------------- the attorney's wording, character exact
@@ -134,10 +154,13 @@ const buy = await page.locator("body").innerText();
 check("the buy control mentions the early draw, as the rules do",
   /draw earlier|may draw earlier|earlier at its discretion/i.test(buy),
   (buy.match(/[^\n]*earlier[^\n]*/i) ?? ["NOT MENTIONED"])[0].slice(0, 80));
-check("the buy control does NOT promise a draw only when the last spot sells",
-  !/drawn once the last spot sells\.(?!\s*The shop may)/i.test(buy));
-check("both surfaces agree there is no end date",
-  /no end date/i.test(buy) && /no end date/i.test(text));
+check("the buy control does NOT promise a draw only when the last guide sells",
+  /drawn once the last guide sells/i.test(buy) &&
+    !/drawn once the last guide sells\.(?!\s*The shop may)/i.test(buy));
+// The rules page's own no-end-date clause is awaiting the attorney, so
+// the buyer-facing statement is checked where it still lives.
+check("the buy control still says there is no end date",
+  /no end date/i.test(buy));
 
 // The one-line summary under the rules link comes from the same constant
 // the rules page uses for its eligibility section, so they cannot drift.

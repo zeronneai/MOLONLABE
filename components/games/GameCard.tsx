@@ -53,7 +53,7 @@ export default function GameCard({
             than no demo at all. */}
         {demo && (
           <p className="absolute left-0 top-0 z-10 bg-amber px-3 py-1 text-xs font-bold uppercase tracking-[0.28em] text-ink">
-            Demo — not a real game
+            Demo — not a real drop
           </p>
         )}
         {image ? (
@@ -101,9 +101,9 @@ export default function GameCard({
         </p>
         <p className={`label mt-1 ${awaiting ? "text-amber" : "text-muted"}`}>
           {finished
-            ? `${game.sold} ${game.sold === 1 ? "spot" : "spots"} sold`
+            ? `${game.sold} ${game.sold === 1 ? "guide" : "guides"} sold`
             : awaiting
-              ? "Every spot taken"
+              ? "Every guide sold"
               : `${remaining} left`}
         </p>
 
@@ -111,7 +111,7 @@ export default function GameCard({
           <div
             className="mt-4 h-[2px] w-full bg-surface-sunken"
             role="img"
-            aria-label={`${game.sold} of ${game.totalSpots} spots sold`}
+            aria-label={`${game.sold} of ${game.totalSpots} guides sold`}
           >
             <div className="h-full bg-acid" style={{ width: `${pct}%` }} />
           </div>
@@ -154,10 +154,10 @@ export default function GameCard({
         ) : (
           <>
             <p className="mt-5 text-sm text-muted">
-              {formatUsd(game.spotPriceCents)} a spot
+              {formatUsd(game.spotPriceCents)} a guide
             </p>
             <Link href="/featured" className="control mt-5 w-full justify-center">
-              Take a spot
+              Get your guide
             </Link>
           </>
         )}

@@ -62,11 +62,11 @@ const browser = await chromium.launch({ executablePath: CHROMIUM });
     (text.match(/\d+\s*\/\s*\d+/g) ?? ["none"]).join(", "));
 
   // The absence that matters. Not "disabled" — absent.
-  const takeSpot = page.getByRole("link", { name: /take a spot/i });
-  check("GAMES: no 'take a spot' control exists anywhere on the page",
+  const takeSpot = page.getByRole("link", { name: /get your guide/i });
+  check("GAMES: no 'get your guide' control exists anywhere on the page",
     (await takeSpot.count()) === 0,
     `${await takeSpot.count()} found`);
-  const anyBuy = page.getByRole("button", { name: /add to cart|take a spot|buy/i });
+  const anyBuy = page.getByRole("button", { name: /add to cart|get your guide|get \d+ guides|buy/i });
   check("GAMES: and no buy button either, disabled or not",
     (await anyBuy.count()) === 0, `${await anyBuy.count()} found`);
 
@@ -94,8 +94,10 @@ const browser = await chromium.launch({ executablePath: CHROMIUM });
   check("HOME: the game section says it is awaiting the draw",
     /awaiting the draw/i.test(text),
     (text.match(/[^\n]*awaiting[^\n]*/i) ?? ["NOT SHOWN"])[0].slice(0, 60));
-  check("HOME: it does NOT say 'open game'", !/open game/i.test(text));
-  const take = page.getByRole("link", { name: /^take a spot/i });
+  // The open-state label is "Featured drop"; a sold-out drop says it is
+  // awaiting the draw instead.
+  check("HOME: it does NOT carry the open-state label", !/^\s*featured drop\s*$/im.test(text));
+  const take = page.getByRole("link", { name: /^get your guide/i });
   check("HOME: the primary buy control is gone",
     (await take.count()) === 0, `${await take.count()} found`);
   check("HOME: a way through to the board remains",
@@ -111,9 +113,9 @@ const browser = await chromium.launch({ executablePath: CHROMIUM });
   const text = await page.locator("body").innerText();
   check("FEATURED: says sold out", /sold out/i.test(text));
   check("FEATURED: has no quantity control",
-    (await page.locator("#spot-count").count()) === 0);
+    (await page.locator("#guide-count").count()) === 0);
   check("FEATURED: has no add-to-cart control",
-    (await page.getByRole("button", { name: /add|take a spot/i }).count()) === 0);
+    (await page.getByRole("button", { name: /add|get your guide|get \d+ guides/i }).count()) === 0);
   await page.context().close();
 }
 
@@ -127,7 +129,7 @@ const browser = await chromium.launch({ executablePath: CHROMIUM });
   const text = await page.locator("body").innerText();
   check("CONTRAST: an open game is listed as open", /open now/i.test(text));
   check("CONTRAST: and DOES carry a buy control",
-    (await page.getByRole("link", { name: /take a spot/i }).count()) > 0);
+    (await page.getByRole("link", { name: /get your guide/i }).count()) > 0);
   check("CONTRAST: and no awaiting section is shown",
     !/awaiting the draw/i.test(text));
   note("the buy control is present when it should be, so its absence above means something");

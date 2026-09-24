@@ -44,8 +44,8 @@ export default function DrawPanel({
         <h2 className="label text-acid">Winner drawn</h2>
         <p className="display mt-4 text-2xl">{winnerName.toUpperCase()}</p>
         <p className="mt-3 max-w-[56ch] text-sm text-muted">
-          {winningSpot ? `Spot ${winningSpot}, drawn from ` : "Drawn from "}
-          {spotsSold} {spotsSold === 1 ? "spot" : "spots"} across {buyers}{" "}
+          {winningSpot ? `Guide #${winningSpot}, drawn from ` : "Drawn from "}
+          {spotsSold} {spotsSold === 1 ? "guide" : "guides"} across {buyers}{" "}
           {buyers === 1 ? "buyer" : "buyers"}. They appear under past
           winners on the featured page.
         </p>
@@ -72,16 +72,16 @@ export default function DrawPanel({
         </div>
       )}
       <p className="mt-3 max-w-[56ch] text-sm text-muted">
-        Picks one spot at random from the {spotsSold}{" "}
-        {spotsSold === 1 ? "spot" : "spots"} sold, held by {buyers}{" "}
-        {buyers === 1 ? "buyer" : "buyers"}. Somebody holding five spots
+        Picks one guide number at random from the {spotsSold}{" "}
+        {spotsSold === 1 ? "guide" : "guides"} sold, held by {buyers}{" "}
+        {buyers === 1 ? "buyer" : "buyers"}. Somebody holding five guides
         has five chances. This can only be done once.
         {spotsSold < totalSpots && (
           <>
             {" "}
             <span className="text-amber">
-              {totalSpots - spotsSold} of {totalSpots} spots are still
-              unsold — drawing now draws from the {spotsSold} sold.
+              {totalSpots - spotsSold} of {totalSpots} guides are still
+              unsold. Drawing now draws from the {spotsSold} sold.
             </span>
           </>
         )}
@@ -104,7 +104,7 @@ export default function DrawPanel({
           onClick={() => setConfirming(true)}
           className="control"
         >
-          {spotsSold === 0 ? "No spots sold yet" : "Draw without ceremony"}
+          {spotsSold === 0 ? "No guides sold yet" : "Draw without ceremony"}
         </button>
       </div>
 
@@ -120,8 +120,8 @@ export default function DrawPanel({
               Draw the winner for {gameTitle.toUpperCase()}?
             </p>
             <p className="mt-3 text-sm text-muted">
-              One spot is picked from the {spotsSold} sold. The game is
-              marked drawn and cannot be drawn again.
+              One guide number is picked from the {spotsSold} sold. The
+              drop is marked drawn and cannot be drawn again.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <button
@@ -177,13 +177,13 @@ export default function DrawPanel({
           className="fixed inset-0 z-50 flex items-end justify-center bg-ink/85 p-5 sm:items-center"
         >
           <div className="w-full max-w-md border border-amber bg-surface p-6">
-            <p className="label text-amber">This game has not sold out</p>
+            <p className="label text-amber">This drop has not sold out</p>
             <p className="display mt-3 text-xl">
-              {early.unsold} OF {early.total} SPOTS UNSOLD.
+              {early.unsold} OF {early.total} GUIDES UNSOLD.
             </p>
             <p className="mt-4 text-sm leading-relaxed text-bone">
               Drawing now goes against the terms buyers agreed to, which say
-              the game runs until every spot sells. It will be recorded on
+              the drop runs until every guide sells. It will be recorded on
               the result that the draw was early and by how much.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">

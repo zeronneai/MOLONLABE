@@ -57,14 +57,14 @@ async function setQty(page, n) {
     await plus.click();
     await page.waitForTimeout(25);
   }
-  return page.locator("#spot-count").inputValue();
+  return page.locator("#guide-count").inputValue();
 }
 
 async function takeSpots(page, gameUrl, n) {
   await page.goto(gameUrl, { waitUntil: "networkidle" });
   await page.waitForTimeout(400);
   const shown = await setQty(page, n);
-  await page.getByRole("button", { name: /^take /i }).click();
+  await page.getByRole("button", { name: /^get /i }).click();
   await page.waitForTimeout(500);
   return shown;
 }
@@ -101,14 +101,14 @@ await reset();
   check("first add asks for 2", first === "2", `control showed ${first}`);
   const afterFirst = await page.locator("body").innerText();
   check("the page says 2 spots are in the cart",
-    /\b2 spots in your cart/i.test(afterFirst),
+    /\b2 guides in your cart/i.test(afterFirst),
     (afterFirst.match(/[^\n]*in your cart[^\n]*/i) ?? ["NOT SAID"])[0].slice(0, 50));
 
   const second = await takeSpots(page, `${APP}/featured`, 3);
   check("second add asks for 3", second === "3", `control showed ${second}`);
   const afterSecond = await page.locator("body").innerText();
   check("the page now says 5 — the running total, not the 3 just added",
-    /\b5 spots in your cart/i.test(afterSecond),
+    /\b5 guides in your cart/i.test(afterSecond),
     (afterSecond.match(/[^\n]*in your cart[^\n]*/i) ?? ["NOT SAID"])[0].slice(0, 50));
 
   const stored = await page.evaluate(() =>
@@ -160,26 +160,26 @@ for (let n = 1; n <= BIG_SPOTS; n++) {
     title);
 
   await setQty(page, 40);
-  const shown = await page.locator("#spot-count").inputValue();
+  const shown = await page.locator("#guide-count").inputValue();
   check("the control allows 40 — more than the old 25 cap",
     shown === "40", `control showed ${shown}`);
 
-  await page.getByRole("button", { name: /^take /i }).click();
+  await page.getByRole("button", { name: /^get /i }).click();
   await page.waitForTimeout(600);
   const msg = await page.locator("body").innerText();
   check("it confirms 40 in the cart",
-    /\b40 spots in your cart/i.test(msg),
+    /\b40 guides in your cart/i.test(msg),
     (msg.match(/[^\n]*in your cart[^\n]*/i) ?? ["NOT SAID"])[0].slice(0, 50));
 
   // And take more on top, over the old cap in a single line.
   await page.goto(`${APP}/featured`, { waitUntil: "networkidle" });
   await page.waitForTimeout(400);
   await setQty(page, 15);
-  await page.getByRole("button", { name: /^take /i }).click();
+  await page.getByRole("button", { name: /^get /i }).click();
   await page.waitForTimeout(600);
   const msg2 = await page.locator("body").innerText();
   check("40 + 15 confirms 55",
-    /\b55 spots in your cart/i.test(msg2),
+    /\b55 guides in your cart/i.test(msg2),
     (msg2.match(/[^\n]*in your cart[^\n]*/i) ?? ["NOT SAID"])[0].slice(0, 50));
 
   check("paying for 55 spots completes", await pay(page, "Ray"));
@@ -208,11 +208,11 @@ for (let n = 1; n <= BIG_SPOTS; n++) {
   const body = await page.locator("body").innerText();
   const left = BIG_SPOTS - 55;
   check(`with ${left} left, the page says so next to the control`,
-    new RegExp(`only ${left} spots left`, "i").test(body),
-    (body.match(/[^\n]*spots? left[^\n]*/i) ?? ["NOT SAID"])[0].slice(0, 60));
+    new RegExp(`only ${left} guides left`, "i").test(body),
+    (body.match(/[^\n]*guides? left[^\n]*/i) ?? ["NOT SAID"])[0].slice(0, 60));
 
   await setQty(page, 99);
-  const shown = await page.locator("#spot-count").inputValue();
+  const shown = await page.locator("#guide-count").inputValue();
   check("and the control will not go past what is left",
     Number(shown) === left, `showed ${shown}, ${left} remain`);
   await page.context().close();

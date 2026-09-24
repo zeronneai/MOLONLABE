@@ -927,9 +927,9 @@ export async function saveGame(
   const totalSpots = Math.round(Number(formData.get("total_spots") ?? 0) || 0);
   const spotPriceCents = parseUsdToCents(String(formData.get("spot_price") ?? ""));
   if (!Number.isFinite(totalSpots) || totalSpots < 1 || totalSpots > 10_000)
-    return { status: "error", message: "Spots must be a whole number between 1 and 10,000." };
+    return { status: "error", message: "The number of guides must be a whole number between 1 and 10,000." };
   if (spotPriceCents === null || spotPriceCents < 100)
-    return { status: "error", message: "Price per spot must be at least $1.00." };
+    return { status: "error", message: "The price per guide must be at least $1.00." };
 
   // The game and every one of its spots in a single transaction, by the
   // database. This used to be two steps with a delete of the game as the
@@ -954,7 +954,7 @@ export async function saveGame(
       message:
         error?.code === "PGRST202"
           ? `The database is missing the create_game function. Apply ${ROLES_MIGRATION} in Supabase, then try again.`
-          : "Could not create the game. Nothing was created. Try again.",
+          : "Could not create the drop. Nothing was created. Try again.",
     };
   }
   const game = { id: gameId };
@@ -1032,7 +1032,7 @@ export async function commitDraw(
     return {
       ok: false,
       error:
-        "Couldn't check whether this game has already been drawn, so " +
+        "Couldn't check whether this drop has already been drawn, so " +
         "nothing has been drawn. This usually means the database is " +
         "missing a column the draw needs. Nothing has changed — call " +
         "Purple Roots rather than trying again.",
@@ -1064,7 +1064,7 @@ export async function commitDraw(
     return {
       ok: false,
       error:
-        "Couldn't read the spots for this game. Nothing has been drawn. " +
+        "Couldn't read the guides sold for this drop. Nothing has been drawn. " +
         "Reload and try again; if it keeps happening, call Purple Roots.",
     };
   }
@@ -1082,7 +1082,7 @@ export async function commitDraw(
       return {
         ok: false,
         error:
-          `No spots are recorded as sold yet, but ${heldCount} ${heldCount === 1 ? "is" : "are"} ` +
+          `No guides are recorded as sold yet, but ${heldCount} ${heldCount === 1 ? "is" : "are"} ` +
           "still held from a checkout that didn't finish. Those release " +
           "themselves after 15 minutes. Wait, refresh, and draw then.",
       };
@@ -1090,8 +1090,8 @@ export async function commitDraw(
     return {
       ok: false,
       error:
-        "No spots have sold, so there is nobody to draw from. A game has " +
-        "to sell at least one spot before it can be drawn.",
+        "No guides have sold, so there is nobody to draw from. A drop has " +
+        "to sell at least one guide before it can be drawn.",
     };
   }
 
@@ -1112,7 +1112,7 @@ export async function commitDraw(
       unsold,
       totalSpots,
       error:
-        `This game has ${unsold} of ${totalSpots} spots unsold. Drawing now ` +
+        `This drop has ${unsold} of ${totalSpots} guides unsold. Drawing now ` +
         "goes against the terms buyers agreed to. Continue?",
     };
   }
@@ -1145,7 +1145,7 @@ export async function commitDraw(
     return {
       ok: false,
       error:
-        "Picked a spot that then couldn't be matched to a buyer. Nothing " +
+        "Picked a guide number that then couldn't be matched to a buyer. Nothing " +
         "has been drawn and nothing has changed. Call Purple Roots.",
     };
 
@@ -1174,7 +1174,7 @@ export async function commitDraw(
       ok: false,
       error:
         "The draw ran but could not be verified, so nothing has been " +
-        "saved and the game is untouched. Do not draw on camera until " +
+        "saved and the drop is untouched. Do not draw on camera until " +
         "this is looked at — call Purple Roots.",
     };
   }
@@ -1202,7 +1202,7 @@ export async function commitDraw(
     return {
       ok: false,
       error:
-        "Couldn't save the winner, so nothing has been drawn — the game " +
+        "Couldn't save the winner, so nothing has been drawn. The drop " +
         "is untouched and safe to try again. If it fails twice, stop and " +
         "call Purple Roots rather than drawing on camera.",
     };
@@ -1306,7 +1306,7 @@ export async function seedDemoGame(): Promise<ActionState> {
   if (existing?.length) {
     return {
       status: "error",
-      message: "A demo game already exists. Delete that one first.",
+      message: "A demo drop already exists. Delete that one first.",
     };
   }
 
@@ -1314,9 +1314,9 @@ export async function seedDemoGame(): Promise<ActionState> {
   const { data: game, error } = await sb
     .from("games")
     .insert({
-      title: `${DEMO_GAME_PREFIX} Example Rifle Game`,
+      title: `${DEMO_GAME_PREFIX} Example Rifle Drop`,
       description:
-        "A demonstration, not a real game. Nothing was sold and nobody won. Delete it from the Games list whenever you like.",
+        "A demonstration, not a real drop. Nothing was sold and nobody won. Delete it from the Drops list whenever you like.",
       total_spots: TOTAL,
       spot_price_cents: 2500,
       status: "drawn",
@@ -1327,7 +1327,7 @@ export async function seedDemoGame(): Promise<ActionState> {
     .single();
   if (error || !game) {
     logDbError("seedDemoGame", error);
-    return { status: "error", message: "Could not create the demo game." };
+    return { status: "error", message: "Could not create the demo drop." };
   }
 
   const spots = Array.from({ length: TOTAL }, (_, i) => ({
@@ -1344,9 +1344,9 @@ export async function seedDemoGame(): Promise<ActionState> {
     .insert(spots)
     .select("id, spot_number");
   if (spotError || !written) {
-    logDbError("seedDemoGame spots", spotError);
+    logDbError("seedDemoGame game_spots", spotError);
     await sb.from("games").delete().eq("id", game.id);
-    return { status: "error", message: "Could not create the demo spots." };
+    return { status: "error", message: "Could not create the demo guides." };
   }
 
   // A real seed over the real pool, so the recorded result verifies the
@@ -1359,7 +1359,7 @@ export async function seedDemoGame(): Promise<ActionState> {
   const winningSpot = pool.find((s) => s.spot_id === result?.entrantId);
   if (!result || !winningSpot) {
     await sb.from("games").delete().eq("id", game.id);
-    return { status: "error", message: "Could not draw the demo game." };
+    return { status: "error", message: "Could not draw the demo drop." };
   }
 
   const { error: winnerError } = await sb.from("winners").insert({
@@ -1382,13 +1382,13 @@ export async function seedDemoGame(): Promise<ActionState> {
 
   await logActivity(sb, session, {
     action: "create", entity: "game", entityId: game.id,
-    entityLabel: `${DEMO_GAME_PREFIX} Example Rifle Game`,
+    entityLabel: `${DEMO_GAME_PREFIX} Example Rifle Drop`,
   });
   revalidatePublic();
   revalidatePath("/admin/games");
   return {
     status: "success",
-    message: "Demo game created. It is marked DEMO everywhere it appears.",
+    message: "Demo drop created. It is marked DEMO everywhere it appears.",
   };
 }
 
@@ -1404,7 +1404,7 @@ export async function deleteDemoGame(): Promise<ActionState> {
     .select("id, title")
     .ilike("title", `${DEMO_GAME_PREFIX}%`);
   if (!games?.length) {
-    return { status: "error", message: "There is no demo game to remove." };
+    return { status: "error", message: "There is no demo drop to remove." };
   }
   for (const g of games) {
     // Order matters: winners and spots both point at the game.
@@ -1413,7 +1413,7 @@ export async function deleteDemoGame(): Promise<ActionState> {
     const { error } = await sb.from("games").delete().eq("id", g.id);
     if (error) {
       logDbError("deleteDemoGame", error);
-      return { status: "error", message: "Could not remove the demo game." };
+      return { status: "error", message: "Could not remove the demo drop." };
     }
     await logActivity(sb, session, {
       action: "delete", entity: "game", entityId: g.id, entityLabel: g.title,
@@ -1421,7 +1421,7 @@ export async function deleteDemoGame(): Promise<ActionState> {
   }
   revalidatePublic();
   revalidatePath("/admin/games");
-  return { status: "success", message: "Demo game removed." };
+  return { status: "success", message: "Demo drop removed." };
 }
 
 // ---------------------------------------------------------------------

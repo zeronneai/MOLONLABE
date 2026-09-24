@@ -102,10 +102,10 @@ notes.push(
 const admin = await page.locator("body").innerText();
 check("ADMIN: names the winner", /winner drawn/i.test(admin));
 check("ADMIN: shows the winning spot number",
-  new RegExp(`Spot ${spot}\\b`, "i").test(admin),
+  new RegExp(`Guide #${spot}\\b`, "i").test(admin),
   (admin.match(/Spot \d+[^\n]{0,60}/i) ?? ["NOT SHOWN"])[0]);
 check("ADMIN: does not show the selector's index as if it were a spot",
-  !new RegExp(`Spot ${idx}\\b`, "i").test(admin));
+  !new RegExp(`Guide #${idx}\\b`, "i").test(admin));
 
 // ------------------------------------------- 2. the presentation mode
 await page.goto(`${APP}/draw/${GAME}`, { waitUntil: "networkidle" });
@@ -123,16 +123,16 @@ check("PRESENTATION: reaches the winner", /winner/i.test(stage),
   stage.slice(0, 70).replace(/\n/g, " "));
 check("PRESENTATION: shows the winning spot number at all",
   new RegExp(`\\b${spot}\\b`).test(stage),
-  (stage.match(/[^\n]*\b(entry|spot)\b[^\n]*/i) ?? ["NOT SHOWN"])[0].slice(0, 80));
-check("PRESENTATION: labels it as a spot, not an entry",
-  new RegExp(`spot\\s*${spot}\\b`, "i").test(stage),
-  (stage.match(/[^\n]*\b(entry|spot)\s*\d+[^\n]*/i) ?? ["no such line"])[0].slice(0, 80));
+  (stage.match(/[^\n]*\b(entry|guide)\b[^\n]*/i) ?? ["NOT SHOWN"])[0].slice(0, 80));
+check("PRESENTATION: labels it as the winning guide number, not an entry",
+  new RegExp(`winning guide\\s*#${spot}\\b`, "i").test(stage),
+  (stage.match(/[^\n]*\b(entry|guide)\s*#?\d+[^\n]*/i) ?? ["no such line"])[0].slice(0, 80));
 check("PRESENTATION: does not read 'N of TOTAL' with a spot number",
   !new RegExp(`\\b${spot}\\b\\s*(of|/)\\s*${row.entry_total}\\b`, "i").test(stage),
   (stage.match(new RegExp(`[^\\n]*\\b${spot}\\b\\s*of\\s*\\d+[^\\n]*`, "i")) ?? ["clean"])[0].slice(0, 80));
 
-check("PRESENTATION: says how many spots sold, not an impossible fraction",
-  new RegExp(`${row.entry_total}\\s*spots?\\s*sold`, "i").test(stage),
+check("PRESENTATION: says how many guides sold, not an impossible fraction",
+  new RegExp(`${row.entry_total}\\s*guides?\\s*sold`, "i").test(stage),
   (stage.match(/[^\n]*spots? sold[^\n]*/i) ?? ["NOT SHOWN"])[0].slice(0, 80));
 check("PRESENTATION: no leftover 'entries'/'entrants' wording on the filmed screen",
   !/\bentr(y|ies|ant|ants)\b/i.test(stage),

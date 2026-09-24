@@ -113,7 +113,7 @@ export default function GameForm({
             id="g-title"
             name="title"
             defaultValue={game?.title}
-            placeholder="September Rifle Game"
+            placeholder="September Rifle Drop"
             className="field-input"
           />
         </div>
@@ -163,7 +163,7 @@ export default function GameForm({
             across the counter.
           </p>
           <p className="mt-3 max-w-[56ch] text-sm leading-relaxed text-amber">
-            This is not optional. A game will not go on sale, and will not
+            This is not optional. A drop will not go on sale, and will not
             save afterwards, until all three are filled in.
           </p>
 
@@ -271,7 +271,7 @@ export default function GameForm({
              disabled inputs, because a greyed-out field reads as "not yet"
              and these are "never". */
           <div className="sm:col-span-2 border-l-2 border-muted pl-5">
-            <p className="field-label">Spots</p>
+            <p className="field-label">Guides</p>
             <p className="mt-2 text-lg">
               <span className="font-extrabold tracking-[-0.02em]">
                 {game!.total_spots}
@@ -283,8 +283,8 @@ export default function GameForm({
               <span className="text-muted">each</span>
             </p>
             <p className="label mt-3 max-w-[52ch] text-muted">
-              Fixed when the game was created and not editable. Changing
-              the count would orphan or invent spots people already hold;
+              Fixed when the drop was created and not editable. Changing
+              the count would orphan or invent guide numbers people already hold;
               changing the price would mean two buyers paid differently
               for the same thing.
             </p>
@@ -292,11 +292,11 @@ export default function GameForm({
         ) : (
           <>
             <div>
-              <label className="field-label" htmlFor="g-spots">
-                How many spots
+              <label className="field-label" htmlFor="g-count">
+                How many guides
               </label>
               <input
-                id="g-spots"
+                id="g-count"
                 name="total_spots"
                 inputMode="numeric"
                 value={spots}
@@ -307,7 +307,7 @@ export default function GameForm({
             </div>
             <div>
               <label className="field-label" htmlFor="g-price">
-                Price per spot ($)
+                Price per guide ($)
               </label>
               <input
                 id="g-price"
@@ -365,14 +365,14 @@ export default function GameForm({
                         <>
                           Covers the prize with{" "}
                           <strong>{formatUsd(covers)}</strong> over, if
-                          every spot sells.
+                          every guide sells.
                         </>
                       ) : (
                         <>
                           <strong>
                             {formatUsd(Math.abs(covers))} short of the prize
                           </strong>{" "}
-                          even if every spot sells.
+                          even if every guide sells.
                         </>
                       )}
                     </p>
@@ -380,7 +380,7 @@ export default function GameForm({
 
                   <p className="label mt-3 max-w-[52ch] text-muted">
                     Before tax, and before anything it costs you to run.
-                    Sales tax is added on top of the spot price at
+                    Sales tax is added on top of the guide price at
                     checkout, so it is not yours to keep.
                     {prizeValue && !prizeValue.exact && (
                       <>
@@ -394,14 +394,14 @@ export default function GameForm({
                 </>
               ) : (
                 <p className="text-sm leading-relaxed text-amber">
-                  Set both and this will show what the game brings in if it
+                  Set both and this will show what the drop brings in if it
                   sells out, against what the prize is worth.
                 </p>
               )}
               <p className="label mt-3 max-w-[52ch] text-muted">
-                Both numbers are permanent once the game is created. The
-                spots are laid out immediately and the game opens for sale
-                straight away — there is no draft.
+                Both numbers are permanent once the drop is created. The
+                guide numbers are laid out immediately and the drop opens
+                for sale straight away. There is no draft.
               </p>
             </div>
           </>
@@ -448,7 +448,7 @@ export default function GameForm({
           admin is broken. */}
       {!guideReady && (
         <p className="mt-8 border-l-2 border-amber pl-5 text-sm leading-relaxed text-amber">
-          {editing ? "This game cannot be saved" : "This game cannot be created"}{" "}
+          {editing ? "This drop cannot be saved" : "This drop cannot be created"}{" "}
           until the three guide sections above are filled in.{" "}
           {Object.values(guideErrors)[0]}
         </p>
@@ -463,7 +463,7 @@ export default function GameForm({
           ? "Saving…"
           : editing
             ? "Save changes"
-            : `Create and open${spotCount > 0 ? ` — ${spotCount} spots` : ""}`}
+            : `Create and open${spotCount > 0 ? ` — ${spotCount} guides` : ""}`}
       </button>
     </form>
   );

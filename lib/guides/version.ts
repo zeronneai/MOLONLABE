@@ -13,4 +13,4 @@
 //
 // It is committed so that a test run and a deployment agree about what
 // the current renderer is; `npm test` fails if it has gone stale.
-export const GUIDE_RENDERER_VERSION = "d2c369508c957985";
+export const GUIDE_RENDERER_VERSION = "e3925e5ed149cd31";

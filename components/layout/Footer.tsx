@@ -9,7 +9,7 @@ import {
 
 const navLinks = [
   { href: "/shop", label: "Shop" },
-  { href: "/games", label: "Games" },
+  { href: "/games", label: "Drops" },
   { href: "/in-the-case", label: "In the case" },
   { href: "/transfers", label: "Transfers" },
   { href: "/services", label: "Services" },

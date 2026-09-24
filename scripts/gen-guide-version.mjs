@@ -33,34 +33,72 @@
 
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = join(ROOT, "lib", "guides", "version.ts");
 
 /**
- * Everything that can change what comes out of the renderer.
+ * Every source file whose contents can reach the PDF, found by following
+ * the renderer's imports rather than listed by hand.
  *
- * `build.ts` is in here because it decides which data reaches the
- * document; `fields.ts` is not, because it only validates. Adding a file
- * is cheap — the cost of a wrong entry is one extra rebuild per game,
- * and the cost of a missing one is a stale guide nobody can explain.
+ * It was a hand-kept list of five files, and it was short by three that
+ * put words on the page: `fields.ts` (the section headings), `lib/brand.ts`
+ * (the shop's name, address and phone) and `lib/legal.ts` (the firearm
+ * disclaimer). A change to any of them left every guide already sold
+ * printing the old text, the exact failure this file exists to prevent,
+ * and nothing would have said so. A list somebody has to maintain is a
+ * list that goes stale for the same reason the GUIDE_VERSION constant
+ * did.
+ *
+ * So: start at the two files that build the document, follow every
+ * relative and `@/` import that is not type-only, and hash whatever that
+ * reaches. A file that changes without affecting the output costs one
+ * extra rebuild per game; a file that is missed costs a stale guide.
  */
-const SOURCES = [
-  "lib/guides/Document.tsx",
-  "lib/guides/theme.ts",
-  "lib/guides/images.ts",
-  "lib/guides/fonts.ts",
-  "lib/guides/build.ts",
-];
+const ENTRY = ["lib/guides/build.ts", "lib/guides/Document.tsx"];
+
+function resolveImport(fromFile, spec) {
+  let base;
+  if (spec.startsWith("@/")) base = join(ROOT, spec.slice(2));
+  else if (spec.startsWith(".")) base = join(dirname(join(ROOT, fromFile)), spec);
+  else return null; // a package; covered by PACKAGES below
+  for (const ext of ["", ".ts", ".tsx", "/index.ts", "/index.tsx"]) {
+    try {
+      readFileSync(base + ext);
+      return relative(ROOT, base + ext);
+    } catch {
+      /* try the next */
+    }
+  }
+  return null;
+}
+
+export function rendererSources() {
+  const seen = new Set();
+  const queue = [...ENTRY];
+  while (queue.length) {
+    const file = queue.shift();
+    if (seen.has(file)) continue;
+    seen.add(file);
+    const src = readFileSync(join(ROOT, file), "utf8");
+    // Value imports only. `import type` carries no text into the page.
+    for (const m of src.matchAll(/^import\s+(?!type\b)[^;]*?from\s+"([^"]+)"/gm)) {
+      const next = resolveImport(file, m[1]);
+      // The generated version file is the output of this, not an input.
+      if (next && !next.endsWith("guides/version.ts")) queue.push(next);
+    }
+  }
+  return [...seen].sort();
+}
 
 /** The packages that do the drawing. A major bump changes output. */
 const PACKAGES = ["@react-pdf/renderer", "sharp", "pdfkit"];
 
 export function guideRendererVersion() {
   const hash = createHash("sha256");
-  for (const file of SOURCES) {
+  for (const file of rendererSources()) {
     hash.update(file);
     hash.update(readFileSync(join(ROOT, file)));
   }
@@ -96,6 +134,11 @@ function fileFor(version) {
 // the current renderer is; \`npm test\` fails if it has gone stale.
 export const GUIDE_RENDERER_VERSION = "${version}";
 `;
+}
+
+if (process.argv.includes("--list")) {
+  for (const f of rendererSources()) console.log(f);
+  process.exit(0);
 }
 
 const version = guideRendererVersion();

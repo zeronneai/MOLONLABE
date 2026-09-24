@@ -29,7 +29,7 @@ export default async function AdminGames() {
   return (
     <div className="mx-auto max-w-2xl">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="display text-2xl">GAMES</h1>
+        <h1 className="display text-2xl">DROPS</h1>
         <Link href="/admin/games/new" className="cta-primary control-go !h-11 !px-5">
           + New
         </Link>
@@ -46,10 +46,10 @@ export default async function AdminGames() {
         ))}
         {(games ?? []).length === 0 && (
           <EmptyState
-            label="No games"
+            label="No drops"
             headline="NOTHING RUNNING."
-            body="Set up a game, point it at the prize, choose how many spots and what one costs. It opens for sale the moment you create it."
-            action={{ href: "/admin/games/new", text: "New game" }}
+            body="Set up a drop, point it at the featured piece, choose how many guides and what one costs. It opens for sale the moment you create it."
+            action={{ href: "/admin/games/new", text: "New drop" }}
           />
         )}
       </div>

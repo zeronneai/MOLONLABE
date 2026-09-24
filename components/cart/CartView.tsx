@@ -123,16 +123,16 @@ export default function CartView() {
           {cart.spotGame && cart.spotCount > 0 && (
             <div className="mt-5 border-t hairline pt-5">
               <p className="text-sm text-acid">
-                {cart.spotCount} {cart.spotCount === 1 ? "spot" : "spots"} in{" "}
+                {cart.spotCount} {cart.spotCount === 1 ? "guide" : "guides"} from{" "}
                 {cart.spotGame.title}.{" "}
                 <span className="text-muted">
                   {cart.spotGame.remaining}{" "}
-                  {cart.spotGame.remaining === 1 ? "spot" : "spots"} left of{" "}
+                  {cart.spotGame.remaining === 1 ? "guide" : "guides"} left of{" "}
                   {cart.spotGame.totalSpots}.
                 </span>
               </p>
               <p className="label mt-3 text-muted">
-                Spot numbers are assigned when you pay. Purchases are final.
+                Guide numbers are assigned when you pay. Purchases are final.
               </p>
             </div>
           )}

@@ -55,7 +55,7 @@ export default async function EditGamePage({
 
   return (
     <div className="mx-auto max-w-2xl">
-      <BackLink href="/admin/inventory" label="All games" />
+      <BackLink href="/admin/inventory" label="All drops" />
       <h1 className="display text-2xl">{game.title.toUpperCase()}</h1>
       <div className="mt-8">
         <GameForm game={game} items={items ?? []} />
@@ -108,8 +108,8 @@ export default async function EditGamePage({
                   "Not given"
                 )}
               </dd>
-              <dt className="label text-muted">Spot</dt>
-              <dd className="tabular-nums">{contact.spot_number}</dd>
+              <dt className="label text-muted">Guide</dt>
+              <dd className="tabular-nums">#{contact.spot_number}</dd>
               {winningOrder?.order_number && (
                 <>
                   <dt className="label text-muted">Order</dt>
@@ -119,8 +119,9 @@ export default async function EditGamePage({
             </dl>
           ) : (
             <p className="mt-4 text-sm text-muted">
-              The draw did not record which spot won, so there are no contact
-              details to show. The spot list above has every buyer.
+              The draw did not record which guide number won, so there are no
+              contact details to show. The list of guides sold above has every
+              buyer.
             </p>
           )}
         </section>

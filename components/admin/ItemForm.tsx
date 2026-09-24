@@ -144,7 +144,8 @@ export default function ItemForm({
             <p className="field-label">Online price</p>
             <p className="mt-2 max-w-[46ch] text-sm text-muted">
               Firearms are not sold through the cart. This one goes in the
-              case with an enquiry button, or becomes the prize in a game.
+              case with an enquiry button, or becomes the featured piece in
+              a drop.
               Use the display price above if you want a figure on the page.
             </p>
           </div>

@@ -49,7 +49,7 @@ async function signedIn(){
   for(let n=1;n<=3;n++) await hold(n);
   const p=await signedIn();
   await p.goto(`${APP}/admin/games/${GAME}`,{waitUntil:"networkidle"});
-  const btn=p.getByRole("button",{name:/no spots sold yet/i});
+  const btn=p.getByRole("button",{name:/no guides sold yet/i});
   check("with nothing sold the draw button is not offered",
     await btn.isDisabled().catch(()=>false));
   const body=await p.locator("body").innerText();

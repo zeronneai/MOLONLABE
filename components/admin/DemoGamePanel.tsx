@@ -33,11 +33,11 @@ export default function DemoGamePanel({ exists }: { exists: boolean }) {
   return (
     <section className="mt-12 border border-amber p-6">
       <p className="label text-amber">Demo</p>
-      <h2 className="display mt-3 text-lg">SHOW THE CLIENT A FINISHED GAME</h2>
+      <h2 className="display mt-3 text-lg">SHOW THE CLIENT A FINISHED DROP</h2>
       <p className="mt-3 max-w-[58ch] text-sm leading-relaxed text-muted">
         {exists
-          ? "A demo game exists. It is marked DEMO everywhere it appears, on the site and in here. Remove it before you go live."
-          : "Creates one completed game so Past games has something in it. Every spot is sold to “Demo Buyer”, it is titled [DEMO], and it carries a badge on every card a customer would see. Remove it whenever you like — nothing else is touched."}
+          ? "A demo drop exists. It is marked DEMO everywhere it appears, on the site and in here. Remove it before you go live."
+          : "Creates one completed drop so Past drops has something in it. Every guide is sold to “Demo Buyer”, it is titled [DEMO], and it carries a badge on every card a customer would see. Remove it whenever you like. Nothing else is touched."}
       </p>
 
       {message && (
@@ -54,7 +54,7 @@ export default function DemoGamePanel({ exists }: { exists: boolean }) {
             onClick={() => run(deleteDemoGame)}
             className="control control-caution"
           >
-            {pending ? "Removing…" : "Remove the demo game"}
+            {pending ? "Removing…" : "Remove the demo drop"}
           </button>
         ) : (
           <button
@@ -63,7 +63,7 @@ export default function DemoGamePanel({ exists }: { exists: boolean }) {
             onClick={() => run(seedDemoGame)}
             className="control"
           >
-            {pending ? "Creating…" : "Create a demo game"}
+            {pending ? "Creating…" : "Create a demo drop"}
           </button>
         )}
         {!owner && <OwnerOnlyNote />}

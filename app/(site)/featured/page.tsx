@@ -11,9 +11,9 @@ import { itemImages } from "@/lib/db/items";
 import { formatUsd } from "@/lib/money";
 
 export const metadata: Metadata = {
-  title: "The game",
+  title: "The featured drop",
   description:
-    "The current game at Molon Labe Firearms x SunCity Outdoors, El Paso, TX.",
+    "The current featured drop at Molon Labe Firearms x SunCity Outdoors, El Paso, TX.",
 };
 
 // Never cached: the spot count is the whole point of the page and a
@@ -44,9 +44,9 @@ export default async function FeaturedPage() {
     return (
       <div className="px-page pb-24 pt-[calc(72px+4rem)]">
         <EmptyState
-          label="The game"
+          label="The featured drop"
           headline="NOTHING RUNNING RIGHT NOW."
-          body="The next game is announced on Instagram first. Follow @molonlabe.fa or check back."
+          body="The next drop is announced on Instagram first. Follow @molonlabe.fa or check back."
         />
         {winners.length > 0 && <PastWinners winners={winners} />}
       </div>
@@ -89,14 +89,14 @@ export default async function FeaturedPage() {
                 <span className="text-muted">/{counts.total}</span>
               </div>
               <div className="label mt-4 text-muted">
-                {soldOut ? "All spots gone" : "Spots left"}
+                {soldOut ? "Every guide sold" : "Guides left"}
               </div>
             </div>
             <div>
               <div className="display text-[clamp(2rem,5vw,3.5rem)] leading-none tabular-nums">
                 {formatUsd(game.spot_price_cents)}
               </div>
-              <div className="label mt-4 text-muted">A spot</div>
+              <div className="label mt-4 text-muted">A guide</div>
             </div>
           </div>
         </Reveal>

@@ -247,17 +247,17 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
         C.bone,
         `<strong style="color:${C.acid}">${
           order.spots.numbers.length === 1
-            ? "Spot"
-            : `${order.spots.numbers.length} spots`
-        }</strong> in ${escapeHtml(order.spots.game)} —
+            ? "Your guide"
+            : `${order.spots.numbers.length} guides`
+        }</strong> from ${escapeHtml(order.spots.game)} —
          ${
            order.spots.numbers.length === 1
-             ? `number <strong style="color:${C.acid}">${order.spots.numbers[0]}</strong>`
-             : `numbers <strong style="color:${C.acid}">${order.spots.numbers.join(", ")}</strong>`
+             ? `guide number <strong style="color:${C.acid}">${order.spots.numbers[0]}</strong>`
+             : `guide numbers <strong style="color:${C.acid}">${order.spots.numbers.join(", ")}</strong>`
          } of ${order.spots.totalSpots}.
          <div style="height:10px;line-height:10px">&nbsp;</div>
          <span style="${SMALL};color:${C.muted}">The draw happens once the last
-         spot sells, or earlier if the shop decides. There is no end date.
+         guide sells, or earlier if the shop decides. There is no end date.
          <a href="${SITE_URL}/featured" style="color:${C.acid};text-decoration:underline">Watch the board</a>.</span>`,
       )
     : "";
@@ -494,12 +494,12 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
     ...(order.spots
       ? [
           ``,
-          `YOUR SPOTS`,
+          `YOUR GUIDE NUMBERS`,
           RULE,
-          `${order.spots.numbers.length === 1 ? "Spot" : "Spots"} ${order.spots.numbers.join(", ")} of ${order.spots.totalSpots}`,
+          `${order.spots.numbers.length === 1 ? "Guide number" : "Guide numbers"} ${order.spots.numbers.join(", ")} of ${order.spots.totalSpots}`,
           `in ${order.spots.game}.`,
           ``,
-          `The draw happens once the last spot sells, or earlier if the`,
+          `The draw happens once the last guide sells, or earlier if the`,
           `shop decides. There is no end date.`,
           `${SITE_URL}/featured`,
         ]

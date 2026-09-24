@@ -118,12 +118,12 @@ export default async function ItemPage({ params }: Params) {
           <div className="mt-8 border-l-2 border-amber pl-5">
             <p className="display text-2xl">NOT FOR SALE.</p>
             <p className="mt-3 max-w-[52ch] text-sm text-muted">
-              This is the prize in a game that is running right now. It
-              goes back on sale if the game is drawn without it being won
-              outright.
+              This is the featured piece in a drop that is running right
+              now. It goes back on sale if the drop is drawn without it
+              being won outright.
             </p>
             <Link href="/featured" className="cta-secondary mt-5 inline-block">
-              See the game →
+              See the drop →
             </Link>
           </div>
         ) : (

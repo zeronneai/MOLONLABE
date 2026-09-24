@@ -112,7 +112,7 @@ export function whyNotVisible(
 
 export const SURFACE_LABEL: Record<Surface, string> = {
   shop: "Shop",
-  games: "Games",
+  games: "Drops",
   case: "In the case",
 };
 
@@ -125,7 +125,7 @@ export const SURFACE_BLURB: Record<Surface, string> = {
   shop:
     "Things customers buy directly — apparel, accessories, ammunition, optics. Set a price and it appears in the Shop.",
   games:
-    "Games. Pick the prize, say how many spots and what a spot costs, and customers buy spots until it sells out.",
+    "Featured drops. Pick the featured piece, say how many guides and what a guide costs, and customers buy guides until it sells out. Each guide comes with entry into the drawing.",
   case:
     "Firearms on the shelf at the shop. No price and no cart — customers send an enquiry and you handle it in person.",
 };

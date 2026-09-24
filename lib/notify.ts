@@ -201,8 +201,8 @@ export function summarize(n: OwnerNotification): string {
         ...(n.spot_numbers.length
           ? [
               "",
-              `SPOTS — ${n.game ?? "game"}`,
-              `  ${n.spot_numbers.length === 1 ? "Spot" : "Spots"} ${n.spot_numbers.join(", ")}`,
+              `GUIDES — ${n.game ?? "drop"}`,
+              `  ${n.spot_numbers.length === 1 ? "Guide number" : "Guide numbers"} ${n.spot_numbers.join(", ")}`,
             ]
           : []),
         // The two things that decide what the shop does next.
@@ -231,11 +231,11 @@ export function summarize(n: OwnerNotification): string {
     case "game_full":
       return [
         `SOLD OUT — ${n.game}`,
-        `All ${n.total_spots} spots are gone.`,
-        ...(n.item ? ["", `Prize: ${n.item}`] : []),
+        `All ${n.total_spots} guides are sold.`,
+        ...(n.item ? ["", `Featured piece: ${n.item}`] : []),
         "",
         "Nothing else happens until you draw it. The draw is under",
-        "Games in the admin, and it can be run on camera.",
+        "Drops in the admin, and it can be run on camera.",
       ].join("\n");
 
     case "order_error":
@@ -246,7 +246,7 @@ export function summarize(n: OwnerNotification): string {
         "TEST ALERT. NOTHING HAS HAPPENED.",
         "",
         `${n.requested_by} sent this from Team & alerts in the admin to check`,
-        `that ${n.group === "problems" ? "problem alerts (a failed order, a guide that did not build)" : "routine alerts (new orders, inquiries, a game selling out)"}`,
+        `that ${n.group === "problems" ? "problem alerts (a failed order, a guide that did not build)" : "routine alerts (new orders, inquiries, a drop selling out)"}`,
         "reach the right people. If you are reading it, they do.",
       ].join("\n");
   }
@@ -278,7 +278,7 @@ function orderErrorSummary(
     const heldLines = (n.held ?? []).map((h) => {
       const name = [h.name, h.size].filter(Boolean).join(", ");
       const qty = h.quantity > 1 ? ` ×${h.quantity}` : "";
-      if (h.hold === "spot")
+      if (h.hold === "spot") // copy-check: internal payload value, compared not shown
         return `  ${name} — HELD, and back on sale in 15 minutes unless you act`;
       return h.hold === "reserved"
         ? `  ${name}${qty} — marked RESERVED, off the website`
@@ -414,12 +414,12 @@ function orderErrorSummary(
       "customer notices and nobody else does.",
       "",
       ...facts,
-      ...(n.game ? [`Game: ${n.game}`] : []),
+      ...(n.game ? [`Drop: ${n.game}`] : []),
       ...(n.message ? ["", `What was left out: ${n.message}`] : []),
       "",
       "WHAT TO DO",
       "",
-      "1. Open the game in the admin. It says the same thing there, and",
+      "1. Open the drop in the admin. It says the same thing there, and",
       "   there is a button to build it again.",
       "2. If rebuilding does not fix it, the photographs on the item are",
       "   the problem — re-upload them and rebuild.",
@@ -434,20 +434,20 @@ function orderErrorSummary(
     return [
       "A GUIDE COULD NOT BE PRODUCED.",
       "",
-      "The order is fine. The money is fine. The spots are recorded.",
+      "The order is fine. The money is fine. The guide numbers are recorded.",
       "What failed is the guide that comes with the purchase, so the",
       "link in the customer's email will not open yet.",
       "",
       ...facts,
-      ...(n.game ? [`Game: ${n.game}`] : []),
+      ...(n.game ? [`Drop: ${n.game}`] : []),
       ...(n.message ? ["", `Reason given: ${n.message}`] : []),
       "",
       "WHAT TO DO",
       "",
-      "1. Open the game in the admin and press 'Open the guide as a",
+      "1. Open the drop in the admin and press 'Open the guide as a",
       "   customer sees it'. Whatever is wrong, it will say so there.",
       "2. The usual cause is one of the three guide sections being",
-      "   empty on an older game. Fill it in and save.",
+      "   empty on an older drop. Fill it in and save.",
       "3. The link rebuilds itself. Once it opens for you it opens for",
       "   the customer — they do not need a new email.",
       "",
@@ -456,25 +456,25 @@ function orderErrorSummary(
   }
 
   return [
-    "URGENT — SPOTS WERE PAID FOR AND NOT RECORDED AS SOLD.",
+    "URGENT — GUIDES WERE PAID FOR AND NOT RECORDED AS SOLD.",
     "",
-    "The card cleared and the order saved. The spots the customer paid",
-    "for are still sitting as held rather than sold, which means they",
-    "are not in the draw and the game cannot fill.",
+    "The card cleared and the order saved. The guide numbers the",
+    "customer paid for are still sitting as held rather than sold, which",
+    "means they are not in the draw and the drop cannot sell out.",
     "",
     ...facts,
-    ...(n.game ? [`Game: ${n.game}`] : []),
+    ...(n.game ? [`Drop: ${n.game}`] : []),
     ...(n.spot_numbers?.length
-      ? [`Spots: ${n.spot_numbers.join(", ")}`]
+      ? [`Guide numbers: ${n.spot_numbers.join(", ")}`]
       : []),
     "",
     "WHAT TO DO",
     "",
-    "1. Open the game in the admin and mark those spot numbers sold to",
+    "1. Open the drop in the admin and mark those guide numbers sold to",
     "   the customer above.",
-    "2. Do it before the draw. A held spot is not in the pool, so",
-    "   drawing now would exclude somebody who paid.",
-    "3. Held spots are released automatically after 15 minutes, which",
+    "2. Do it before the draw. A held guide number is not in the pool,",
+    "   so drawing now would exclude somebody who paid.",
+    "3. Held guide numbers are released automatically after 15 minutes, which",
     "   would put them back on sale. This is the one to do first.",
     "",
     `${AGENCY_NAME}: ${AGENCY_CONTACT}`,
@@ -494,7 +494,7 @@ export function subjectFor(n: OwnerNotification): string {
     case "order":
       return `New order ${n.order_number} — ${formatUsd(n.total_cents)}${
         n.spot_numbers.length
-          ? ` — ${n.spot_numbers.length} ${n.spot_numbers.length === 1 ? "spot" : "spots"}`
+          ? ` — ${n.spot_numbers.length} ${n.spot_numbers.length === 1 ? "guide" : "guides"}`
           : ""
       }${n.collects.length ? " — COLLECT AT SHOP" : ""}`;
     case "inquiry":
@@ -512,7 +512,7 @@ export function subjectFor(n: OwnerNotification): string {
       return {
         charged_not_saved: `URGENT: card charged, order NOT saved — ${n.order_number}`,
         lines_not_saved: `URGENT: order ${n.order_number} saved without its items`,
-        spots_not_sold: `URGENT: order ${n.order_number} paid for spots that were not recorded`,
+        spots_not_sold: `URGENT: order ${n.order_number} paid for guides that were not recorded`,
         // Not urgent in the same sense — nothing is lost and nothing is
         // held — so the subject does not shout. It still names the order.
         guide_not_built: `Guide not produced for order ${n.order_number}`,

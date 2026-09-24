@@ -10,8 +10,8 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/games" },
-  title: "Games",
-  description: `Open and completed games at ${SHOP_NAME}, El Paso, TX.`,
+  title: "Featured drops",
+  description: `Featured drops at ${SHOP_NAME}, El Paso, TX: a written guide to each featured piece, with entry into its drawing.`,
 };
 
 export default async function GamesPage() {
@@ -19,16 +19,17 @@ export default async function GamesPage() {
 
   return (
     <div className="px-page pb-24 pt-[calc(72px+4rem)]">
-      <p className="label text-acid">Games</p>
+      <p className="label text-acid">Featured drops</p>
       <h1 className="display mt-6 text-[clamp(2.5rem,6vw,5.5rem)]">
         A FIXED
         <br />
         NUMBER.
       </h1>
       <p className="mt-8 max-w-[54ch] text-muted">
-        Every game sells a set number of spots at a set price. When the
-        last one goes, one spot is drawn. No end date, no countdown — it
-        runs until it fills.
+        Every drop sells a set number of guides to its featured piece, at a
+        set price, and each guide comes with entry into the drawing. When
+        the last guide goes, the winner is drawn. No end date, no
+        countdown. It runs until it sells out.
       </p>
 
       {/* ------------------------------------------------- open */}
@@ -51,8 +52,8 @@ export default async function GamesPage() {
             <div className="mt-6">
               <EmptyState
                 label="Nothing running"
-                headline="NO GAME IS OPEN."
-                body="Nothing is running right now. The next one goes up here the moment it opens — and it sells until the last spot goes, so there is no date to miss."
+                headline="NO DROP IS OPEN."
+                body="Nothing is running right now. The next drop goes up here the moment it opens, and it sells until the last guide goes, so there is no date to miss."
                 action={{ href: "/in-the-case", text: "See what's in the case" }}
               />
             </div>
@@ -60,8 +61,8 @@ export default async function GamesPage() {
         )}
         {open.length === 0 && awaiting.length > 0 && (
           <p className="mt-6 max-w-[52ch] text-muted">
-            Nothing is open for spots at the moment. The game below filled
-            and is waiting on its draw.
+            Nothing is on sale at the moment. The drop below sold out and
+            is waiting on its draw.
           </p>
         )}
       </section>
@@ -76,8 +77,8 @@ export default async function GamesPage() {
             Awaiting the draw
           </h2>
           <p className="mt-3 max-w-[52ch] text-sm text-muted">
-            Every spot is taken. Nothing here can be bought — the draw is
-            what happens next, and the winner is posted on the game.
+            Every guide is sold. Nothing here can be bought. The draw is
+            what happens next, and the winner is posted on the drop.
           </p>
           <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {awaiting.map((g) => (
@@ -94,8 +95,8 @@ export default async function GamesPage() {
             Finished
           </h2>
           <p className="mt-3 max-w-[52ch] text-sm text-muted">
-            Games that filled and drew. Winners are shown as a first name
-            and last initial — never more than that.
+            Drops that sold out and drew. Winners are shown as a first name
+            and last initial, never more than that.
           </p>
           <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {finished.map((g) => (

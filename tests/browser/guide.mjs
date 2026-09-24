@@ -155,7 +155,7 @@ async function fillNewGame({ why, care, pairs }) {
   await owner.goto(`${APP}/admin/games/new`, { waitUntil: "networkidle" });
   await owner.fill("#g-title", "October Rifle Game");
   await owner.selectOption("#g-item", PRIZE);
-  await owner.fill("#g-spots", "50");
+  await owner.fill("#g-count", "50");
   await owner.fill("#g-price", "40.00");
   await owner.fill("#g-guide_why", why);
   await owner.fill("#g-guide_care", care);
@@ -324,6 +324,34 @@ check("asking again does not rebuild it", stored[0].digest === firstDigest,
   `${firstDigest} then ${stored[0].digest}`);
 
 // =====================================================================
+// 4b. Rebuilt when the WORDING in the code changes
+// =====================================================================
+// A guide already sold, built by an older renderer: its stored
+// fingerprint was made with a different GUIDE_RENDERER_VERSION, which is
+// exactly the state every existing guide is in after a deployment that
+// changes a printed string (a heading, the shop's details, the
+// disclaimer). Planting a foreign fingerprint recreates that state
+// without a second build. The customer's next open must rebuild it, not
+// serve the old file out of storage.
+{
+  const before = (await dump()).games.find((g) => g.id === game.id);
+  await fetch(`${DOUBLE}/rest/v1/games?id=eq.${game.id}`, {
+    method: "PATCH", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ guide_fingerprint: "built-by-an-older-renderer" }),
+  });
+  await owner.request.get(`${APP}/admin/games/${game.id}/guide.pdf`);
+  const after = (await dump()).games.find((g) => g.id === game.id);
+  check("a guide built by an older renderer is rebuilt on the next open",
+    after?.guide_fingerprint === before?.guide_fingerprint &&
+      after?.guide_generated_at !== before?.guide_generated_at,
+    `fingerprint ${after?.guide_fingerprint === before?.guide_fingerprint ? "restored" : after?.guide_fingerprint}, ` +
+      `built ${before?.guide_generated_at} then ${after?.guide_generated_at}`);
+}
+// What section 5 compares against: the guide as it stands now, so its
+// "rebuilt" can only come from the owner's edit.
+const baselineDigest = (await storage()).find((o) => o.key.startsWith("game-guides/"))?.digest;
+
+// =====================================================================
 // 5. Rebuilt when the owner changes his words
 // =====================================================================
 await owner.goto(`${APP}/admin/games/${game.id}`, { waitUntil: "networkidle" });
@@ -341,8 +369,8 @@ check("the edit saved", has(edited?.guide_care ?? "", "collects carbon"),
 const after = await owner.request.get(`${APP}/admin/games/${game.id}/guide.pdf`);
 const afterBody = Buffer.from(await after.body());
 stored = (await storage()).filter((o) => o.key.startsWith("game-guides/"));
-check("changing a section rebuilds the guide", stored[0].digest !== firstDigest,
-  `${firstDigest} then ${stored[0].digest}`);
+check("changing a section rebuilds the guide", stored[0].digest !== baselineDigest,
+  `${baselineDigest} then ${stored[0].digest}`);
 check("and the new words are in it", has(pdfFlatText(afterBody), "collects carbon"));
 check("and the old ones are gone", !has(pdfFlatText(afterBody), "light film of oil"));
 check("still one object, not a second copy", stored.length === 1,
@@ -378,7 +406,7 @@ check("the guide is cleared before the purchase",
 const buyer = await shopper();
 await buyer.goto(`${APP}/featured`, { waitUntil: "networkidle" });
 await buyer.waitForTimeout(400);
-await buyer.getByRole("button", { name: /^take /i }).click();
+await buyer.getByRole("button", { name: /^get /i }).click();
 await buyer.waitForTimeout(500);
 await buyer.goto(`${APP}/checkout`, { waitUntil: "networkidle" });
 await buyer.waitForTimeout(600);
@@ -674,6 +702,24 @@ check("a game with no prize tells the owner why, rather than 500ing",
     generated
       ? `${generated} — ${version.includes(`"${generated}"`) ? "matches" : "COMMITTED FILE IS STALE, run scripts/gen-guide-version.mjs"}`
       : "could not compute one");
+  // The version has to cover every file whose WORDS reach the page, not
+  // only the renderer's own. It covered five hand-listed files and missed
+  // the three that print text: the section headings, the shop's details
+  // and the firearm disclaimer. A wording change in any of them left
+  // every guide already sold serving the old text.
+  const sources = (await import("../../scripts/gen-guide-version.mjs")).rendererSources?.() ?? [];
+  for (const f of ["lib/guides/fields.ts", "lib/brand.ts", "lib/legal.ts", "lib/guides/Document.tsx"]) {
+    check(`the renderer version covers ${f}, whose text is printed in the guide`,
+      sources.includes(f), sources.join(", "));
+  }
+  // And the file set is the import graph, so a file the document starts
+  // importing tomorrow is covered without anybody adding it to a list.
+  const docImports = [...readFileSync(join(ROOT, "lib/guides/Document.tsx"), "utf8")
+    .matchAll(/^import\s+(?!type\b)[^;]*?from\s+"(@\/[^"]+|\.[^"]+)"/gm)].map((m) => m[1]);
+  check("every value the document imports from this repo is in the version",
+    docImports.length > 0 && docImports.every((spec) => sources.some((f) =>
+      f.startsWith(spec.replace(/^@\//, "").replace(/^\.\//, "lib/guides/")))),
+    docImports.join(", "));
   const buildSource = readFileSync(join(ROOT, "lib/guides/build.ts"), "utf8");
   check("and it is what the fingerprint is built from",
     /version:\s*GUIDE_RENDERER_VERSION/.test(buildSource),

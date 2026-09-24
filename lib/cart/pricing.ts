@@ -102,9 +102,9 @@ const REJECTION = {
   needsSize: "Pick a size for this one.",
   sizeGone: "That size has sold out.",
   noSizes: "No sizes are in stock.",
-  oneGame: "Spots in one game at a time — this cart already holds another.",
-  isPrize: "This is the prize in a game that is running. It is not for sale until the game is drawn.",
-  gameClosed: "That game has sold out. Nothing has been charged.",
+  oneGame: "Guides from one drop at a time. This cart already holds another.",
+  isPrize: "This is the featured piece in a drop that is running. It is not for sale until the drop is drawn.",
+  gameClosed: "That drop has sold out. Nothing has been charged.",
 } as const;
 
 /**
@@ -211,7 +211,7 @@ export async function priceCart(
             key: lineKey({ gameId: game.id }),
             itemId: game.id,
             name: game.title,
-            reason: `Only ${remaining} ${remaining === 1 ? "spot" : "spots"} left, so the cart holds ${spotCount}.`,
+            reason: `Only ${remaining} ${remaining === 1 ? "guide" : "guides"} left, so the cart holds ${spotCount}.`,
           });
         }
         spotGame = {
@@ -228,7 +228,7 @@ export async function priceCart(
           variantId: null,
           size: null,
           slug: `game-${game.id}`,
-          name: `${game.title} — ${spotCount === 1 ? "1 spot" : `${spotCount} spots`}`,
+          name: `${game.title} — ${spotCount === 1 ? "1 guide" : `${spotCount} guides`}`,
           image: null,
           unitPriceCents: game.spot_price_cents,
           quantity: spotCount,
