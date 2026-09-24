@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { formatUsd } from "@/lib/money";
 import type { GameRow } from "@/lib/database.types";
+import { useIsOwner } from "@/components/admin/Role";
+import { OWNER_ONLY } from "@/lib/admin/constants";
 
 // No status buttons. A game's state is derived — open at creation, full
 // the instant the last spot sells, drawn once a winner is recorded — so
@@ -24,6 +26,7 @@ export default function GameCard({
   sold: number;
 }) {
   const pct = game.total_spots > 0 ? (sold / game.total_spots) * 100 : 0;
+  const owner = useIsOwner();
 
   return (
     <div className="border-b hairline py-5">
@@ -60,12 +63,22 @@ export default function GameCard({
           {formatUsd(sold * game.spot_price_cents)} taken
         </span>
         <div className="ml-auto flex items-center gap-2">
-          <a
-            href={`/admin/games/${game.id}/spots.csv`}
-            className="label flex h-11 items-center px-3 text-muted hover:text-bone"
-          >
-            CSV
-          </a>
+          {owner ? (
+            <a
+              href={`/admin/games/${game.id}/spots.csv`}
+              className="label flex h-11 items-center px-3 text-muted hover:text-bone"
+            >
+              CSV
+            </a>
+          ) : (
+            <span
+              aria-disabled="true"
+              title={OWNER_ONLY}
+              className="label flex h-11 cursor-not-allowed items-center px-3 text-muted opacity-50"
+            >
+              CSV · owner only
+            </span>
+          )}
           <Link href={`/admin/games/${game.id}`} className="control control-sm">
             Open
           </Link>

@@ -1,12 +1,27 @@
 "use server";
 
-// Admin mutations. Every action runs on the owner's session client, so
-// RLS enforces `authenticated` — there is no service-role use here.
+// Admin mutations. Every action runs on the signed-in person's session
+// client, so row level security applies to every write — there is no
+// service-role use here.
+//
+// Two roles. The owner can do everything; the manager cannot delete
+// anything permanently, change tax, shipping, the offer or the arcade,
+// or touch the demo game. The DATABASE refuses those for a manager
+// whatever arrives here (supabase/migrations/20260928100000_staff_roles.sql,
+// tests/db/roles.mjs). The checks in this file are the second lock, and
+// the reason a manager reads "owner only" instead of a save that quietly
+// changed nothing, which is how row level security refuses an update.
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSessionSupabase } from "@/lib/supabase/session";
+import {
+  ROLES_MIGRATION,
+  refuseManager,
+  requireStaff,
+  type Staff,
+} from "@/lib/admin/staff";
 import { slugify } from "@/lib/slug";
 import { parseUsdToCents } from "@/lib/money";
 import type { Database, Json } from "@/lib/database.types";
@@ -23,7 +38,6 @@ import { logDbError } from "@/lib/db/log";
 import {
   WATCHED_ITEM_FIELDS,
   changedFields,
-  displayName,
   logActivity,
 } from "@/lib/admin/audit";
 import { DIFFICULTY_RANGES } from "@/lib/game/settings";
@@ -31,29 +45,33 @@ import { DEMO_GAME_PREFIX, isFirearmCategory } from "@/lib/surfaces";
 import { firstGuideError } from "@/lib/guides/fields";
 import { newSeed, redactName, selectWinner, verifyDraw } from "@/lib/draw/select";
 import type { DrawRecord } from "@/lib/draw/presentation";
+import {
+  ALERT_ROUTING_KEY,
+  EMPTY_ROUTING,
+  MAX_RECIPIENTS,
+  parseRecipients,
+  readRouting,
+} from "@/lib/alerts";
+import { sendAlert } from "@/lib/notify";
 
 export type { ActionState };
 
-async function requireClient(): Promise<SupabaseClient<Database> | null> {
-  const session = await requireSession();
-  return session?.sb ?? null;
+/** Any member of staff. Owner-only actions check `role` after this. */
+async function requireSession(): Promise<Staff | null> {
+  return requireStaff();
 }
 
-/**
- * The client AND who is holding it. Authorship and the activity log both
- * need the user, and every write already had to fetch it to check the
- * session — so it is returned rather than thrown away.
- */
-async function requireSession(): Promise<
-  { sb: SupabaseClient<Database>; user: User } | null
-> {
-  const sb = await getSessionSupabase();
-  if (!sb) return null;
-  const {
-    data: { user },
-  } = await sb.auth.getUser();
-  return user ? { sb, user } : null;
-}
+/** The item fields logged by name only; see saveItem. */
+const ITEM_DETAIL_FIELDS = [
+  "name", "slug", "category", "brand", "short_desc", "long_desc",
+  "price_display", "has_variants", "video_url", "specs",
+] as const;
+const ITEM_FIELD_NAMES: Record<string, string> = {
+  name: "name", slug: "web address", category: "category", brand: "brand",
+  short_desc: "short description", long_desc: "description",
+  price_display: "price label", has_variants: "sizes on/off",
+  video_url: "video", specs: "specifications",
+};
 
 function revalidatePublic(slug?: string) {
   revalidatePath("/");
@@ -68,7 +86,7 @@ function revalidatePublic(slug?: string) {
 export async function setItemStatus(id: string, status: string): Promise<void> {
   const session = await requireSession();
   if (!session || !ITEM_STATUSES.includes(status as (typeof ITEM_STATUSES)[number])) return;
-  const { sb, user } = session;
+  const { sb } = session;
   const { data: was } = await sb
     .from("items")
     .select("name, status")
@@ -76,11 +94,11 @@ export async function setItemStatus(id: string, status: string): Promise<void> {
     .maybeSingle();
   const { error } = await sb
     .from("items")
-    .update({ status, updated_by_name: displayName(user) })
+    .update({ status, updated_by_name: session.name })
     .eq("id", id);
   if (error) console.error("setItemStatus:", error.message);
   else if (was?.status !== status) {
-    await logActivity(sb, user, {
+    await logActivity(sb, session, {
       action: "status", entity: "item", entityId: id, entityLabel: was?.name ?? null,
       field: "status", before: was?.status ?? null, after: status,
     });
@@ -98,7 +116,7 @@ export async function setItemStatus(id: string, status: string): Promise<void> {
 export async function archiveItem(id: string): Promise<string | null> {
   const session = await requireSession();
   if (!session) return null;
-  const { sb, user } = session;
+  const { sb } = session;
   const { data: before } = await sb
     .from("items")
     .select("name, status")
@@ -106,13 +124,13 @@ export async function archiveItem(id: string): Promise<string | null> {
     .maybeSingle();
   const { error } = await sb
     .from("items")
-    .update({ status: ARCHIVED_STATUS, updated_by_name: displayName(user) })
+    .update({ status: ARCHIVED_STATUS, updated_by_name: session.name })
     .eq("id", id);
   if (error) {
     console.error("archiveItem:", error.message);
     return null;
   }
-  await logActivity(sb, user, {
+  await logActivity(sb, session, {
     action: "archive", entity: "item", entityId: id, entityLabel: before?.name ?? null,
     field: "status", before: before?.status ?? null, after: ARCHIVED_STATUS,
   });
@@ -125,18 +143,18 @@ export async function archiveItem(id: string): Promise<string | null> {
 export async function restoreItem(id: string, status: string): Promise<void> {
   const session = await requireSession();
   if (!session) return;
-  const { sb, user } = session;
+  const { sb } = session;
   const next = ITEM_STATUSES.includes(status as (typeof ITEM_STATUSES)[number])
     ? status
     : "available";
   const { data: was } = await sb.from("items").select("name").eq("id", id).maybeSingle();
   const { error } = await sb
     .from("items")
-    .update({ status: next, updated_by_name: displayName(user) })
+    .update({ status: next, updated_by_name: session.name })
     .eq("id", id);
   if (error) console.error("restoreItem:", error.message);
   else {
-    await logActivity(sb, user, {
+    await logActivity(sb, session, {
       action: "restore", entity: "item", entityId: id, entityLabel: was?.name ?? null,
       field: "status", before: ARCHIVED_STATUS, after: next,
     });
@@ -158,7 +176,9 @@ export async function deleteItem(
 ): Promise<ActionState> {
   const session = await requireSession();
   if (!session) return { status: "error", message: "Not signed in." };
-  const { sb, user } = session;
+  // Permanent. A manager archives instead, which keeps everything.
+  if (session.role !== "owner") return refuseManager(session, "delete an item");
+  const { sb } = session;
   const id = String(formData.get("id") ?? "");
   if (!id) return { status: "error", message: "Missing item." };
 
@@ -201,7 +221,7 @@ export async function deleteItem(
   }
   // Logged after the fact but with the label captured before, so the line
   // still names the thing that no longer exists.
-  await logActivity(sb, user, {
+  await logActivity(sb, session, {
     action: "delete", entity: "item", entityId: id, entityLabel: item.name,
     before: { name: item.name } as Json, after: null,
   });
@@ -213,15 +233,15 @@ export async function deleteItem(
 export async function toggleItemFeatured(id: string, next: boolean): Promise<void> {
   const session = await requireSession();
   if (!session) return;
-  const { sb, user } = session;
+  const { sb } = session;
   const { data: was } = await sb.from("items").select("name").eq("id", id).maybeSingle();
   const { error } = await sb
     .from("items")
-    .update({ is_featured: next, updated_by_name: displayName(user) })
+    .update({ is_featured: next, updated_by_name: session.name })
     .eq("id", id);
   if (error) console.error("toggleItemFeatured:", error.message);
   else {
-    await logActivity(sb, user, {
+    await logActivity(sb, session, {
       action: "featured", entity: "item", entityId: id, entityLabel: was?.name ?? null,
       field: "is_featured", before: !next, after: next,
     });
@@ -231,8 +251,9 @@ export async function toggleItemFeatured(id: string, next: boolean): Promise<voi
 }
 
 export async function moveItem(id: string, direction: "up" | "down"): Promise<void> {
-  const sb = await requireClient();
-  if (!sb) return;
+  const session = await requireSession();
+  if (!session) return;
+  const { sb } = session;
   const { data: rows, error } = await sb
     .from("items")
     .select("id, sort_order")
@@ -250,13 +271,19 @@ export async function moveItem(id: string, direction: "up" | "down"): Promise<vo
       sb.from("items").update({ sort_order: position }).eq("id", rowId),
     ),
   );
+  const { data: moved } = await sb.from("items").select("name").eq("id", id).maybeSingle();
+  await logActivity(sb, session, {
+    action: "update", entity: "item", entityId: id, entityLabel: moved?.name ?? null,
+    field: "order", after: direction === "up" ? "moved up" : "moved down",
+  });
   revalidatePublic();
   revalidatePath("/admin/inventory");
 }
 
 export async function duplicateItem(id: string): Promise<void> {
-  const sb = await requireClient();
-  if (!sb) return;
+  const session = await requireSession();
+  if (!session) return;
+  const { sb } = session;
   const { data: item } = await sb.from("items").select("*").eq("id", id).maybeSingle();
   if (!item) return;
   // Sizes come across, their stock does not. A duplicate is a new run of
@@ -310,6 +337,12 @@ export async function duplicateItem(id: string): Promise<void> {
     );
     if (variantError) logDbError("duplicateItem variants", variantError);
   }
+  if (copy?.id) {
+    await logActivity(sb, session, {
+      action: "create", entity: "item", entityId: copy.id, entityLabel: `${item.name} COPY`,
+      field: "duplicated from", after: item.name,
+    });
+  }
   revalidatePath("/admin/inventory");
   if (copy?.id) redirect(`/admin/inventory/${copy.id}`);
 }
@@ -344,8 +377,8 @@ export async function saveItem(
 ): Promise<ActionState> {
   const session = await requireSession();
   if (!session) return { status: "error", message: "Not signed in." };
-  const { sb, user } = session;
-  const actor = displayName(user);
+  const { sb } = session;
+  const actor = session.name;
 
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
@@ -451,6 +484,9 @@ export async function saveItem(
   const { data: previous } = id
     ? await sb.from("items").select("*").eq("id", id).maybeSingle()
     : { data: null };
+  const { data: previousVariants } = id
+    ? await sb.from("item_variants").select("size, stock").eq("item_id", id)
+    : { data: [] };
 
   // Authorship is never read from the form. These are the only two fields
   // the browser cannot influence, and the database stamps the ids from the
@@ -528,7 +564,7 @@ export async function saveItem(
     }
   }
   if (!id) {
-    await logActivity(sb, user, {
+    await logActivity(sb, session, {
       action: "create", entity: "item", entityId: saved.id, entityLabel: row.name,
     });
   } else {
@@ -538,10 +574,51 @@ export async function saveItem(
       WATCHED_ITEM_FIELDS,
     );
     for (const diff of diffs) {
-      await logActivity(sb, user, {
+      await logActivity(sb, session, {
         action: diff.field === "price_cents" ? "price" : diff.field === "status" ? "status" : "update",
         entity: "item", entityId: saved.id, entityLabel: row.name,
         field: diff.field, before: diff.before, after: diff.after,
+      });
+    }
+
+    // Everything else, so that no edit goes unrecorded. The watched
+    // fields above get a line each with before and after; the rest are
+    // named in one line, because "changed the description" is what the
+    // owner needs to know and the old paragraph is not.
+    const was = (previous ?? {}) as Record<string, unknown>;
+    const now = row as unknown as Record<string, unknown>;
+    const same = (a: unknown, b: unknown) =>
+      JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+    const other = ITEM_DETAIL_FIELDS.filter((f) => !same(was[f], now[f]));
+    if (other.length > 0) {
+      await logActivity(sb, session, {
+        action: "update", entity: "item", entityId: saved.id, entityLabel: row.name,
+        field: "details", after: other.map((f) => ITEM_FIELD_NAMES[f] ?? f).join(", "),
+      });
+    }
+
+    const photosBefore = Array.isArray(was.images) ? was.images.length : 0;
+    const photosAfter = Array.isArray(images) ? images.length : 0;
+    if (!same(was.images, images)) {
+      await logActivity(sb, session, {
+        action: "photos", entity: "item", entityId: saved.id, entityLabel: row.name,
+        field: "images", before: photosBefore, after: photosAfter,
+      });
+    }
+  }
+
+  // Sizes and stock, as a map of size to count before and after. A size
+  // missing from "after" was removed, which is the one permanent delete
+  // a manager can make, so it has to be on the record.
+  if (hasVariants) {
+    const before = Object.fromEntries(
+      (previousVariants ?? []).map((v) => [v.size, v.stock]),
+    );
+    const after = Object.fromEntries(variants.map((v) => [v.size, v.stock]));
+    if (JSON.stringify(before) !== JSON.stringify(after) && (id || variants.length > 0)) {
+      await logActivity(sb, session, {
+        action: "stock", entity: "item", entityId: saved.id, entityLabel: row.name,
+        field: "sizes", before: before as Json, after: after as Json,
       });
     }
   }
@@ -552,10 +629,23 @@ export async function saveItem(
 }
 
 export async function setInquiryStatus(id: string, status: string): Promise<void> {
-  const sb = await requireClient();
-  if (!sb || !["new", "contacted", "closed"].includes(status)) return;
+  const session = await requireSession();
+  if (!session || !["new", "contacted", "closed"].includes(status)) return;
+  const { sb } = session;
+  const { data: was } = await sb
+    .from("inquiries")
+    .select("name, type, status")
+    .eq("id", id)
+    .maybeSingle();
   const { error } = await sb.from("inquiries").update({ status }).eq("id", id);
   if (error) console.error("setInquiryStatus:", error.message);
+  else if (was && was.status !== status) {
+    await logActivity(sb, session, {
+      action: "status", entity: "inquiry", entityId: id,
+      entityLabel: `${was.name} (${was.type})`,
+      field: "status", before: was.status, after: status,
+    });
+  }
   revalidatePath("/admin/inquiries");
 }
 
@@ -593,22 +683,25 @@ function revalidateGame() {
 }
 
 /** The kill switch: flips only `enabled`, touches nothing else. */
-export async function toggleGameOffer(enabled: boolean): Promise<void> {
+export async function toggleGameOffer(enabled: boolean): Promise<ActionState> {
   const session = await requireSession();
-  if (!session) return;
-  const { sb, user } = session;
+  if (!session) return { status: "error", message: "Not signed in." };
+  if (session.role !== "owner") return refuseManager(session, "switch the offer");
+  const { sb } = session;
   const current = await readSetting(sb, "game_offer");
   const was = current.enabled === true;
-  await writeSetting(sb, "game_offer", { ...current, enabled } as Json, displayName(user));
+  const ok = await writeSetting(sb, "game_offer", { ...current, enabled } as Json, session.name);
+  if (!ok) return { status: "error", message: "The switch did not save. Try again." };
   if (was !== enabled) {
     // Turning a live discount on or off is the settings change most worth
     // being able to point at afterwards.
-    await logActivity(sb, user, {
+    await logActivity(sb, session, {
       action: "offer", entity: "settings", entityLabel: "Game & Offer",
       field: "enabled", before: was, after: enabled,
     });
   }
   revalidateGame();
+  return { status: "idle", message: enabled ? "The offer is on." : "The offer is off." };
 }
 
 export async function saveGameOffer(
@@ -617,8 +710,9 @@ export async function saveGameOffer(
 ): Promise<ActionState> {
   const session = await requireSession();
   if (!session) return { status: "error", message: "Not signed in." };
-  const { sb, user } = session;
-  const actor = displayName(user);
+  if (session.role !== "owner") return refuseManager(session, "change the offer code");
+  const { sb } = session;
+  const actor = session.name;
 
   const code = String(formData.get("code") ?? "")
     .trim()
@@ -640,7 +734,7 @@ export async function saveGameOffer(
   } as Json, actor);
   if (!ok) return { status: "error", message: "Save failed — try again." };
   if (current.code !== code) {
-    await logActivity(sb, user, {
+    await logActivity(sb, session, {
       action: "offer", entity: "settings", entityLabel: "Game & Offer",
       field: "code", before: (current.code ?? null) as Json, after: code,
     });
@@ -655,8 +749,9 @@ export async function saveGameDifficulty(
 ): Promise<ActionState> {
   const session = await requireSession();
   if (!session) return { status: "error", message: "Not signed in." };
-  const { sb, user } = session;
-  const actor = displayName(user);
+  if (session.role !== "owner") return refuseManager(session, "change the arcade difficulty");
+  const { sb } = session;
+  const actor = session.name;
 
   const mode = String(formData.get("mode") ?? "");
   if (mode !== "desktop" && mode !== "mobile")
@@ -687,7 +782,7 @@ export async function saveGameDifficulty(
     [mode]: { roundMs, targetCount, popMs, magSize },
   } as Json, actor);
   if (!ok) return { status: "error", message: "Save failed — try again." };
-  await logActivity(sb, user, {
+  await logActivity(sb, session, {
     action: "difficulty", entity: "settings", entityLabel: `Game difficulty (${mode})`,
     field: mode, before: (current[mode] ?? null) as Json,
     after: { roundMs, targetCount, popMs, magSize } as Json,
@@ -710,8 +805,9 @@ export async function saveCommerce(
 ): Promise<ActionState> {
   const session = await requireSession();
   if (!session) return { status: "error", message: "Not signed in." };
-  const { sb, user } = session;
-  const actor = displayName(user);
+  if (session.role !== "owner") return refuseManager(session, "change tax or shipping");
+  const { sb } = session;
+  const actor = session.name;
 
   const percent = Number(String(formData.get("tax_percent") ?? "").trim());
   if (!Number.isFinite(percent) || percent < 0 || percent > 25)
@@ -742,7 +838,7 @@ export async function saveCommerce(
     ["shipping_oversize_cents", current.shipping_oversize_cents, oversizeCents],
   ] as const) {
     if ((before ?? null) === after) continue;
-    await logActivity(sb, user, {
+    await logActivity(sb, session, {
       action: "commerce", entity: "settings", entityLabel: "Tax & Shipping",
       field, before: (before ?? null) as Json, after: after as Json,
     });
@@ -771,8 +867,8 @@ export async function saveGame(
 ): Promise<ActionState> {
   const session = await requireSession();
   if (!session) return { status: "error", message: "Not signed in." };
-  const { sb, user } = session;
-  const actor = displayName(user);
+  const { sb } = session;
+  const actor = session.name;
 
   const id = String(formData.get("id") ?? "");
   const title = String(formData.get("title") ?? "").trim();
@@ -820,7 +916,7 @@ export async function saveGame(
       console.error("saveGame update:", error.message);
       return { status: "error", message: "Save failed — try again." };
     }
-    await logActivity(sb, user, {
+    await logActivity(sb, session, {
       action: "update", entity: "game", entityId: id, entityLabel: title,
     });
     revalidatePublic();
@@ -835,53 +931,35 @@ export async function saveGame(
   if (spotPriceCents === null || spotPriceCents < 100)
     return { status: "error", message: "Price per spot must be at least $1.00." };
 
-  const { data: game, error } = await sb
-    .from("games")
-    .insert({
-      title,
-      description,
-      winner_note: winnerNote,
-      item_id: itemId,
-      ...guide,
-      total_spots: totalSpots,
-      spot_price_cents: spotPriceCents,
-      status: "open",
-      created_by_name: actor,
-      updated_by_name: actor,
-    })
-    .select("id")
-    .single();
-
-  if (error || !game) {
-    console.error("saveGame insert:", error?.message);
-    return { status: "error", message: "Save failed — try again." };
+  // The game and every one of its spots in a single transaction, by the
+  // database. This used to be two steps with a delete of the game as the
+  // clean-up if the spots failed half way; a manager may not delete a
+  // game, so for him that clean-up would have been refused and left a
+  // board on sale with holes in it. Now there is nothing to clean up.
+  const { data: gameId, error } = await sb.rpc("create_game", {
+    p_title: title,
+    p_description: description,
+    p_winner_note: winnerNote,
+    p_item_id: itemId,
+    p_guide_why: guide.guide_why,
+    p_guide_care: guide.guide_care,
+    p_guide_pairs: guide.guide_pairs,
+    p_total_spots: totalSpots,
+    p_spot_price_cents: spotPriceCents,
+  });
+  if (error || !gameId) {
+    if (error) logDbError("saveGame create_game", error);
+    return {
+      status: "error",
+      message:
+        error?.code === "PGRST202"
+          ? `The database is missing the create_game function. Apply ${ROLES_MIGRATION} in Supabase, then try again.`
+          : "Could not create the game. Nothing was created. Try again.",
+    };
   }
+  const game = { id: gameId };
 
-  // Every spot exists from the moment the game does. See the migration
-  // for why this is rows rather than a counter.
-  const spots = Array.from({ length: totalSpots }, (_, i) => ({
-    game_id: game.id,
-    spot_number: i + 1,
-  }));
-  // Chunked: a 10,000-spot game is one statement too many for a single
-  // insert, and a half-created board is worse than a slow one.
-  for (let i = 0; i < spots.length; i += 500) {
-    const { error: spotError } = await sb
-      .from("game_spots")
-      .insert(spots.slice(i, i + 500));
-    if (spotError) {
-      logDbError("saveGame spots", spotError);
-      // The game exists but cannot be sold from. Remove it rather than
-      // leave a board with holes in it.
-      await sb.from("games").delete().eq("id", game.id);
-      return {
-        status: "error",
-        message: "Could not lay out the spots — nothing was created. Try again.",
-      };
-    }
-  }
-
-  await logActivity(sb, user, {
+  await logActivity(sb, session, {
     action: "create", entity: "game", entityId: game.id, entityLabel: title,
     after: { spots: totalSpots, price_cents: spotPriceCents } as Json,
   });
@@ -936,7 +1014,7 @@ export async function commitDraw(
 ): Promise<DrawRecord> {
   const session = await requireSession();
   if (!session) return { ok: false, error: "Not signed in." };
-  const { sb, user } = session;
+  const { sb } = session;
 
   const { data: already, error: alreadyError } = await sb
     .from("winners")
@@ -1021,7 +1099,7 @@ export async function commitDraw(
   // because total_spots is fixed at creation and cannot drift.
   const { data: gameRow } = await sb
     .from("games")
-    .select("total_spots")
+    .select("total_spots, title")
     .eq("id", gameId)
     .maybeSingle();
   const totalSpots = gameRow?.total_spots ?? spots.length;
@@ -1132,7 +1210,7 @@ export async function commitDraw(
 
   const { error: statusError } = await sb
     .from("games")
-    .update({ status: "drawn", updated_by_name: displayName(user) })
+    .update({ status: "drawn", updated_by_name: session.name })
     .eq("id", gameId);
   if (statusError) {
     // The winner IS recorded — this is cosmetic, and saying "it failed"
@@ -1141,9 +1219,9 @@ export async function commitDraw(
     logDbError("commitDraw status", statusError);
   }
   // The draw is the single least reversible thing anyone does in here.
-  await logActivity(sb, user, {
+  await logActivity(sb, session, {
     action: "draw", entity: "game", entityId: gameId,
-    entityLabel: null,
+    entityLabel: gameRow?.title ?? null,
     field: "winner", before: null,
     after: {
       name: displayNameOfWinner,
@@ -1216,8 +1294,9 @@ export async function drawWinner(
 export async function seedDemoGame(): Promise<ActionState> {
   const session = await requireSession();
   if (!session) return { status: "error", message: "Not signed in." };
-  const { sb, user } = session;
-  const actor = displayName(user);
+  if (session.role !== "owner") return refuseManager(session, "create the demo game");
+  const { sb } = session;
+  const actor = session.name;
 
   const { data: existing } = await sb
     .from("games")
@@ -1301,7 +1380,7 @@ export async function seedDemoGame(): Promise<ActionState> {
     return { status: "error", message: "Could not record the demo winner." };
   }
 
-  await logActivity(sb, user, {
+  await logActivity(sb, session, {
     action: "create", entity: "game", entityId: game.id,
     entityLabel: `${DEMO_GAME_PREFIX} Example Rifle Game`,
   });
@@ -1317,7 +1396,8 @@ export async function seedDemoGame(): Promise<ActionState> {
 export async function deleteDemoGame(): Promise<ActionState> {
   const session = await requireSession();
   if (!session) return { status: "error", message: "Not signed in." };
-  const { sb, user } = session;
+  if (session.role !== "owner") return refuseManager(session, "delete the demo game");
+  const { sb } = session;
 
   const { data: games } = await sb
     .from("games")
@@ -1335,11 +1415,94 @@ export async function deleteDemoGame(): Promise<ActionState> {
       logDbError("deleteDemoGame", error);
       return { status: "error", message: "Could not remove the demo game." };
     }
-    await logActivity(sb, user, {
+    await logActivity(sb, session, {
       action: "delete", entity: "game", entityId: g.id, entityLabel: g.title,
     });
   }
   revalidatePublic();
   revalidatePath("/admin/games");
   return { status: "success", message: "Demo game removed." };
+}
+
+// ---------------------------------------------------------------------
+// Who gets alerts
+// ---------------------------------------------------------------------
+
+/**
+ * The two recipient lists. Owner only: the database refuses a manager's
+ * write to settings, and this refuses first so he is told why.
+ */
+export async function saveAlertRouting(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireSession();
+  if (!session) return { status: "error", message: "Not signed in." };
+  if (session.role !== "owner") return refuseManager(session, "change alert recipients");
+  const { sb } = session;
+
+  const next = { ...EMPTY_ROUTING };
+  for (const group of ["problems", "routine"] as const) {
+    const parsed = parseRecipients(String(formData.get(group) ?? ""));
+    if (!parsed.ok) {
+      return { status: "error", message: `"${parsed.bad}" is not an email address.` };
+    }
+    if (parsed.list.length > MAX_RECIPIENTS) {
+      return { status: "error", message: `At most ${MAX_RECIPIENTS} addresses per list.` };
+    }
+    next[group] = parsed.list;
+  }
+
+  const current = readRouting(
+    (await sb.from("settings").select("value").eq("key", ALERT_ROUTING_KEY).maybeSingle())
+      .data?.value,
+  );
+  const ok = await writeSetting(sb, ALERT_ROUTING_KEY, next as unknown as Json, session.name);
+  if (!ok) return { status: "error", message: "Save failed. Try again." };
+
+  for (const group of ["problems", "routine"] as const) {
+    if (current[group].join(",") === next[group].join(",")) continue;
+    await logActivity(sb, session, {
+      action: "alerts", entity: "settings", entityLabel: "Alert recipients",
+      field: group, before: current[group].join(", ") || null,
+      after: next[group].join(", ") || null,
+    });
+  }
+  revalidatePath("/admin/team");
+  return { status: "idle", message: "Saved." };
+}
+
+/**
+ * Sends a test through the real transport and reports what came back.
+ *
+ * The point is the report. "Sent" proves only that the script accepted
+ * it; whether the script honoured the recipient list is something only
+ * the script can say, and one that has not been updated says nothing.
+ */
+export async function sendTestAlert(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireSession();
+  if (!session) return { status: "error", message: "Not signed in." };
+  if (session.role !== "owner") return refuseManager(session, "send a test alert");
+  const group = formData.get("group") === "problems" ? "problems" : "routine";
+
+  const result = await sendAlert({ kind: "test_alert", group, requested_by: session.name });
+  if (!result.sent) return { status: "error", message: `Not sent. ${result.reason}` };
+
+  const asked = result.requested.length ? result.requested.join(", ") : null;
+  if (result.deliveredTo === null) {
+    return {
+      status: "error",
+      message: asked
+        ? `The script accepted it but did not say who it sent to, so it has not been updated to use this list. It went to its usual address, not to ${asked}. See docs/email.md.`
+        : "The script accepted it and did not say who it sent to. It went to its usual address.",
+    };
+  }
+  const got = result.deliveredTo.join(", ") || "nobody";
+  if (asked && result.requested.some((a) => !result.deliveredTo!.includes(a))) {
+    return { status: "error", message: `Asked for ${asked}. The script says it sent to ${got}.` };
+  }
+  return { status: "success", message: `Sent. The script says it went to ${got}.` };
 }

@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { getSessionSupabase } from "@/lib/supabase/session";
 import AdminLogin from "@/components/admin/AdminLogin";
 import AdminShell from "@/components/admin/AdminShell";
-import { displayName } from "@/lib/admin/audit";
+import NoAccess from "@/components/admin/NoAccess";
+import { ROLES_MIGRATION, getStaff } from "@/lib/admin/staff";
 
 export const metadata: Metadata = {
   title: "MLF Admin",
@@ -23,8 +23,8 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const sb = await getSessionSupabase();
-  if (!sb) {
+  const who = await getStaff();
+  if (!who.ok && who.reason === "unconfigured") {
     return (
       <div className="px-page flex min-h-svh flex-col items-start justify-center">
         <p className="label text-danger">Admin unavailable</p>
@@ -34,12 +34,21 @@ export default async function AdminLayout({
       </div>
     );
   }
+  if (!who.ok && who.reason === "signed-out") return <AdminLogin />;
+  // Signed in, but not somebody this admin knows. Before roles, any
+  // account that could sign in was a full admin; now an account needs a
+  // row in the staff table, which only the owner can add.
+  if (!who.ok) return <NoAccess reason={who.reason === "no-access" ? "no-access" : "error"} />;
 
-  const {
-    data: { user },
-  } = await sb.auth.getUser();
-
-  if (!user) return <AdminLogin />;
-
-  return <AdminShell who={displayName(user)}>{children}</AdminShell>;
+  const { staff } = who;
+  return (
+    <AdminShell
+      who={staff.name}
+      role={staff.role}
+      rolesMissing={staff.rolesMissing}
+      migration={ROLES_MIGRATION}
+    >
+      {children}
+    </AdminShell>
+  );
 }

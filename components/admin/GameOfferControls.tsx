@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useTransition } from "react";
+import { useActionState, useState, useTransition } from "react";
+import { OwnerOnlyNote, useIsOwner } from "@/components/admin/Role";
 import { saveGameDifficulty, saveGameOffer, toggleGameOffer } from "@/app/admin/actions";
 import { DEFAULT_EXCLUSION_NOTE } from "@/lib/admin/constants";
 import { DIFFICULTY_RANGES } from "@/lib/game/settings";
@@ -14,23 +15,40 @@ export interface OfferValue {
 }
 
 // The kill switch. Lives at the top of the screen; one tap, no confirm.
+// Owner only: for a manager it shows the state, disabled, with the line
+// saying why.
 export function OfferSwitch({ enabled }: { enabled: boolean }) {
   const [pending, start] = useTransition();
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const owner = useIsOwner();
   return (
+    <>
     <button
       type="button"
       aria-pressed={enabled}
-      disabled={pending}
-      onClick={() => start(() => toggleGameOffer(!enabled))}
+      disabled={pending || !owner}
+      onClick={() =>
+        start(async () => {
+          const result = await toggleGameOffer(!enabled);
+          setRefusal(result.status === "error" ? (result.message ?? null) : null);
+        })
+      }
       className={`control w-full justify-between !px-5 ${
         enabled ? "tone-acid" : "tone-danger"
       }`}
     >
       <span className="label">{enabled ? "Offer is live" : "Offer is off"}</span>
       <span className={`label ${enabled ? "text-acid" : "text-danger"}`}>
-        {pending ? "…" : enabled ? "Tap to switch off" : "Tap to switch on"}
+        {pending ? "…" : !owner ? "" : enabled ? "Tap to switch off" : "Tap to switch on"}
       </span>
     </button>
+    {!owner && <OwnerOnlyNote />}
+    {refusal && (
+      <p role="alert" className="label mt-3 text-danger">
+        {refusal}
+      </p>
+    )}
+    </>
   );
 }
 
@@ -38,9 +56,11 @@ export function OfferForm({ offer }: { offer: OfferValue }) {
   const [state, action, pending] = useActionState(saveGameOffer, {
     status: "idle" as const,
   });
+  const owner = useIsOwner();
 
   return (
     <form action={action} className="mt-8">
+      <fieldset disabled={!owner} className="disabled:opacity-60">
       <div className="grid gap-8 sm:grid-cols-2">
         <div>
           <label className="field-label" htmlFor="g-code">Code</label>
@@ -99,6 +119,8 @@ export function OfferForm({ offer }: { offer: OfferValue }) {
       <button type="submit" disabled={pending} className="cta-primary mt-8 disabled:opacity-50">
         {pending ? "Saving…" : "Save reward"}
       </button>
+      </fieldset>
+      {!owner && <OwnerOnlyNote />}
     </form>
   );
 }
@@ -116,9 +138,11 @@ export function DifficultyForm({
     status: "idle" as const,
   });
   const r = DIFFICULTY_RANGES;
+  const owner = useIsOwner();
 
   return (
     <form action={action} className="border-t hairline pt-6">
+      <fieldset disabled={!owner} className="disabled:opacity-60">
       <input type="hidden" name="mode" value={mode} />
       <div className="flex items-baseline justify-between gap-4">
         <h3 className="label text-acid">{mode}</h3>
@@ -204,6 +228,8 @@ export function DifficultyForm({
       <button type="submit" disabled={pending} className="cta-primary mt-6 !h-11 !px-5 disabled:opacity-50">
         {pending ? "Saving…" : `Save ${mode}`}
       </button>
+      </fieldset>
+      {!owner && <OwnerOnlyNote />}
     </form>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteDemoGame, seedDemoGame } from "@/app/admin/actions";
+import { OwnerOnlyNote, useIsOwner } from "@/components/admin/Role";
 
 /**
  * Creates or removes one clearly-labelled demonstration game.
@@ -20,6 +21,7 @@ export default function DemoGamePanel({ exists }: { exists: boolean }) {
   const [pending, start] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const router = useRouter();
+  const owner = useIsOwner();
 
   const run = (fn: () => Promise<{ status: string; message?: string }>) =>
     start(async () => {
@@ -48,7 +50,7 @@ export default function DemoGamePanel({ exists }: { exists: boolean }) {
         {exists ? (
           <button
             type="button"
-            disabled={pending}
+            disabled={pending || !owner}
             onClick={() => run(deleteDemoGame)}
             className="control control-caution"
           >
@@ -57,13 +59,14 @@ export default function DemoGamePanel({ exists }: { exists: boolean }) {
         ) : (
           <button
             type="button"
-            disabled={pending}
+            disabled={pending || !owner}
             onClick={() => run(seedDemoGame)}
             className="control"
           >
             {pending ? "Creating…" : "Create a demo game"}
           </button>
         )}
+        {!owner && <OwnerOnlyNote />}
       </div>
     </section>
   );

@@ -15,6 +15,8 @@
 // knows what an order looks like; the script should not have to.
 
 import { formatUsd } from "@/lib/money";
+import { getServiceSupabase } from "@/lib/supabase/service";
+import { loadRouting, type AlertGroup } from "@/lib/alerts";
 import { AGENCY_CONTACT, AGENCY_NAME } from "@/lib/brand";
 
 // ---------------------------------------------------------------- types
@@ -31,6 +33,12 @@ export type NotifyLine = {
 };
 
 export type OwnerNotification =
+  | {
+      /** Sent from Team & alerts to prove the routing reaches people. */
+      kind: "test_alert";
+      group: AlertGroup;
+      requested_by: string;
+    }
   | {
       kind: "inquiry";
       type: "item" | "transfer" | "general" | "service";
@@ -232,6 +240,15 @@ export function summarize(n: OwnerNotification): string {
 
     case "order_error":
       return orderErrorSummary(n);
+
+    case "test_alert":
+      return [
+        "TEST ALERT. NOTHING HAS HAPPENED.",
+        "",
+        `${n.requested_by} sent this from Team & alerts in the admin to check`,
+        `that ${n.group === "problems" ? "problem alerts (a failed order, a guide that did not build)" : "routine alerts (new orders, inquiries, a game selling out)"}`,
+        "reach the right people. If you are reading it, they do.",
+      ].join("\n");
   }
 }
 
@@ -489,6 +506,8 @@ export function subjectFor(n: OwnerNotification): string {
       }[n.type];
     case "game_full":
       return `${n.game} has SOLD OUT — ready to draw`;
+    case "test_alert":
+      return `Test alert (${n.group === "problems" ? "problems" : "routine"}) — nothing has happened`;
     case "order_error":
       return {
         charged_not_saved: `URGENT: card charged, order NOT saved — ${n.order_number}`,
@@ -504,21 +523,74 @@ export function subjectFor(n: OwnerNotification): string {
 
 // -------------------------------------------------------------- transport
 
-export async function notifyOwner(payload: OwnerNotification): Promise<void> {
+/** Which recipient list a notification goes to. */
+export function groupFor(n: OwnerNotification): AlertGroup {
+  if (n.kind === "test_alert") return n.group;
+  return n.kind === "order_error" ? "problems" : "routine";
+}
+
+export type AlertResult =
+  | { sent: false; reason: string }
+  | {
+      sent: true;
+      /** What the site asked for. Empty means "the script's default". */
+      requested: string[];
+      /**
+       * What the script says it sent to, if it says. A script that has
+       * not been updated for routing answers without this, and that is
+       * the one fact the test button exists to surface.
+       */
+      deliveredTo: string[] | null;
+    };
+
+/**
+ * Sends one alert and reports what happened.
+ *
+ * `notify_to` is the recipient list for this alert's group, and is left
+ * out entirely when that list is empty so an un-updated script sees the
+ * exact payload it always has.
+ */
+export async function sendAlert(payload: OwnerNotification): Promise<AlertResult> {
   const url = process.env.GOOGLE_SCRIPT_URL;
-  if (!url) return;
+  if (!url) return { sent: false, reason: "GOOGLE_SCRIPT_URL is not set." };
+  const group = groupFor(payload);
+  const routing = await loadRouting(getServiceSupabase());
+  const to = routing[group];
   try {
-    await fetch(url, {
+    const res = await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         ...payload,
+        notify_group: group,
+        ...(to.length ? { notify_to: to } : {}),
         subject: subjectFor(payload),
         summary: summarize(payload),
         submitted_at: new Date().toISOString(),
       }),
+      signal: AbortSignal.timeout(15_000),
     });
+    if (!res.ok) return { sent: false, reason: `The script answered ${res.status}.` };
+    const body: unknown = await res.json().catch(() => null);
+    const obj = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+    if (obj.ok === false) {
+      return { sent: false, reason: typeof obj.error === "string" ? obj.error : "The script refused it." };
+    }
+    const delivered = Array.isArray(obj.delivered_to)
+      ? obj.delivered_to.filter((x): x is string => typeof x === "string")
+      : typeof obj.delivered_to === "string"
+        ? obj.delivered_to.split(/\s*,\s*/).filter(Boolean)
+        : null;
+    return { sent: true, requested: to, deliveredTo: delivered };
   } catch (err) {
-    console.error("notifyOwner failed:", err);
+    return { sent: false, reason: err instanceof Error ? err.message : "Request failed." };
+  }
+}
+
+/** Fire and forget, for the site's own alerts. Never throws. */
+export async function notifyOwner(payload: OwnerNotification): Promise<void> {
+  const result = await sendAlert(payload);
+  if (!result.sent && process.env.GOOGLE_SCRIPT_URL) {
+    console.error("notifyOwner failed:", result.reason);
   }
 }

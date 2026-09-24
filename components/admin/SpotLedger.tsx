@@ -9,6 +9,7 @@
 // sparse.
 
 import { useState } from "react";
+import { OwnerOnlyNote, useIsOwner } from "@/components/admin/Role";
 
 type Row = {
   spotNumber: number;
@@ -26,6 +27,7 @@ export default function SpotLedger({
   gameId: string;
 }) {
   const [showAll, setShowAll] = useState(false);
+  const owner = useIsOwner();
   const sold = spots.filter((s) => s.status === "sold");
   const held = spots.filter((s) => s.status === "held");
   const shown = showAll ? sold : sold.slice(0, 12);
@@ -34,13 +36,20 @@ export default function SpotLedger({
     <section className="mt-14 border-t hairline pt-8">
       <div className="flex items-baseline justify-between gap-4">
         <h2 className="label text-muted">Spots sold</h2>
-        <a
-          href={`/admin/games/${gameId}/spots.csv`}
-          className="label text-muted hover:text-bone"
-        >
-          Download CSV
-        </a>
+        {owner ? (
+          <a
+            href={`/admin/games/${gameId}/spots.csv`}
+            className="label text-muted hover:text-bone"
+          >
+            Download CSV
+          </a>
+        ) : (
+          <button type="button" disabled className="label cursor-not-allowed text-muted opacity-50">
+            Download CSV
+          </button>
+        )}
       </div>
+      {!owner && <OwnerOnlyNote className="text-right" />}
 
       {held.length > 0 && (
         <p className="label mt-4 text-amber">

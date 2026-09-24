@@ -517,6 +517,29 @@ export interface Database {
         };
         Relationships: [];
       };
+      /**
+       * Who may use the admin, and as what. No row, no access. Written
+       * only from the Supabase SQL editor; see docs/roles.md.
+       */
+      staff: {
+        Row: {
+          user_id: string;
+          role: "owner" | "manager";
+          display_name: string;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          role: "owner" | "manager";
+          display_name: string;
+          created_at?: string;
+        };
+        Update: {
+          role?: "owner" | "manager";
+          display_name?: string;
+        };
+        Relationships: [];
+      };
       game_events: {
         Row: {
           id: string;
@@ -606,6 +629,21 @@ export interface Database {
       release_checkout: {
         Args: { p_key: string };
         Returns: undefined;
+      };
+      /** The game and every one of its spots, in one transaction. */
+      create_game: {
+        Args: {
+          p_title: string;
+          p_description: string | null;
+          p_winner_note: string | null;
+          p_item_id: string | null;
+          p_guide_why: string;
+          p_guide_care: string;
+          p_guide_pairs: string;
+          p_total_spots: number;
+          p_spot_price_cents: number;
+        };
+        Returns: string;
       };
     };
     Enums: Record<string, never>;

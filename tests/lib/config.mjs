@@ -52,3 +52,15 @@ export const OWNER = {
   email: "owner@molonlabe.example",
   password: "x",
 };
+
+/** The manager, whose staff name is Luis Ortega. */
+export const MANAGER = {
+  email: "manager@molonlabe.example",
+  password: "x",
+};
+
+/** Can sign in, has no staff row. */
+export const STRANGER = {
+  email: "stranger@molonlabe.example",
+  password: "x",
+};

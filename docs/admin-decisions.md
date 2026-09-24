@@ -33,29 +33,24 @@ defaults.
    setting is now stamped with who made it, and the consequential ones
    land in Admin → Activity with their previous value.
 
-   **This needs one manual step per account, and without it the log is
-   useless.** Supabase carries a person's name in `user_metadata`, which
-   is empty unless somebody fills it in. In the Supabase dashboard, go to
-   Authentication → Users → the user → *User Metadata*, and add:
-
-   ```json
-   { "full_name": "Rey Marquez" }
-   ```
-
-   Until that is set the log reads `Unnamed (9f1c0d)` — the account is
-   still distinguishable, and the six characters are the start of the
-   user id, which is meaningless to anyone reading over a shoulder.
+   **Names come from the staff table.** Since the roles migration
+   (`20260928100000_staff_roles.sql`) the name on every log line and
+   every record is `public.staff.display_name`, stamped by the database
+   from the session. It used to be read from Supabase `user_metadata`,
+   which the user it describes can edit, so anyone could have signed the
+   log as somebody else. See docs/roles.md for setting a name.
 
    **Never the email address.** Not in the log, not in the item footer,
    not in a tooltip. A mailbox in an audit trail is a mailbox in every
    export of that table, and none of this is ever rendered outside the
-   admin. `displayName()` in `lib/admin/audit.ts` is the only thing that
-   turns a user into a string, and it has no path that returns an email.
+   admin. The staff table is the only source of a name, and it has no
+   column holding an email.
 
    Authorship cannot be set from the browser. The ids are stamped by a
    database trigger from `auth.uid()`, so a hand-crafted request cannot
-   forge them; the display names are written by the server action from
-   the session, and no action reads a name out of the submitted form.
+   forge them; the display names are written by the database from the
+   staff row of the session, and no action reads a name out of the
+   submitted form.
 
 ---
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSessionSupabase } from "@/lib/supabase/session";
+import { OWNER_ONLY, getStaff } from "@/lib/admin/staff";
 
 export const dynamic = "force-dynamic";
 
@@ -13,14 +13,29 @@ const csvCell = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
  * valid there is no export. Full names and emails are in here because
  * this is the shop's own record of who bought what; it is the one place
  * they appear together, and it never leaves the admin.
+ *
+ * OWNER ONLY. Bulk export of the entrant list is on the manager's
+ * restricted list. Be clear about what that does and does not stop: a
+ * manager can read the same names on the game page, because he needs
+ * them to run the draw and contact the winner. What he cannot do is walk
+ * out with the whole list as a file. The database cannot tell a download
+ * from a page view, so this refusal is the server's alone.
  */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const sb = await getSessionSupabase();
-  if (!sb) return new NextResponse("Not signed in", { status: 401 });
+  const who = await getStaff();
+  if (!who.ok) return new NextResponse("Not signed in", { status: 401 });
+  if (who.staff.role !== "owner") {
+    console.warn(`Refused for a manager (${who.staff.name}): spot list export`);
+    return new NextResponse(OWNER_ONLY, {
+      status: 403,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    });
+  }
+  const { sb } = who.staff;
 
   const [{ data: game }, { data: spots }] = await Promise.all([
     sb.from("games").select("title").eq("id", id).maybeSingle(),

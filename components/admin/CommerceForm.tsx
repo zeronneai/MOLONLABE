@@ -9,6 +9,7 @@
 
 import { useActionState } from "react";
 import { saveCommerce } from "@/app/admin/actions";
+import { OwnerOnlyNote, useIsOwner } from "@/components/admin/Role";
 import type { CommerceSettings } from "@/lib/cart/pricing";
 
 export default function CommerceForm({
@@ -25,9 +26,12 @@ export default function CommerceForm({
   });
 
   const dollars = (cents: number) => (cents / 100).toFixed(2);
+  const owner = useIsOwner();
 
   return (
     <form action={action} className="max-w-2xl">
+      {!owner && <OwnerOnlyNote className="!mt-0 mb-8" />}
+      <fieldset disabled={!owner} className="disabled:opacity-60">
       <section>
         <h2 className="label text-acid">Sales tax</h2>
         <p className="mt-3 max-w-[60ch] text-sm text-muted">
@@ -128,6 +132,7 @@ export default function CommerceForm({
       >
         {pending ? "Saving…" : "Save"}
       </button>
+      </fieldset>
 
       {updatedBy && (
         <p className="label mt-12 border-t hairline pt-5 text-muted">

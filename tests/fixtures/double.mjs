@@ -59,6 +59,19 @@ function undeclared(table, body) {
 
 const PORT = Number(process.argv[2] || 4010);
 
+// Three accounts. The owner's metadata name is deliberately the same as
+// his staff name; the MANAGER's metadata says something else, so a test
+// can prove the admin takes the name from the staff table and never from
+// metadata, which the user can edit about himself.
+const USERS = {
+  owner: { id: "9f1c0d2e-4b6a-4c8d-9e10-2f3a4b5c6d7e", email: "owner@molonlabe.example",
+           meta: { full_name: "Rey Marquez" } },
+  manager: { id: "7a2b3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d", email: "manager@molonlabe.example",
+             meta: { full_name: "The Real Owner" } },
+  stranger: { id: "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a", email: "stranger@molonlabe.example",
+              meta: {} },
+};
+
 const RIFLE = "11111111-1111-4111-8111-111111111111";
 const OPTIC = "22222222-2222-4222-8222-222222222222";
 const SHIRT = "33333333-3333-4333-8333-333333333333";
@@ -135,6 +148,14 @@ const seed = () => ({
   orders: [], order_items: [], inquiries: [], winners: [],
   emails: [], notifications: [], charges: [], checkout_attempts: [],
   admin_activity: [],
+  // Who may use the admin. The stranger signs in and has no row, which
+  // is the case roles exist to refuse.
+  staff: [
+    { user_id: USERS.owner.id, role: "owner", display_name: "Rey Marquez",
+      created_at: "2026-01-01T00:00:00Z" },
+    { user_id: USERS.manager.id, role: "manager", display_name: "Luis Ortega",
+      created_at: "2026-09-20T00:00:00Z" },
+  ],
 });
 
 let db = seed();
@@ -313,19 +334,29 @@ function authorizeNet(body) {
 }
 
 
-const FAKE_USER_ID = "9f1c0d2e-4b6a-4c8d-9e10-2f3a4b5c6d7e";
 const b64u = (o) =>
   Buffer.from(JSON.stringify(o)).toString("base64url");
 /** JWT-shaped, never verified — the double is the issuer and the audience. */
-function fakeJwt() {
+function fakeJwt(u) {
   const now = Math.floor(Date.now() / 1000);
   return [
     b64u({ alg: "HS256", typ: "JWT" }),
-    b64u({ sub: FAKE_USER_ID, aud: "authenticated", role: "authenticated",
-           email: "owner@molonlabe.example", iat: now, exp: now + 3600,
-           user_metadata: { full_name: "Rey Marquez" } }),
+    b64u({ sub: u.id, aud: "authenticated", role: "authenticated",
+           email: u.email, iat: now, exp: now + 3600,
+           user_metadata: u.meta }),
     "not-a-real-signature",
   ].join(".");
+}
+
+/** The account a bearer token belongs to, or the owner if it cannot tell. */
+function userFromAuth(header) {
+  const token = String(header ?? "").replace(/^Bearer\s+/i, "");
+  try {
+    const sub = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString()).sub;
+    return Object.values(USERS).find((u) => u.id === sub) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 http.createServer(async (req, res) => {
@@ -408,7 +439,13 @@ http.createServer(async (req, res) => {
     else db.notifications.push(body);
     // Apps Script answers 200 with whatever the script returns. A script
     // that wants to report failure answers {ok:false}; this one succeeds.
-    return send(res, 200, { ok: true });
+    // It is the UPDATED script (docs/email.md, "Who receives an alert"):
+    // it honours notify_to and says who it sent to.
+    if (body?.kind === "order_confirmation") return send(res, 200, { ok: true });
+    return send(res, 200, {
+      ok: true,
+      delivered_to: body?.notify_to?.length ? body.notify_to : ["owner@molonlabe.example"],
+    });
   }
 
   // Stands in for Resend, so the confirmation email can be read back
@@ -440,24 +477,39 @@ http.createServer(async (req, res) => {
     if (!auth.includes(".") && path === "/auth/v1/user") {
       return send(res, 401, { message: "no session" });
     }
+    let u;
+    if (path === "/auth/v1/token") {
+      const body = (await readBody(req)) ?? {};
+      if (url.searchParams.get("grant_type") === "refresh_token") {
+        // The refresh token names the account it was issued to.
+        const who = String(body.refresh_token ?? "").replace("fake-refresh-", "");
+        u = USERS[who] ?? USERS.owner;
+      } else {
+        u = Object.values(USERS).find((x) => x.email === body.email);
+        if (!u) return send(res, 400, { error: "invalid_grant", error_description: "Invalid login credentials" });
+      }
+    } else {
+      u = userFromAuth(auth) ?? USERS.owner;
+    }
     const user = {
-      id: FAKE_USER_ID,
+      id: u.id,
       aud: "authenticated",
       role: "authenticated",
-      email: "owner@molonlabe.example",
+      email: u.email,
       email_confirmed_at: "2026-01-01T00:00:00Z",
       phone: "",
       created_at: "2026-01-01T00:00:00Z",
       updated_at: "2026-01-01T00:00:00Z",
       app_metadata: { provider: "email", providers: ["email"] },
-      user_metadata: { full_name: "Rey Marquez" },
+      user_metadata: u.meta,
       identities: [],
     };
     if (path === "/auth/v1/user") return send(res, 200, user);
+    const key = Object.keys(USERS).find((k) => USERS[k] === u);
     return send(res, 200, {
-      access_token: fakeJwt(), token_type: "bearer", expires_in: 3600,
+      access_token: fakeJwt(u), token_type: "bearer", expires_in: 3600,
       expires_at: Math.floor(Date.now() / 1000) + 3600,
-      refresh_token: "fake-refresh", user,
+      refresh_token: `fake-refresh-${key}`, user,
     });
   }
   if (path.startsWith("/auth/v1/")) return send(res, 401, { message: "no session" });
@@ -510,6 +562,35 @@ http.createServer(async (req, res) => {
   if (path.startsWith("/rest/v1/rpc/")) {
     const fn = path.replace("/rest/v1/rpc/", "");
     const a = (await readBody(req)) ?? {};
+    if (fn === "create_game") {
+      // The real function refuses anyone without a staff row, lays out
+      // every spot in the same transaction, and stamps the creator's
+      // name from the staff table.
+      const caller = userFromAuth(req.headers.authorization);
+      const member = caller && db.staff.find((m) => m.user_id === caller.id);
+      if (!member) return send(res, 403, { code: "42501", message: "Only staff can create a game." });
+      const id = randomUUID();
+      const now = new Date().toISOString();
+      db.games.push({
+        // Every declared column, null unless set, as a fresh row would be.
+        ...Object.fromEntries([...(SCHEMA.get("games") ?? [])].map((c) => [c, null])),
+        id, title: a.p_title, description: a.p_description, winner_note: a.p_winner_note,
+        item_id: a.p_item_id, guide_why: a.p_guide_why, guide_care: a.p_guide_care,
+        guide_pairs: a.p_guide_pairs, total_spots: a.p_total_spots,
+        spot_price_cents: a.p_spot_price_cents, status: "open",
+        created_at: now, updated_at: now,
+        created_by: caller.id, created_by_name: member.display_name,
+        updated_by: caller.id, updated_by_name: member.display_name,
+      });
+      for (let n = 1; n <= a.p_total_spots; n += 1) {
+        db.game_spots.push({
+          id: randomUUID(), game_id: id, spot_number: n, status: "open",
+          order_id: null, first_name: null, last_name: null, email: null, phone: null,
+          held_at: null, sold_at: null,
+        });
+      }
+      return send(res, 200, id);
+    }
     if (fn === "claim_checkout") {
       const k = a.p_key;
       if (!k || k.length < 8) return send(res, 200, "claimed");

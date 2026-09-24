@@ -162,7 +162,13 @@ async function prepareTemplate() {
   // suite would stay green while proving nothing about the change just
   // made. So the template carries a hash of the chain that built it, and
   // is rebuilt when that no longer matches.
+  //
+  // The platform stub is part of what built it too. auth.uid() lives
+  // there, and the roles suite is meaningless against a template whose
+  // auth.uid() still returns null for everybody.
   const fingerprint = createHash("sha256");
+  const stubPath = join(HERE, "fixtures", "platform-stub.sql");
+  if (existsSync(stubPath)) fingerprint.update(readFileSync(stubPath));
   for (const f of files) {
     fingerprint.update(f);
     fingerprint.update(readFileSync(join(migrations, f)));

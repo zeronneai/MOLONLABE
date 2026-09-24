@@ -115,3 +115,14 @@ export type ActionState = {
 // limits is a discount on everything.
 export const DEFAULT_EXCLUSION_NOTE =
   "Accessories and apparel only. Not valid on firearms.";
+
+/**
+ * The line a manager reads on anything only the owner can do.
+ *
+ * Shown under a DISABLED control rather than instead of a missing one: a
+ * button that is simply absent teaches nothing, and a manager who cannot
+ * find it assumes the site is broken. This tells him it exists, that it
+ * is deliberate, and who to ask. The server says the same words if the
+ * request reaches it anyway.
+ */
+export const OWNER_ONLY = "Owner only. Ask the owner if this needs changing.";

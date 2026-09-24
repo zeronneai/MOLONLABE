@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { LOGO_URL } from "@/lib/brand";
 import Toast from "@/components/admin/Toast";
+import { RoleProvider, type Role } from "@/components/admin/Role";
 
 const tabs = [
   // "What you sell" holds all three surfaces side by side, which is how
@@ -18,14 +19,22 @@ const tabs = [
   { href: "/admin/game", label: "Arcade & Offer" },
   { href: "/admin/commerce", label: "Tax & Shipping" },
   { href: "/admin/activity", label: "Activity" },
+  { href: "/admin/team", label: "Team & alerts" },
 ];
 
 export default function AdminShell({
   who,
+  role,
+  rolesMissing = false,
+  migration,
   children,
 }: {
   /** The signed-in person's display name. Never their email address. */
   who: string;
+  role: Role;
+  /** The staff table does not exist yet: roles are not in force. */
+  rolesMissing?: boolean;
+  migration?: string;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -56,14 +65,22 @@ export default function AdminShell({
               MLF ADMIN
             </span>
           </Link>
-          <button
-            type="button"
-            onClick={signOut}
-            title={`Signed in as ${who}`}
-            className="label flex h-11 items-center text-muted transition-colors hover:text-bone"
-          >
-            Sign out
-          </button>
+          <div className="flex items-center gap-4">
+            {/* Who and as what, always visible. A manager who can see
+                that he is signed in as the manager understands a
+                disabled button; one who cannot, reports it as broken. */}
+            <span data-signed-in-as className="label hidden text-muted sm:inline">
+              {who} · {role === "owner" ? "Owner" : "Manager"}
+            </span>
+            <button
+              type="button"
+              onClick={signOut}
+              title={`Signed in as ${who}`}
+              className="label flex h-11 items-center text-muted transition-colors hover:text-bone"
+            >
+              Sign out
+            </button>
+          </div>
         </div>
         <nav aria-label="Admin" className="px-page -mb-px overflow-x-auto">
           <ul className="flex gap-7 whitespace-nowrap">
@@ -84,7 +101,17 @@ export default function AdminShell({
           </ul>
         </nav>
       </header>
-      <main className="px-page pb-24 pt-8">{children}</main>
+      {rolesMissing && (
+        <div role="alert" className="px-page border-b border-danger bg-surface py-3">
+          <p className="label text-danger">
+            Roles are not in force. The database is missing {migration}. Until it is
+            applied, every account has full access. Apply it in the Supabase SQL editor.
+          </p>
+        </div>
+      )}
+      <main className="px-page pb-24 pt-8">
+        <RoleProvider role={role}>{children}</RoleProvider>
+      </main>
       <Toast />
     </div>
   );

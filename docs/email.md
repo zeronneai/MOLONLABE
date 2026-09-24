@@ -287,6 +287,52 @@ written so the inbox row alone says what happened.
 
 ---
 
+## Who receives an alert
+
+Recipients are set in the admin under **Team & alerts**, owner only. Two
+lists:
+
+| Group | `notify_group` | What goes to it |
+| --- | --- | --- |
+| Problems with an order | `problems` | every `order_error`, both severities |
+| Everything else | `routine` | `order`, `inquiry`, `game_full` |
+
+Every owner-facing payload now carries `notify_group`, and carries
+`notify_to` (an array of addresses) **only when that group's list is not
+empty**. An empty list sends exactly the payload the script has always
+received, so nothing changes until an address is entered.
+
+**The script has to be updated to honour it.** The site cannot choose who
+Apps Script emails; it can only ask. Until the script reads `notify_to`,
+the lists in the admin do nothing and every alert keeps going to the
+script's own address.
+
+The change, in the script's `doPost`, where it sends the owner email:
+
+```js
+// Before: MailApp.sendEmail(OWNER_EMAIL, data.subject, data.summary);
+var to = (data.notify_to && data.notify_to.length)
+  ? data.notify_to.join(",")
+  : OWNER_EMAIL;
+MailApp.sendEmail(to, data.subject, data.summary);
+// ...append the sheet row as before...
+return ContentService
+  .createTextOutput(JSON.stringify({ ok: true, delivered_to: to.split(",") }))
+  .setMimeType(ContentService.MimeType.JSON);
+```
+
+`delivered_to` in the answer is what makes the **Send a test** button in
+Team & alerts honest. With it, the button reports who the script says it
+sent to. Without it, the button says the script accepted the alert but
+has not been updated, and names the addresses that did not get it. Run
+both tests after changing the script.
+
+`kind: "test_alert"` is the test. It has `group` and `requested_by` and a
+summary that starts "TEST ALERT. NOTHING HAS HAPPENED." The script can
+skip the sheet row for it.
+
+---
+
 ## Vercel
 
 Required for the site to function at all:

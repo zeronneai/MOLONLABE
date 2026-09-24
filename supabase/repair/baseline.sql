@@ -16,11 +16,18 @@
 --
 -- WHAT IT WILL NOT DO
 --
--- It only adds. There is no drop table, no drop column, no delete and no
--- update anywhere in it, so it cannot lose data or lose a column that
--- something else still depends on. A column in your database that the
--- schema no longer has is left alone; check-schema.sql lists those
--- separately as harmless.
+-- It does not remove data. There is no drop table, no drop column, no
+-- delete and no update anywhere in it, so it cannot lose data or lose a
+-- column that something else still depends on. A column in your database
+-- that the schema no longer has is left alone; check-schema.sql lists
+-- those separately as harmless.
+--
+-- Two things it does take away or add that are not structure, both
+-- about who gets in. Row level security policies the schema does not
+-- have are DROPPED, each named in a notice as it goes: policies are
+-- OR'ed, so one leftover "any signed-in account" policy would undo the
+-- owner and manager roles. And if public.staff is empty, every existing
+-- account is made an owner, which is how access worked before roles.
 --
 -- It does not replace the migration chain for NEW changes. New work still
 -- gets a migration; this file is regenerated from the chain afterwards.
@@ -35,24 +42,6 @@ begin;
 -- Each table is created if absent, then every column is added if absent.
 -- The two together cover a missing table, a table missing some columns,
 -- and a table that is already correct.
-
-create table if not exists public._test_template_fingerprint (
-  fingerprint text not null
-);
-alter table public._test_template_fingerprint add column if not exists fingerprint text;
-do $$ begin
-  if exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public' and table_name = '_test_template_fingerprint'
-      and column_name = 'fingerprint' and is_nullable = 'YES'
-  ) then
-    if exists (select 1 from public._test_template_fingerprint where fingerprint is null) then
-      raise notice 'public._test_template_fingerprint.fingerprint holds nulls; left nullable. Fill them, then: alter table public._test_template_fingerprint alter column fingerprint set not null;';
-    else
-      alter table public._test_template_fingerprint alter column fingerprint set not null;
-    end if;
-  end if;
-end $$;
 
 create table if not exists public.admin_activity (
   id uuid default gen_random_uuid() not null,
@@ -1241,6 +1230,69 @@ alter table public.settings add column if not exists updated_at timestamp with t
 alter table public.settings add column if not exists updated_by uuid;
 alter table public.settings add column if not exists updated_by_name text;
 
+create table if not exists public.staff (
+  user_id uuid not null,
+  role text not null,
+  display_name text not null,
+  created_at timestamp with time zone default now() not null
+);
+alter table public.staff add column if not exists user_id uuid;
+do $$ begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'staff'
+      and column_name = 'user_id' and is_nullable = 'YES'
+  ) then
+    if exists (select 1 from public.staff where user_id is null) then
+      raise notice 'public.staff.user_id holds nulls; left nullable. Fill them, then: alter table public.staff alter column user_id set not null;';
+    else
+      alter table public.staff alter column user_id set not null;
+    end if;
+  end if;
+end $$;
+alter table public.staff add column if not exists role text;
+do $$ begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'staff'
+      and column_name = 'role' and is_nullable = 'YES'
+  ) then
+    if exists (select 1 from public.staff where role is null) then
+      raise notice 'public.staff.role holds nulls; left nullable. Fill them, then: alter table public.staff alter column role set not null;';
+    else
+      alter table public.staff alter column role set not null;
+    end if;
+  end if;
+end $$;
+alter table public.staff add column if not exists display_name text;
+do $$ begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'staff'
+      and column_name = 'display_name' and is_nullable = 'YES'
+  ) then
+    if exists (select 1 from public.staff where display_name is null) then
+      raise notice 'public.staff.display_name holds nulls; left nullable. Fill them, then: alter table public.staff alter column display_name set not null;';
+    else
+      alter table public.staff alter column display_name set not null;
+    end if;
+  end if;
+end $$;
+alter table public.staff add column if not exists created_at timestamp with time zone default now();
+do $$ begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'staff'
+      and column_name = 'created_at' and is_nullable = 'YES'
+  ) then
+    if exists (select 1 from public.staff where created_at is null) then
+      raise notice 'public.staff.created_at holds nulls; left nullable. Fill them, then: alter table public.staff alter column created_at set not null;';
+    else
+      alter table public.staff alter column created_at set not null;
+    end if;
+  end if;
+end $$;
+
 create table if not exists public.winners (
   id uuid default gen_random_uuid() not null,
   game_id uuid not null,
@@ -1380,20 +1432,6 @@ SELECT g.id AS game_id,
 -- behaviour to want: it is the difference between finding out now and
 -- finding out at the next checkout.
 
-do $$
-declare current_def text;
-begin
-  select pg_get_constraintdef(c.oid) into current_def
-  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
-  where n.nspname = 'public' and c.conname = '_test_template_fingerprint_pkey'
-    and c.conrelid = '_test_template_fingerprint'::regclass;
-  if current_def is null then
-    alter table _test_template_fingerprint add constraint _test_template_fingerprint_pkey PRIMARY KEY (fingerprint);
-  elsif current_def is distinct from 'PRIMARY KEY (fingerprint)' then
-    alter table _test_template_fingerprint drop constraint _test_template_fingerprint_pkey;
-    alter table _test_template_fingerprint add constraint _test_template_fingerprint_pkey PRIMARY KEY (fingerprint);
-  end if;
-end $$;
 do $$
 declare current_def text;
 begin
@@ -1546,6 +1584,20 @@ begin
   elsif current_def is distinct from 'PRIMARY KEY (key)' then
     alter table settings drop constraint settings_pkey;
     alter table settings add constraint settings_pkey PRIMARY KEY (key);
+  end if;
+end $$;
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'staff_pkey'
+    and c.conrelid = 'staff'::regclass;
+  if current_def is null then
+    alter table staff add constraint staff_pkey PRIMARY KEY (user_id);
+  elsif current_def is distinct from 'PRIMARY KEY (user_id)' then
+    alter table staff drop constraint staff_pkey;
+    alter table staff add constraint staff_pkey PRIMARY KEY (user_id);
   end if;
 end $$;
 do $$
@@ -1819,6 +1871,34 @@ declare current_def text;
 begin
   select pg_get_constraintdef(c.oid) into current_def
   from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'staff_display_name_check'
+    and c.conrelid = 'staff'::regclass;
+  if current_def is null then
+    alter table staff add constraint staff_display_name_check CHECK ((length(btrim(display_name)) > 0));
+  elsif current_def is distinct from 'CHECK ((length(btrim(display_name)) > 0))' then
+    alter table staff drop constraint staff_display_name_check;
+    alter table staff add constraint staff_display_name_check CHECK ((length(btrim(display_name)) > 0));
+  end if;
+end $$;
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'staff_role_check'
+    and c.conrelid = 'staff'::regclass;
+  if current_def is null then
+    alter table staff add constraint staff_role_check CHECK ((role = ANY (ARRAY['owner'::text, 'manager'::text])));
+  elsif current_def is distinct from 'CHECK ((role = ANY (ARRAY[''owner''::text, ''manager''::text])))' then
+    alter table staff drop constraint staff_role_check;
+    alter table staff add constraint staff_role_check CHECK ((role = ANY (ARRAY['owner'::text, 'manager'::text])));
+  end if;
+end $$;
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
   where n.nspname = 'public' and c.conname = 'admin_activity_actor_id_fkey'
     and c.conrelid = 'admin_activity'::regclass;
   if current_def is null then
@@ -2043,6 +2123,20 @@ declare current_def text;
 begin
   select pg_get_constraintdef(c.oid) into current_def
   from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'staff_user_id_fkey'
+    and c.conrelid = 'staff'::regclass;
+  if current_def is null then
+    alter table staff add constraint staff_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+  elsif current_def is distinct from 'FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE' then
+    alter table staff drop constraint staff_user_id_fkey;
+    alter table staff add constraint staff_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+  end if;
+end $$;
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
   where n.nspname = 'public' and c.conname = 'winners_game_id_fkey'
     and c.conrelid = 'winners'::regclass;
   if current_def is null then
@@ -2073,6 +2167,7 @@ end $$;
 -- Indexes that back a primary key or unique constraint are skipped: the
 -- constraint above already created them, and creating them again fails.
 
+create index if not exists admin_activity_actor_idx ON public.admin_activity USING btree (actor_id, at DESC);
 create index if not exists admin_activity_at_idx ON public.admin_activity USING btree (at DESC);
 create index if not exists admin_activity_entity_idx ON public.admin_activity USING btree (entity, entity_id);
 create index if not exists checkout_attempts_started_idx ON public.checkout_attempts USING btree (started_at DESC);
@@ -2221,6 +2316,40 @@ begin
 end;
 $function$;
 
+create or replace function public.create_game(p_title text, p_description text, p_winner_note text, p_item_id uuid, p_guide_why text, p_guide_care text, p_guide_pairs text, p_total_spots integer, p_spot_price_cents integer)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_id uuid;
+begin
+  if not public.is_staff() then
+    raise exception 'Only staff can create a game.' using errcode = '42501';
+  end if;
+  if p_total_spots is null or p_total_spots < 1 or p_total_spots > 10000 then
+    raise exception 'Spots must be between 1 and 10,000.' using errcode = '22023';
+  end if;
+
+  insert into public.games (
+    title, description, winner_note, item_id,
+    guide_why, guide_care, guide_pairs,
+    total_spots, spot_price_cents, status
+  ) values (
+    p_title, p_description, p_winner_note, p_item_id,
+    p_guide_why, p_guide_care, p_guide_pairs,
+    p_total_spots, p_spot_price_cents, 'open'
+  )
+  returning id into v_id;
+
+  insert into public.game_spots (game_id, spot_number)
+  select v_id, n from generate_series(1, p_total_spots) as n;
+
+  return v_id;
+end;
+$function$;
+
 create or replace function public.finish_checkout(p_key text, p_order text, p_outcome text)
  RETURNS void
  LANGUAGE sql
@@ -2243,6 +2372,26 @@ AS $function$
   select count(*)::int
   from public.game_spots
   where game_id = p_game and status = 'open';
+$function$;
+
+create or replace function public.is_owner()
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select exists (
+    select 1 from public.staff s where s.user_id = auth.uid() and s.role = 'owner'
+  )
+$function$;
+
+create or replace function public.is_staff()
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select exists (select 1 from public.staff s where s.user_id = auth.uid())
 $function$;
 
 create or replace function public.release_checkout(p_key text)
@@ -2324,21 +2473,60 @@ begin
 end;
 $function$;
 
-create or replace function public.stamp_authorship()
+create or replace function public.staff_name()
+ RETURNS text
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select s.display_name from public.staff s where s.user_id = auth.uid()
+$function$;
+
+create or replace function public.staff_role()
+ RETURNS text
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select s.role from public.staff s where s.user_id = auth.uid()
+$function$;
+
+create or replace function public.stamp_activity_actor()
  RETURNS trigger
  LANGUAGE plpgsql
 AS $function$
 begin
+  if auth.uid() is not null then
+    new.actor_id := auth.uid();
+    new.actor_name := coalesce(public.staff_name(), 'Unknown account');
+  end if;
+  new.at := now();
+  return new;
+end;
+$function$;
+
+create or replace function public.stamp_authorship()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+declare
+  v_name text := public.staff_name();
+begin
   if tg_op = 'INSERT' then
     new.created_by := coalesce(auth.uid(), new.created_by);
     new.updated_by := coalesce(auth.uid(), new.updated_by);
+    if v_name is not null then
+      new.created_by_name := v_name;
+      new.updated_by_name := v_name;
+    end if;
   else
-    -- Who created a record never changes.
     new.created_by := old.created_by;
     new.created_by_name := old.created_by_name;
     new.updated_by := coalesce(auth.uid(), old.updated_by);
     if auth.uid() is null then
       new.updated_by_name := old.updated_by_name;
+    elsif v_name is not null then
+      new.updated_by_name := v_name;
     end if;
   end if;
   return new;
@@ -2349,11 +2537,15 @@ create or replace function public.stamp_authorship_updated_only()
  RETURNS trigger
  LANGUAGE plpgsql
 AS $function$
+declare
+  v_name text := public.staff_name();
 begin
   new.updated_by := coalesce(auth.uid(), new.updated_by);
   if auth.uid() is null and tg_op = 'UPDATE' then
     new.updated_by := old.updated_by;
     new.updated_by_name := old.updated_by_name;
+  elsif v_name is not null then
+    new.updated_by_name := v_name;
   end if;
   return new;
 end;
@@ -2367,6 +2559,8 @@ $function$;
 -- touches no data; it is off for the length of one transaction and this
 -- whole script runs in one.
 
+drop trigger if exists admin_activity_stamp_actor on public.admin_activity;
+CREATE TRIGGER admin_activity_stamp_actor BEFORE INSERT ON public.admin_activity FOR EACH ROW EXECUTE FUNCTION stamp_activity_actor();
 drop trigger if exists campaigns_stamp_authorship on public.games;
 CREATE TRIGGER campaigns_stamp_authorship BEFORE INSERT OR UPDATE ON public.games FOR EACH ROW EXECUTE FUNCTION stamp_authorship();
 drop trigger if exists items_set_updated_at on public.items;
@@ -2396,6 +2590,7 @@ comment on column public.orders.confirmation_expires_at is 'When the receipt lin
    bounds it. Extending an individual order means moving this date, not
    minting a new token, so an old email keeps working if someone chooses
    to let it.';
+comment on table public.staff is 'Admin access. No row, no access. Written from the SQL editor only.';
 comment on column public.winners.ticket is 'The WINNING SPOT NUMBER — what gets read aloud. This is pool[ticket_index-1].spot_number, not the index itself: the selector orders by spot id, so the index and the spot number are different numbers.';
 comment on column public.winners.ticket_index is '1-based index the selector returned, into pool. The raw output of the algorithm.';
 comment on column public.winners.unsold_spots is 'How many spots were still unsold at the moment of the draw. Zero or null on a full game.';
@@ -2419,6 +2614,7 @@ alter table public.items enable row level security;
 alter table public.order_items enable row level security;
 alter table public.orders enable row level security;
 alter table public.settings enable row level security;
+alter table public.staff enable row level security;
 alter table public.winners enable row level security;
 
 -- Policies are dropped and recreated, because unlike a constraint a
@@ -2426,105 +2622,194 @@ alter table public.winners enable row level security;
 -- and there is no "replace" form. Inside the transaction, so no request
 -- ever sees the table unprotected.
 
+do $$
+declare
+  p record;
+begin
+  for p in
+    select schemaname, tablename, policyname from pg_policies
+    where (schemaname || '.' || tablename) = any (array['public.admin_activity', 'public.game_events', 'public.game_spots', 'public.games', 'public.inquiries', 'public.item_variants', 'public.items', 'public.order_items', 'public.orders', 'public.settings', 'public.staff', 'public.winners', 'storage.objects'])
+      and not ((schemaname || '.' || tablename || '.' || policyname) = any (array[
+        'public.admin_activity.Owner reads activity',
+        'public.admin_activity.Staff write activity',
+        'public.game_events.Anyone can record a game event',
+        'public.game_events.Staff read game events',
+        'public.game_spots.Owner manages spots',
+        'public.game_spots.Staff read spots',
+        'public.games.Anyone can read games',
+        'public.games.Owner deletes games',
+        'public.games.Staff add games',
+        'public.games.Staff edit games',
+        'public.games.Staff read all games',
+        'public.inquiries.Owner deletes inquiries',
+        'public.inquiries.Staff add inquiries',
+        'public.inquiries.Staff read inquiries',
+        'public.inquiries.Staff update inquiries',
+        'public.item_variants.Anyone can read variants',
+        'public.item_variants.Staff manage variants',
+        'public.items.Owner deletes items',
+        'public.items.Public can read visible items',
+        'public.items.Staff add items',
+        'public.items.Staff edit items',
+        'public.items.Staff read all items',
+        'public.order_items.Owner manages order items',
+        'public.order_items.Staff read order items',
+        'public.orders.Owner manages orders',
+        'public.orders.Staff read orders',
+        'public.settings.Owner adds settings',
+        'public.settings.Owner deletes settings',
+        'public.settings.Owner edits settings',
+        'public.settings.Public read game settings',
+        'public.settings.Staff read settings',
+        'public.staff.Owner reads all staff',
+        'public.staff.Staff read own row',
+        'public.winners.Anyone can read winners',
+        'public.winners.Owner manages winners',
+        'public.winners.Staff record winners',
+        'storage.objects.Owner delete product images',
+        'storage.objects.Owner update product images',
+        'storage.objects.Owner upload product images',
+        'storage.objects.Public read product images'
+      ]))
+      and (schemaname = 'public'
+           or coalesce(qual, '') || coalesce(with_check, '') like '%product-images%')
+  loop
+    raise notice 'Removing policy "%" on %.%, which the current schema does not have',
+      p.policyname, p.schemaname, p.tablename;
+    execute format('drop policy %I on %I.%I', p.policyname, p.schemaname, p.tablename);
+  end loop;
+end $$;
+
 drop policy if exists "Owner reads activity" on public.admin_activity;
 create policy "Owner reads activity" on public.admin_activity for select to authenticated
-  using (true);
-drop policy if exists "Owner writes activity" on public.admin_activity;
-create policy "Owner writes activity" on public.admin_activity for insert to authenticated
-  with check (true);
+  using (( SELECT is_owner() AS is_owner));
+drop policy if exists "Staff write activity" on public.admin_activity;
+create policy "Staff write activity" on public.admin_activity for insert to authenticated
+  with check (( SELECT is_staff() AS is_staff));
 drop policy if exists "Anyone can record a game event" on public.game_events;
 create policy "Anyone can record a game event" on public.game_events for insert to anon,authenticated
   with check ((kind = ANY (ARRAY['played'::text, 'won'::text, 'code_copied'::text])));
-drop policy if exists "Owner can read game events" on public.game_events;
-create policy "Owner can read game events" on public.game_events for select to authenticated
-  using (true);
+drop policy if exists "Staff read game events" on public.game_events;
+create policy "Staff read game events" on public.game_events for select to authenticated
+  using (( SELECT is_staff() AS is_staff));
 drop policy if exists "Owner manages spots" on public.game_spots;
 create policy "Owner manages spots" on public.game_spots for all to authenticated
-  using (true)
-  with check (true);
+  using (( SELECT is_owner() AS is_owner))
+  with check (( SELECT is_owner() AS is_owner));
+drop policy if exists "Staff read spots" on public.game_spots;
+create policy "Staff read spots" on public.game_spots for select to authenticated
+  using (( SELECT is_staff() AS is_staff));
 drop policy if exists "Anyone can read games" on public.games;
 create policy "Anyone can read games" on public.games for select to anon,authenticated
   using (true);
-drop policy if exists "Owner can delete games" on public.games;
-create policy "Owner can delete games" on public.games for delete to authenticated
-  using (true);
-drop policy if exists "Owner can insert games" on public.games;
-create policy "Owner can insert games" on public.games for insert to authenticated
-  with check (true);
-drop policy if exists "Owner can read all games" on public.games;
-create policy "Owner can read all games" on public.games for select to authenticated
-  using (true);
-drop policy if exists "Owner can update games" on public.games;
-create policy "Owner can update games" on public.games for update to authenticated
-  using (true)
-  with check (true);
-drop policy if exists "Owner can delete inquiries" on public.inquiries;
-create policy "Owner can delete inquiries" on public.inquiries for delete to authenticated
-  using (true);
-drop policy if exists "Owner can insert inquiries" on public.inquiries;
-create policy "Owner can insert inquiries" on public.inquiries for insert to authenticated
-  with check (true);
-drop policy if exists "Owner can read inquiries" on public.inquiries;
-create policy "Owner can read inquiries" on public.inquiries for select to authenticated
-  using (true);
-drop policy if exists "Owner can update inquiries" on public.inquiries;
-create policy "Owner can update inquiries" on public.inquiries for update to authenticated
-  using (true)
-  with check (true);
+drop policy if exists "Owner deletes games" on public.games;
+create policy "Owner deletes games" on public.games for delete to authenticated
+  using (( SELECT is_owner() AS is_owner));
+drop policy if exists "Staff add games" on public.games;
+create policy "Staff add games" on public.games for insert to authenticated
+  with check (( SELECT is_staff() AS is_staff));
+drop policy if exists "Staff edit games" on public.games;
+create policy "Staff edit games" on public.games for update to authenticated
+  using (( SELECT is_staff() AS is_staff))
+  with check (( SELECT is_staff() AS is_staff));
+drop policy if exists "Staff read all games" on public.games;
+create policy "Staff read all games" on public.games for select to authenticated
+  using (( SELECT is_staff() AS is_staff));
+drop policy if exists "Owner deletes inquiries" on public.inquiries;
+create policy "Owner deletes inquiries" on public.inquiries for delete to authenticated
+  using (( SELECT is_owner() AS is_owner));
+drop policy if exists "Staff add inquiries" on public.inquiries;
+create policy "Staff add inquiries" on public.inquiries for insert to authenticated
+  with check (( SELECT is_staff() AS is_staff));
+drop policy if exists "Staff read inquiries" on public.inquiries;
+create policy "Staff read inquiries" on public.inquiries for select to authenticated
+  using (( SELECT is_staff() AS is_staff));
+drop policy if exists "Staff update inquiries" on public.inquiries;
+create policy "Staff update inquiries" on public.inquiries for update to authenticated
+  using (( SELECT is_staff() AS is_staff))
+  with check (( SELECT is_staff() AS is_staff));
 drop policy if exists "Anyone can read variants" on public.item_variants;
 create policy "Anyone can read variants" on public.item_variants for select to anon,authenticated
   using (true);
-drop policy if exists "Owner manages variants" on public.item_variants;
-create policy "Owner manages variants" on public.item_variants for all to authenticated
-  using (true)
-  with check (true);
-drop policy if exists "Owner can delete items" on public.items;
-create policy "Owner can delete items" on public.items for delete to authenticated
-  using (true);
-drop policy if exists "Owner can insert items" on public.items;
-create policy "Owner can insert items" on public.items for insert to authenticated
-  with check (true);
-drop policy if exists "Owner can read all items" on public.items;
-create policy "Owner can read all items" on public.items for select to authenticated
-  using (true);
-drop policy if exists "Owner can update items" on public.items;
-create policy "Owner can update items" on public.items for update to authenticated
-  using (true)
-  with check (true);
+drop policy if exists "Staff manage variants" on public.item_variants;
+create policy "Staff manage variants" on public.item_variants for all to authenticated
+  using (( SELECT is_staff() AS is_staff))
+  with check (( SELECT is_staff() AS is_staff));
+drop policy if exists "Owner deletes items" on public.items;
+create policy "Owner deletes items" on public.items for delete to authenticated
+  using (( SELECT is_owner() AS is_owner));
 drop policy if exists "Public can read visible items" on public.items;
 create policy "Public can read visible items" on public.items for select to anon
   using ((status <> 'hidden'::text));
-drop policy if exists "Owner reads order items" on public.order_items;
-create policy "Owner reads order items" on public.order_items for all to authenticated
-  using (true)
-  with check (true);
-drop policy if exists "Owner reads orders" on public.orders;
-create policy "Owner reads orders" on public.orders for all to authenticated
-  using (true)
-  with check (true);
-drop policy if exists "Owner can delete settings" on public.settings;
-create policy "Owner can delete settings" on public.settings for delete to authenticated
-  using (true);
-drop policy if exists "Owner can insert settings" on public.settings;
-create policy "Owner can insert settings" on public.settings for insert to authenticated
-  with check (true);
-drop policy if exists "Owner can read settings" on public.settings;
-create policy "Owner can read settings" on public.settings for select to authenticated
-  using (true);
-drop policy if exists "Owner can update settings" on public.settings;
-create policy "Owner can update settings" on public.settings for update to authenticated
-  using (true)
-  with check (true);
+drop policy if exists "Staff add items" on public.items;
+create policy "Staff add items" on public.items for insert to authenticated
+  with check (( SELECT is_staff() AS is_staff));
+drop policy if exists "Staff edit items" on public.items;
+create policy "Staff edit items" on public.items for update to authenticated
+  using (( SELECT is_staff() AS is_staff))
+  with check (( SELECT is_staff() AS is_staff));
+drop policy if exists "Staff read all items" on public.items;
+create policy "Staff read all items" on public.items for select to authenticated
+  using (( SELECT is_staff() AS is_staff));
+drop policy if exists "Owner manages order items" on public.order_items;
+create policy "Owner manages order items" on public.order_items for all to authenticated
+  using (( SELECT is_owner() AS is_owner))
+  with check (( SELECT is_owner() AS is_owner));
+drop policy if exists "Staff read order items" on public.order_items;
+create policy "Staff read order items" on public.order_items for select to authenticated
+  using (( SELECT is_staff() AS is_staff));
+drop policy if exists "Owner manages orders" on public.orders;
+create policy "Owner manages orders" on public.orders for all to authenticated
+  using (( SELECT is_owner() AS is_owner))
+  with check (( SELECT is_owner() AS is_owner));
+drop policy if exists "Staff read orders" on public.orders;
+create policy "Staff read orders" on public.orders for select to authenticated
+  using (( SELECT is_staff() AS is_staff));
+drop policy if exists "Owner adds settings" on public.settings;
+create policy "Owner adds settings" on public.settings for insert to authenticated
+  with check (( SELECT is_owner() AS is_owner));
+drop policy if exists "Owner deletes settings" on public.settings;
+create policy "Owner deletes settings" on public.settings for delete to authenticated
+  using (( SELECT is_owner() AS is_owner));
+drop policy if exists "Owner edits settings" on public.settings;
+create policy "Owner edits settings" on public.settings for update to authenticated
+  using (( SELECT is_owner() AS is_owner))
+  with check (( SELECT is_owner() AS is_owner));
 drop policy if exists "Public read game settings" on public.settings;
 create policy "Public read game settings" on public.settings for select to anon
   using (((key = 'game_difficulty'::text) OR ((key = 'game_offer'::text) AND COALESCE(((value ->> 'enabled'::text))::boolean, false))));
+drop policy if exists "Staff read settings" on public.settings;
+create policy "Staff read settings" on public.settings for select to authenticated
+  using (( SELECT is_staff() AS is_staff));
+drop policy if exists "Owner reads all staff" on public.staff;
+create policy "Owner reads all staff" on public.staff for select to authenticated
+  using (( SELECT is_owner() AS is_owner));
+drop policy if exists "Staff read own row" on public.staff;
+create policy "Staff read own row" on public.staff for select to authenticated
+  using ((user_id = auth.uid()));
 drop policy if exists "Anyone can read winners" on public.winners;
 create policy "Anyone can read winners" on public.winners for select to anon,authenticated
   using (true);
 drop policy if exists "Owner manages winners" on public.winners;
 create policy "Owner manages winners" on public.winners for all to authenticated
-  using (true)
-  with check (true);
+  using (( SELECT is_owner() AS is_owner))
+  with check (( SELECT is_owner() AS is_owner));
+drop policy if exists "Staff record winners" on public.winners;
+create policy "Staff record winners" on public.winners for insert to authenticated
+  with check (( SELECT is_staff() AS is_staff));
+drop policy if exists "Owner delete product images" on storage.objects;
+create policy "Owner delete product images" on storage.objects for delete to authenticated
+  using (((bucket_id = 'product-images'::text) AND ( SELECT is_owner() AS is_owner)));
+drop policy if exists "Owner update product images" on storage.objects;
+create policy "Owner update product images" on storage.objects for update to authenticated
+  using (((bucket_id = 'product-images'::text) AND ( SELECT is_staff() AS is_staff)))
+  with check (((bucket_id = 'product-images'::text) AND ( SELECT is_staff() AS is_staff)));
+drop policy if exists "Owner upload product images" on storage.objects;
+create policy "Owner upload product images" on storage.objects for insert to authenticated
+  with check (((bucket_id = 'product-images'::text) AND ( SELECT is_staff() AS is_staff)));
+drop policy if exists "Public read product images" on storage.objects;
+create policy "Public read product images" on storage.objects for select to anon,authenticated
+  using ((bucket_id = 'product-images'::text));
 
 -- ---------------------------------------------------------------------
 -- Grants
@@ -2556,13 +2841,19 @@ grant select on public.game_scoreboard to authenticated;
 revoke execute on function public.claim_checkout(p_key text) from public;
 revoke execute on function public.claim_game_spots(p_game uuid, p_qty integer) from public;
 revoke execute on function public.claim_variant_stock(p_variant uuid, p_qty integer) from public;
+revoke execute on function public.create_game(p_title text, p_description text, p_winner_note text, p_item_id uuid, p_guide_why text, p_guide_care text, p_guide_pairs text, p_total_spots integer, p_spot_price_cents integer) from public;
 revoke execute on function public.finish_checkout(p_key text, p_order text, p_outcome text) from public;
 revoke execute on function public.game_spots_remaining(p_game uuid) from public;
+revoke execute on function public.is_owner() from public;
+revoke execute on function public.is_staff() from public;
 revoke execute on function public.release_checkout(p_key text) from public;
 revoke execute on function public.release_game_spots(p_game uuid, p_spots integer[]) from public;
 revoke execute on function public.release_variant_stock(p_variant uuid, p_qty integer) from public;
 revoke execute on function public.sell_game_spots(p_game uuid, p_spots integer[], p_order uuid, p_first_name text, p_last_name text, p_email text, p_phone text) from public;
 revoke execute on function public.set_updated_at() from public;
+revoke execute on function public.staff_name() from public;
+revoke execute on function public.staff_role() from public;
+revoke execute on function public.stamp_activity_actor() from public;
 revoke execute on function public.stamp_authorship() from public;
 revoke execute on function public.stamp_authorship_updated_only() from public;
 revoke execute on function public.claim_checkout(p_key text) from anon;
@@ -2571,10 +2862,18 @@ revoke execute on function public.claim_game_spots(p_game uuid, p_qty integer) f
 revoke execute on function public.claim_game_spots(p_game uuid, p_qty integer) from authenticated;
 revoke execute on function public.claim_variant_stock(p_variant uuid, p_qty integer) from anon;
 revoke execute on function public.claim_variant_stock(p_variant uuid, p_qty integer) from authenticated;
+revoke execute on function public.create_game(p_title text, p_description text, p_winner_note text, p_item_id uuid, p_guide_why text, p_guide_care text, p_guide_pairs text, p_total_spots integer, p_spot_price_cents integer) from anon;
+grant execute on function public.create_game(p_title text, p_description text, p_winner_note text, p_item_id uuid, p_guide_why text, p_guide_care text, p_guide_pairs text, p_total_spots integer, p_spot_price_cents integer) to authenticated;
 revoke execute on function public.finish_checkout(p_key text, p_order text, p_outcome text) from anon;
 revoke execute on function public.finish_checkout(p_key text, p_order text, p_outcome text) from authenticated;
 grant execute on function public.game_spots_remaining(p_game uuid) to anon;
 grant execute on function public.game_spots_remaining(p_game uuid) to authenticated;
+revoke execute on function public.is_owner() from anon;
+grant execute on function public.is_owner() to authenticated;
+grant execute on function public.is_owner() to service_role;
+revoke execute on function public.is_staff() from anon;
+grant execute on function public.is_staff() to authenticated;
+grant execute on function public.is_staff() to service_role;
 revoke execute on function public.release_checkout(p_key text) from anon;
 revoke execute on function public.release_checkout(p_key text) from authenticated;
 revoke execute on function public.release_game_spots(p_game uuid, p_spots integer[]) from anon;
@@ -2585,10 +2884,36 @@ revoke execute on function public.sell_game_spots(p_game uuid, p_spots integer[]
 revoke execute on function public.sell_game_spots(p_game uuid, p_spots integer[], p_order uuid, p_first_name text, p_last_name text, p_email text, p_phone text) from authenticated;
 revoke execute on function public.set_updated_at() from anon;
 revoke execute on function public.set_updated_at() from authenticated;
+revoke execute on function public.staff_name() from anon;
+grant execute on function public.staff_name() to authenticated;
+grant execute on function public.staff_name() to service_role;
+revoke execute on function public.staff_role() from anon;
+grant execute on function public.staff_role() to authenticated;
+grant execute on function public.staff_role() to service_role;
+revoke execute on function public.stamp_activity_actor() from anon;
+revoke execute on function public.stamp_activity_actor() from authenticated;
 revoke execute on function public.stamp_authorship() from anon;
 revoke execute on function public.stamp_authorship() from authenticated;
 revoke execute on function public.stamp_authorship_updated_only() from anon;
 revoke execute on function public.stamp_authorship_updated_only() from authenticated;
+
+-- ---------------------------------------------------------------------
+-- Access: every existing account becomes an owner, ONCE
+-- ---------------------------------------------------------------------
+-- Only while public.staff is empty, i.e. only on the day roles arrive.
+-- A manager is added afterwards by hand; see docs/roles.md.
+insert into public.staff (user_id, role, display_name)
+select u.id,
+       'owner',
+       coalesce(
+         nullif(btrim(u.raw_user_meta_data ->> 'full_name'), ''),
+         nullif(btrim(u.raw_user_meta_data ->> 'name'), ''),
+         nullif(btrim(u.raw_user_meta_data ->> 'display_name'), ''),
+         'Owner (set a name)'
+       )
+from auth.users u
+where not exists (select 1 from public.staff)
+on conflict (user_id) do nothing;
 
 commit;
 

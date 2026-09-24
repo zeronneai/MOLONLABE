@@ -5,7 +5,7 @@
 
 import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
-import { APP, ARTIFACTS, CHROMIUM, DOUBLE, OWNER } from "./config.mjs";
+import { APP, ARTIFACTS, CHROMIUM, DOUBLE, MANAGER, OWNER, STRANGER } from "./config.mjs";
 
 export function suite() {
   const ok = [];
@@ -127,10 +127,24 @@ export async function page(b, contextOptions = {}) {
 
 /** A page signed in as the shop owner. */
 export async function adminPage(b, contextOptions = {}) {
+  return signedInPage(b, OWNER, contextOptions);
+}
+
+/** A page signed in as the manager. */
+export async function managerPage(b, contextOptions = {}) {
+  return signedInPage(b, MANAGER, contextOptions);
+}
+
+/** A page signed in as an account with no access. */
+export async function strangerPage(b, contextOptions = {}) {
+  return signedInPage(b, STRANGER, contextOptions);
+}
+
+async function signedInPage(b, account, contextOptions) {
   const p = await page(b, contextOptions);
   await p.goto(`${APP}/admin`, { waitUntil: "networkidle" });
-  await p.fill('input[type="email"]', OWNER.email);
-  await p.fill('input[type="password"]', OWNER.password);
+  await p.fill('input[type="email"]', account.email);
+  await p.fill('input[type="password"]', account.password);
   await p.click('button[type="submit"]');
   await p.waitForTimeout(2000);
   return p;

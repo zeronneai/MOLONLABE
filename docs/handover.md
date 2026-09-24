@@ -89,6 +89,17 @@ site, no way to sign up, and no password reset link.
 
 **Sign in.** Email and password.
 
+**Two roles.** Owner and manager, set per account in the database. The
+owner can do everything. The manager can do the day-to-day work but
+cannot delete anything permanently, change tax, shipping, the discount
+code, the offer switch or the arcade, download the spot list, read the
+activity log, or manage accounts. Those controls are shown to him
+disabled with the line "Owner only. Ask the owner if this needs
+changing." The database refuses them for him as well, not just the
+screen. An account that can sign in but has no role sees "No access".
+The header shows who is signed in and as what. Full table in
+`docs/roles.md`.
+
 **What you sell.** Four sections: things for sale, games, items currently
 used as prizes, and firearms in the case. The owner can search, filter by
 status, add an item, edit one, reorder them, mark one available, reserved
@@ -115,11 +126,14 @@ it. If the last guide came out with fewer photographs than the item has,
 the screen says so in red.
 
 **Spot ledger.** Who holds which spot, with an export to a spreadsheet.
+The export is owner only.
 
 **Draw a winner.** Two ways: a full-screen presentation at a separate
 address for filming, or a plain button. Drawing twice returns the same
 winner rather than picking a second one. Drawing before a game sells out
-asks for confirmation and records that it was early.
+asks for confirmation and records that it was early. After the draw the
+game page shows the winner's name, email, phone, spot and order number,
+so whoever ran the draw can contact them.
 
 **Orders.** Every order with what was bought, what was paid, and the card
 details the gateway returned.
@@ -132,7 +146,17 @@ what it is worth, and tune how hard the game is on desktop and mobile.
 **Tax & shipping.** The sales tax rate and the two shipping prices. The
 shipping figures are marked on screen as not yet decided by the client.
 
-**Activity.** A log of what was changed in the admin, by whom and when.
+**Activity.** A log of what was changed in the admin, by whom and when,
+filterable by person. Every change is logged, including plain
+description edits, photographs, sizes and stock, inquiry status and guide
+rebuilds. The name on each line comes from the staff table and is
+stamped by the database, so nobody can sign a line as somebody else.
+Owner only.
+
+**Team & alerts.** Who has access and as what, and who receives each of
+the two kinds of alert: problems with an order, and everything else. A
+button sends a test through the real Apps Script and reports who it
+reached. Owner only.
 
 ---
 
@@ -141,40 +165,51 @@ shipping figures are marked on screen as not yet decided by the client.
 ### Purple Roots
 
 1. Apply migration `20260927100000_guide_image_count.sql` to the live
-   database. It is the newest of 21 and is missing; the admin's
-   photograph count depends on it.
-2. Run `npm run check:schema` against the live database and apply
+   database. It was missing; the admin's photograph count depends on it.
+   Then apply `20260928100000_staff_roles.sql`, the newest of 22. Steps
+   and checks are in `docs/roles.md`. Every account that exists when it
+   runs becomes an owner.
+2. **Before 15 October**, create the manager's account and give it the
+   manager role, in that order and after step 1. `docs/roles.md`,
+   "Creating the manager's account". Then sign in as him once and check
+   that Tax & Shipping is greyed out.
+3. Update the Apps Script to send to the `notify_to` list, as shown in
+   `docs/email.md`, "Who receives an alert". Until then the recipient
+   lists in Team & alerts do nothing. Then put the manager's address in
+   the problems list and press Send a test for both lists.
+4. Turn off "Allow new users to sign up" in Supabase Authentication.
+5. Run `npm run check:schema` against the live database and apply
    anything else it reports, in filename order.
-3. Drop the `items.surface` column that was added by hand. No code reads
+6. Drop the `items.surface` column that was added by hand. No code reads
    it.
-4. Create the `game-guides` storage bucket in Supabase: not public,
+7. Create the `game-guides` storage bucket in Supabase: not public,
    `application/pdf` only, 10 MB limit, and no policies at all.
-5. Set `NEXT_PUBLIC_AUTHORIZENET_ENV=production` and put the live
+8. Set `NEXT_PUBLIC_AUTHORIZENET_ENV=production` and put the live
    Authorize.net API Login ID, Transaction Key and Public Client Key in
    the deployment's environment.
-6. Set `NEXT_PUBLIC_SITE_URL` to the live domain before the build runs,
+9. Set `NEXT_PUBLIC_SITE_URL` to the live domain before the build runs,
    not after.
-7. Set `GOOGLE_SCRIPT_URL` to the deployed Apps Script, and confirm a
+10. Set `GOOGLE_SCRIPT_URL` to the deployed Apps Script, and confirm a
    test order produces both the customer email and the owner
    notification.
-8. Set `NEXT_PUBLIC_GA_MEASUREMENT_ID`, or leave it unset deliberately.
-9. Put the agency's real phone number in `AGENCY_CONTACT`. It currently
+11. Set `NEXT_PUBLIC_GA_MEASUREMENT_ID`, or leave it unset deliberately.
+12. Put the agency's real phone number in `AGENCY_CONTACT`. It currently
    reads "(number to be supplied)" and is printed in the alert the owner
    gets if a card is charged and the order fails to save.
-10. Buy one real spot on the live site with a real card, confirm the
+13. Buy one real spot on the live site with a real card, confirm the
     order, the email, the spot numbers and the guide, then refund it.
-11. Run one declined card (`4000 0000 0000 0002` in sandbox) and confirm
+14. Run one declined card (`4000 0000 0000 0002` in sandbox) and confirm
     a second attempt with a good card succeeds.
-12. Run `npm run audit:cloudinary -- --check` and re-upload anything it
+15. Run `npm run audit:cloudinary -- --check` and re-upload anything it
     reports as dead.
-13. Delete any demo game. A game whose title starts with `[DEMO]` still
+16. Delete any demo game. A game whose title starts with `[DEMO]` still
     appears on the public site, carrying an amber DEMO badge. It is
     labelled, not hidden.
-14. Delete `components/home/Countdown.tsx`. It is correct and nothing
+17. Delete `components/home/Countdown.tsx`. It is correct and nothing
     uses it.
-15. Take the `noindex` off the rules and privacy pages once the attorney
+18. Take the `noindex` off the rules and privacy pages once the attorney
     has approved them.
-16. Run Lighthouse against the live site and record the numbers.
+19. Run Lighthouse against the live site and record the numbers.
 
 ### The client
 
@@ -201,6 +236,8 @@ shipping figures are marked on screen as not yet decided by the client.
 11. Write the three guide sections for every game before it goes on sale.
     The admin will not let a game be created without them.
 12. Supply the Authorize.net production credentials.
+13. Give us the manager's name as it should appear in the log, and the
+    email address his account should use, before 15 October.
 
 ### The client's attorney
 
@@ -273,6 +310,14 @@ shipping figures are marked on screen as not yet decided by the client.
   the SQL editor, and policy behaviour with a real `auth.uid()` are all
   untested. This sits under the advice to run one script against
   production.
+- **Roles on Supabase itself.** The policies are proven against stock
+  PostgreSQL 16, acting as each role through the same JWT claim Supabase
+  uses. Not against a Supabase project. Once applied, sign in as the
+  manager and try one owner-only thing.
+- **Alert routing.** The site sends the recipient list; the Apps Script
+  decides. Until the script is updated, every alert still goes to its
+  usual address and the lists do nothing. The Send a test button says
+  which is happening.
 - **A declined card.** Only approval has ever been exercised. The path
   that matters is that a declined card releases the idempotency key so an
   honest second attempt is not refused as a duplicate.
@@ -319,6 +364,17 @@ shipping figures are marked on screen as not yet decided by the client.
   while the unrecorded order sits there. The owner is emailed, and that
   email is the only thing standing between that state and somebody else
   buying the same spots.
+- **A manager can read what he cannot export.** He sees every buyer's
+  name and email on a game's spot list, because he needs them to run
+  the draw. Only the spreadsheet download is refused. Anything he can
+  read, he can copy by hand.
+- **Photographs removed by the manager stay in storage.** Deleting a file
+  is owner only, so taking a photo off an item as manager leaves the file
+  in the bucket. Harmless, and recoverable.
+- **Photographs removed by the owner are deleted at once.** The file is
+  deleted the moment the owner presses the cross, before the item is
+  saved. Leaving the form without saving leaves the item pointing at a
+  file that no longer exists. This predates roles and is not fixed.
 - **`/api/health` reports secrets by shape, not value.** It is safe to
   leave deployed, but it is unauthenticated and describes the
   environment.
@@ -344,6 +400,8 @@ shipping figures are marked on screen as not yet decided by the client.
   bundling failure, and one shipped behind a green run.
 - The stand-in for Supabase has no row level security at all, so no
   browser test can catch an RLS mistake. One production bug has already
-  come from that gap.
+  come from that gap. The roles policies are tested separately against
+  real PostgreSQL, and the browser tests prove the server refuses a
+  manager on its own, but nothing tests the two together in one request.
 - I have not seen the live database. Everything in section 2 about it is
   inferred from what the code expects.

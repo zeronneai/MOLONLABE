@@ -30,8 +30,24 @@ export default async function EditGamePage({
       .select("spot_number, status, first_name, last_name, email, sold_at")
       .eq("game_id", id)
       .order("spot_number"),
-    sb.from("winners").select("display_name, ticket").eq("game_id", id).maybeSingle(),
+    sb.from("winners").select("display_name, ticket, spot_id").eq("game_id", id).maybeSingle(),
   ]);
+
+  // Who to call. The public board shows a redacted name; the person
+  // running the draw needs the real one and a way to reach them, and
+  // for a month that person is the manager. Read from the spot the draw
+  // recorded, not by matching a name, so two buyers called Ana cannot
+  // be confused.
+  const { data: contact } = winner?.spot_id
+    ? await sb
+        .from("game_spots")
+        .select("spot_number, first_name, last_name, email, phone, order_id")
+        .eq("id", winner.spot_id)
+        .maybeSingle()
+    : { data: null };
+  const { data: winningOrder } = contact?.order_id
+    ? await sb.from("orders").select("order_number").eq("id", contact.order_id).maybeSingle()
+    : { data: null };
 
   const rows = spots ?? [];
   const sold = rows.filter((s) => s.status === "sold");
@@ -68,6 +84,47 @@ export default async function EditGamePage({
         winnerName={winner?.display_name ?? null}
         winningSpot={winner?.ticket ?? null}
       />
+
+      {winner && (
+        <section data-winner-contact className="mt-10 border hairline p-6">
+          <h2 className="label text-acid">Contact the winner</h2>
+          {contact ? (
+            <dl className="mt-4 grid grid-cols-[110px_1fr] gap-y-3 text-sm">
+              <dt className="label text-muted">Name</dt>
+              <dd>{[contact.first_name, contact.last_name].filter(Boolean).join(" ") || "Not given"}</dd>
+              <dt className="label text-muted">Email</dt>
+              <dd>
+                {contact.email ? (
+                  <a href={`mailto:${contact.email}`} className="underline">{contact.email}</a>
+                ) : (
+                  "Not given"
+                )}
+              </dd>
+              <dt className="label text-muted">Phone</dt>
+              <dd>
+                {contact.phone ? (
+                  <a href={`tel:${contact.phone}`} className="underline">{contact.phone}</a>
+                ) : (
+                  "Not given"
+                )}
+              </dd>
+              <dt className="label text-muted">Spot</dt>
+              <dd className="tabular-nums">{contact.spot_number}</dd>
+              {winningOrder?.order_number && (
+                <>
+                  <dt className="label text-muted">Order</dt>
+                  <dd className="tabular-nums">{winningOrder.order_number}</dd>
+                </>
+              )}
+            </dl>
+          ) : (
+            <p className="mt-4 text-sm text-muted">
+              The draw did not record which spot won, so there are no contact
+              details to show. The spot list above has every buyer.
+            </p>
+          )}
+        </section>
+      )}
     </div>
   );
 }

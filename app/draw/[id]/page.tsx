@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getSessionSupabase } from "@/lib/supabase/session";
+import { getStaff } from "@/lib/admin/staff";
 import DrawStage from "@/components/draw/DrawStage";
 import { ticketsFor } from "@/lib/draw/select";
 import type { PoolMember } from "@/lib/draw/presentation";
@@ -31,8 +31,11 @@ export default async function DrawPresentation({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const sb = await getSessionSupabase();
-  if (!sb) return null;
+  // Staff only. The middleware lets any signed-in account through; the
+  // pool and the draw are for the owner and the manager.
+  const who = await getStaff();
+  if (!who.ok) notFound();
+  const { sb } = who.staff;
 
   const { data: game } = await sb
     .from("games")

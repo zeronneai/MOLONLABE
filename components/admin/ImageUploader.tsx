@@ -7,6 +7,7 @@
 
 import { useRef, useState } from "react";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
+import { useIsOwner } from "@/components/admin/Role";
 
 const BUCKET = "product-images";
 const MAX_EDGE = 2000;
@@ -95,6 +96,7 @@ export default function ImageUploader({ initial }: { initial: string[] }) {
   const [urls, setUrls] = useState<string[]>(initial);
   const [pending, setPending] = useState<Pending[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const owner = useIsOwner();
 
   const patch = (key: string, changes: Partial<Pending>) =>
     setPending((p) => p.map((u) => (u.key === key ? { ...u, ...changes } : u)));
@@ -150,6 +152,11 @@ export default function ImageUploader({ initial }: { initial: string[] }) {
 
   const remove = async (url: string) => {
     setUrls((u) => u.filter((x) => x !== url));
+    // A manager takes the photo off the item and the file stays in the
+    // bucket: deleting a file is permanent and owner-only, and the
+    // database would refuse it for him anyway. Nothing is lost by
+    // leaving it; an orphaned photo costs a few hundred kilobytes.
+    if (!owner) return;
     // Only storage objects can be deleted; legacy Cloudinary URLs just
     // drop out of the list.
     const marker = `/storage/v1/object/public/${BUCKET}/`;

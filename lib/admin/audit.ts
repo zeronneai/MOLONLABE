@@ -7,25 +7,12 @@ import { logDbError } from "@/lib/db/log";
 /**
  * Who did it, as a name.
  *
- * Never an email address. Two people touch this admin — the agency and
- * the shop — and "who changed the price" is answered by a name, not by a
- * mailbox that then sits in a log, on a screen, and in a database that
- * gets exported.
- *
- * Supabase carries the name in user metadata, which is blank unless
- * somebody fills it in. The fallback identifies the account without
- * leaking anything: enough of the id to tell two people apart, and a
- * prompt to go and set a real name. See docs/admin-decisions.md.
+ * Never an email address, and never a name the person typed about
+ * themselves: it comes from the staff table (lib/admin/staff.ts), which
+ * only the owner can write to, and the database stamps the same name on
+ * every log line itself so a request cannot sign as somebody else.
  */
-export function displayName(user: User | null): string {
-  if (!user) return "Unknown";
-  const meta = user.user_metadata ?? {};
-  for (const key of ["full_name", "name", "display_name"]) {
-    const value = meta[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-  return `Unnamed (${user.id.slice(0, 6)})`;
-}
+export type Actor = { user: User; name: string };
 
 export type ActivityAction =
   | "create"
@@ -39,11 +26,14 @@ export type ActivityAction =
   | "offer"
   | "difficulty"
   | "commerce"
-  | "draw";
+  | "draw"
+  | "stock"
+  | "photos"
+  | "alerts";
 
 export type ActivityEntry = {
   action: ActivityAction;
-  entity: "item" | "game" | "settings";
+  entity: "item" | "game" | "settings" | "inquiry";
   entityId?: string | null;
   /** Name or title as it was, so a deleted record stays identifiable. */
   entityLabel?: string | null;
@@ -64,12 +54,15 @@ export type ActivityEntry = {
  */
 export async function logActivity(
   sb: SupabaseClient<Database>,
-  user: User | null,
+  actor: Actor,
   entry: ActivityEntry,
 ): Promise<void> {
+  // Both of these are overwritten by the database from the session. They
+  // are sent so the column constraints are met and so the test double,
+  // which has no triggers, records the same thing.
   const { error } = await sb.from("admin_activity").insert({
-    actor_id: user?.id ?? null,
-    actor_name: displayName(user),
+    actor_id: actor.user.id,
+    actor_name: actor.name,
     action: entry.action,
     entity: entry.entity,
     entity_id: entry.entityId ?? null,

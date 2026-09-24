@@ -19,7 +19,11 @@
 // generated script is tested by applying it to an empty database, to a
 // damaged one, and twice in a row, then diffing against the reference.
 //
-// It only ever adds. No drop table, no drop column, no data touched.
+// No drop table, no drop column, no data deleted or changed. Two
+// exceptions, both about access rather than data: policies the schema no
+// longer has are dropped, because a leftover permissive policy defeats
+// the current ones; and on the day roles arrive, existing accounts are
+// given the owner role so nobody is locked out.
 
 import { execFileSync } from "node:child_process";
 
@@ -126,11 +130,18 @@ w(`-- The schema, expressed so it can be applied to a database in any state.
 --
 -- WHAT IT WILL NOT DO
 --
--- It only adds. There is no drop table, no drop column, no delete and no
--- update anywhere in it, so it cannot lose data or lose a column that
--- something else still depends on. A column in your database that the
--- schema no longer has is left alone; check-schema.sql lists those
--- separately as harmless.
+-- It does not remove data. There is no drop table, no drop column, no
+-- delete and no update anywhere in it, so it cannot lose data or lose a
+-- column that something else still depends on. A column in your database
+-- that the schema no longer has is left alone; check-schema.sql lists
+-- those separately as harmless.
+--
+-- Two things it does take away or add that are not structure, both
+-- about who gets in. Row level security policies the schema does not
+-- have are DROPPED, each named in a notice as it goes: policies are
+-- OR'ed, so one leftover "any signed-in account" policy would undo the
+-- owner and manager roles. And if public.staff is empty, every existing
+-- account is made an owner, which is how access worked before roles.
 --
 -- It does not replace the migration chain for NEW changes. New work still
 -- gets a migration; this file is regenerated from the chain afterwards.
@@ -409,22 +420,56 @@ for (const t of rls) w(`alter table public.${t} enable row level security;`);
 w("");
 
 // -------------------------------------------------------------- policies
+// Storage policies too. The product-images bucket's policies decide who
+// may upload and who may DELETE a photograph, which since the roles
+// migration is the difference between the owner and the manager. They
+// were left out before, so a repaired database kept whatever storage
+// policies it happened to have.
 const policies = q(`
-  select tablename, policyname, permissive, roles::text, cmd,
+  select schemaname || '.' || tablename, policyname, permissive, roles::text, cmd,
          coalesce(qual, ''), coalesce(with_check, '')
-  from pg_policies where schemaname = 'public'
-  order by tablename, policyname
+  from pg_policies where schemaname in ('public', 'storage')
+  order by schemaname, tablename, policyname
 `);
 w(`-- Policies are dropped and recreated, because unlike a constraint a
 -- policy's definition can have changed while its name stayed the same,
 -- and there is no "replace" form. Inside the transaction, so no request
 -- ever sees the table unprotected.
 `);
+// Then every policy the reference does NOT have is removed. This is the
+// one place the baseline takes something away, and it has to: policies
+// are permissive and OR'ed, so a leftover `to authenticated using (true)`
+// from before the roles migration would let every signed-in account do
+// everything, sitting quietly next to the correct policies. Converging
+// by adding alone left exactly that behind. On storage.objects only the
+// product-images bucket's policies are touched; other buckets are not
+// this schema's business.
+const known = policies.map(([table, name]) => `${table}.${name}`);
+const policyTables = [...new Set(policies.map(([table]) => table))];
+w(`do $$
+declare
+  p record;
+begin
+  for p in
+    select schemaname, tablename, policyname from pg_policies
+    where (schemaname || '.' || tablename) = any (array[${policyTables.map(quote).join(", ")}])
+      and not ((schemaname || '.' || tablename || '.' || policyname) = any (array[
+        ${known.map(quote).join(",\n        ")}
+      ]))
+      and (schemaname = 'public'
+           or coalesce(qual, '') || coalesce(with_check, '') like '%product-images%')
+  loop
+    raise notice 'Removing policy "%" on %.%, which the current schema does not have',
+      p.policyname, p.schemaname, p.tablename;
+    execute format('drop policy %I on %I.%I', p.policyname, p.schemaname, p.tablename);
+  end loop;
+end $$;
+`);
 for (const [table, name, permissive, roles, cmd, qual, check] of policies) {
   const to = roles.replace(/[{}]/g, "");
-  w(`drop policy if exists "${name}" on public.${table};`);
+  w(`drop policy if exists "${name}" on ${table};`);
   w(
-    `create policy "${name}" on public.${table}` +
+    `create policy "${name}" on ${table}` +
       (permissive === "PERMISSIVE" ? "" : " as restrictive") +
       ` for ${cmd.toLowerCase()}` +
       (to ? ` to ${to}` : "") +
@@ -458,7 +503,7 @@ const fnGrants = q(`
          has_function_privilege(r.rolname, p.oid, 'EXECUTE')
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
-  cross join (select rolname from pg_roles where rolname in ('anon','authenticated')) r
+  cross join (select rolname from pg_roles where rolname in ('anon','authenticated','service_role')) r
   where n.nspname = 'public' and p.prokind = 'f'
   order by p.proname, r.rolname
 `);
@@ -493,11 +538,49 @@ if (fnGrants.length) {
     w(`revoke execute on function ${sig} from public;`);
   }
   for (const [name, args, role, allowed] of fnGrants) {
+    // The service role is only ever GRANTED here, never revoked. On
+    // Supabase it holds EXECUTE on public functions by default privilege,
+    // which the reference database built on stock PostgreSQL does not
+    // have, so a "false" for it here means "not granted explicitly", not
+    // "must not have". Revoking would take checkout's functions away.
+    // The explicit grants matter: the roles migration's authorship
+    // trigger calls staff_name() during checkout's service-role writes.
+    if (role === "service_role" && allowed !== "true") continue;
     const verb = allowed === "true" ? "grant" : "revoke";
     const dir = allowed === "true" ? "to" : "from";
     w(`${verb} execute on function public.${name}(${args}) ${dir} ${role};`);
   }
   w("");
+}
+
+// The one piece of data a repair has to put back. Without a staff row
+// nobody can use the admin, so a database brought up to date from this
+// file instead of the roles migration would lock its owner out. Same
+// statement as the migration, same guard: only while the table is empty,
+// which is exactly the state in which nobody has access anyway.
+const hasStaff = q(`
+  select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public' and c.relname = 'staff'
+`);
+if (hasStaff[0]?.[0] === "1") {
+  w(`-- ---------------------------------------------------------------------
+-- Access: every existing account becomes an owner, ONCE
+-- ---------------------------------------------------------------------
+-- Only while public.staff is empty, i.e. only on the day roles arrive.
+-- A manager is added afterwards by hand; see docs/roles.md.
+insert into public.staff (user_id, role, display_name)
+select u.id,
+       'owner',
+       coalesce(
+         nullif(btrim(u.raw_user_meta_data ->> 'full_name'), ''),
+         nullif(btrim(u.raw_user_meta_data ->> 'name'), ''),
+         nullif(btrim(u.raw_user_meta_data ->> 'display_name'), ''),
+         'Owner (set a name)'
+       )
+from auth.users u
+where not exists (select 1 from public.staff)
+on conflict (user_id) do nothing;
+`);
 }
 
 w(`commit;

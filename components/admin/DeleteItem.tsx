@@ -9,6 +9,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { deleteItem } from "@/app/admin/actions";
 import type { ItemReferences } from "@/lib/db/itemRefs";
+import { OwnerOnlyNote, useIsOwner } from "@/components/admin/Role";
 
 export default function DeleteItem({
   id,
@@ -24,6 +25,10 @@ export default function DeleteItem({
   });
   const [confirming, setConfirming] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
+  // A manager archives instead. The button stays, disabled, so he knows
+  // the option exists and whose it is. The server refuses him too, and
+  // the database after that.
+  const owner = useIsOwner();
   const blocked = refs.total > 0;
 
   useEffect(() => {
@@ -57,13 +62,14 @@ export default function DeleteItem({
 
       <button
         type="button"
-        disabled={blocked || pending}
-        aria-disabled={blocked}
+        disabled={blocked || pending || !owner}
+        aria-disabled={blocked || !owner}
         onClick={() => setConfirming(true)}
         className="control control-danger mt-6"
       >
         Delete this item
       </button>
+      {!owner && <OwnerOnlyNote />}
 
       {state.status === "error" && (
         <p aria-live="polite" className="label mt-4 text-danger">
