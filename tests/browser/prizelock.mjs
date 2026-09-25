@@ -95,7 +95,7 @@ async function shopper() {
   await page.waitForTimeout(700);
   const cart = await page.locator("body").innerText();
   check("CART: a hand-written cart holding the prize is refused",
-    /not for sale|prize in a game/i.test(cart),
+    /not sold online|not for sale/i.test(cart),
     (cart.match(/[^\n]*(prize|not for sale)[^\n]*/i) ?? ["NOT REFUSED"])[0].slice(0, 70));
   check("CART: it is not priced into a total",
     !/\$32\.00/.test(cart), (cart.match(/\$[\d.]+/g) ?? []).join(" "));
@@ -112,19 +112,91 @@ async function shopper() {
   await page.context().close();
 }
 
-// ------------------------------------ it comes back once the game is drawn
+// ------------------------------- once drawn, it never comes back online
+// The client's rule (2026-09-25): a drawn prize is the winner's if
+// claimed and sold in store only if not. It never returns to the
+// website, whatever its status says. This reverses the earlier decision
+// that returned a drawn prize to its surface.
 {
   await update("games", `id=eq.${GAME}`, { status: "drawn" });
+  // Deliberately left "available": the lock is the drop's status, not the
+  // item's, so an owner putting it back to available to sell over the
+  // counter must not republish it.
+  await update("items", `id=eq.${SHIRT}`, { status: "available" });
   const page = await shopper();
   await page.goto(`${APP}/shop`, { waitUntil: "networkidle" });
-  check("AFTER THE DRAW: it is back in the Shop",
-    /molon labe tee/i.test(await page.locator("body").innerText()));
+  check("AFTER THE DRAW: it is NOT back in the Shop",
+    !/molon labe tee/i.test(await page.locator("body").innerText()));
+  await page.goto(`${APP}/`, { waitUntil: "networkidle" });
+  const home = await page.locator("body").innerText();
+  check("AFTER THE DRAW: nor anywhere on the home page as something to buy",
+    !/molon labe tee/i.test(home.split(/past drops/i)[0] ?? home),
+    (home.match(/[^\n]*molon labe tee[^\n]*/i) ?? ["absent"])[0].slice(0, 60));
 
-  await page.goto(`${APP}/inventory/${SHIRT_SLUG}`, { waitUntil: "networkidle" });
-  check("AFTER THE DRAW: and can be bought again",
-    (await page.getByRole("button", { name: /add to cart|pick a size/i }).count()) > 0);
-  note("a drawn game releases its prize — apparel is stock the shop keeps selling");
+  const res = await page.goto(`${APP}/inventory/${SHIRT_SLUG}`, { waitUntil: "networkidle" });
+  const itemText = await page.locator("body").innerText();
+  check("AFTER THE DRAW: its page is gone, not merely unbuyable",
+    /not found|404|page you were looking for/i.test(itemText) &&
+      (await page.getByRole("button", { name: /add to cart|pick a size/i }).count()) === 0,
+    `${res?.status()} · ${itemText.replace(/\s+/g, " ").slice(0, 70)}`);
+
+  const sitemap = await (await fetch(`${APP}/sitemap.xml`)).text();
+  check("AFTER THE DRAW: and it is out of the sitemap", !sitemap.includes(SHIRT_SLUG));
+
+  // A cart saved before the draw, holding it.
+  await page.evaluate((id) => localStorage.setItem("mlf_cart",
+    JSON.stringify([{ itemId: id, quantity: 1, variantId: "aaaaaaaa-0000-4000-8000-000000000001" }])), SHIRT);
+  await page.goto(`${APP}/cart`, { waitUntil: "networkidle" });
+  const cart = await page.locator("body").innerText();
+  check("AFTER THE DRAW: a cart holding it is refused",
+    /not sold online/i.test(cart), (cart.match(/[^\n]*not sold online[^\n]*/i) ?? ["NOT REFUSED"])[0]);
   await page.context().close();
+}
+
+// ------------------------- the draw hides it, and a claim marks it sold
+{
+  await reset();
+  await update("games", `id=eq.${GAME}`, { item_id: SHIRT });
+  const d0 = await dump();
+  for (const s of d0.game_spots.filter((x) => x.game_id === GAME)) {
+    await update("game_spots", `id=eq.${s.id}`, {
+      status: "sold", first_name: "Ana", last_name: "Lopez", email: `a${s.spot_number}@example.com`,
+      sold_at: new Date().toISOString(),
+    });
+  }
+  const admin = await adminPage(browser);
+  await admin.goto(`${APP}/admin/games/${GAME}`, { waitUntil: "networkidle" });
+  await admin.getByRole("button", { name: /draw without ceremony/i }).click();
+  await admin.waitForTimeout(400);
+  await admin.locator('[role="dialog"] button').first().click();
+  await admin.waitForTimeout(2500);
+
+  let d = await dump();
+  check("THE DRAW: a winner is recorded", d.winners.some((w) => w.game_id === GAME));
+  check("THE DRAW: the featured piece is hidden, because nobody has claimed it yet",
+    d.items.find((x) => x.id === SHIRT)?.status === "hidden",
+    d.items.find((x) => x.id === SHIRT)?.status);
+  check("THE DRAW: and that is on the activity log",
+    d.admin_activity.some((r) => r.entity_id === SHIRT && r.after_value === "hidden"));
+
+  await admin.goto(`${APP}/admin/games/${GAME}`, { waitUntil: "networkidle" });
+  const claim = admin.getByRole("button", { name: "Prize claimed" });
+  check("ADMIN: the drop page offers to mark the prize claimed", (await claim.count()) === 1);
+  await claim.click();
+  await admin.waitForTimeout(1500);
+  d = await dump();
+  check("CLAIMED: the piece is recorded as sold",
+    d.items.find((x) => x.id === SHIRT)?.status === "sold", d.items.find((x) => x.id === SHIRT)?.status);
+  check("CLAIMED: and the page says so",
+    /recorded as claimed and sold/i.test(await admin.locator("body").innerText()));
+  const page = await shopper();
+  await page.goto(`${APP}/shop`, { waitUntil: "networkidle" });
+  check("CLAIMED: and it is still not on the website",
+    !/molon labe tee/i.test(await page.locator("body").innerText()));
+  await page.context().close();
+  await admin.context().close();
+  await reset();
+  await update("games", `id=eq.${GAME}`, { item_id: SHIRT });
 }
 
 // --------------------------------------------- the owner can always see it

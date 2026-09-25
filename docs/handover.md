@@ -25,7 +25,10 @@ sold in person through the counter.
 add-to-cart control or an enquiry form depending on which surface the
 item belongs to. Apparel shows a size picker and greys out sizes that are
 out of stock. An item that is currently the featured piece in a running drop
-shows "NOT FOR SALE" instead of either.
+shows "NOT FOR SALE" instead of either. Once its drop is drawn, the piece
+leaves the website for good: no listing, no page, not in the sitemap,
+refused by the cart. The draw sets it to hidden; "Prize claimed" on the
+drop's admin page marks it sold. An unclaimed piece is sold in the shop.
 
 **The featured drop.** The drop currently running: the featured piece,
 what a guide costs, how many guides are left, and a control to get one
@@ -218,9 +221,13 @@ reached. Owner only.
 1. Confirm the two shipping prices. They are currently $10 standard and
    $20 oversize, both invented.
 2. Confirm the sales tax rate of 8.25%.
-3. Answer the three outstanding rules questions: how long a winner has to
-   respond, what happens to an unclaimed prize, and whether there is any
-   limit by state or residency beyond the age requirement.
+3. Confirm the wording of rules clause 15, how the winner is picked. The
+   draft described a wheel spun by hand, which is not how the drawing
+   works, so it is held. Seven other clauses are still to be confirmed;
+   `docs/wording.md` lists them.
+   Decide the early draw: the rules no longer mention one, but the
+   checkout terms still say the shop may draw early and the admin still
+   allows it.
 4. Supply the final wording for the refund line. It currently reads "All
    sales are final. No refunds or exchanges." and that is our wording,
    not theirs.
@@ -250,10 +257,9 @@ reached. Owner only.
 3. Approve or rewrite the refund line.
 4. Approve or rewrite the pickup notice, which says that paying online
    does not complete a firearm sale. That wording is ours.
-5. Return wording for the sixteen rules clauses and the final-sale line
-   now showing "Awaiting the attorney's wording" on the rules page. Each
-   is listed with its previous text in `docs/wording.md`. The site follows
-   the terminology ruling everywhere else.
+5. Review the rules as the client edited them on 25 September, and the
+   eight clauses still marked "Wording to be confirmed". `docs/wording.md`
+   lists what changed and what is open.
 6. Confirm the checkout terms, which were changed by word substitution
    only (spot to guide, game to drop). They are stored on every order.
 
@@ -265,10 +271,13 @@ reached. Owner only.
    buying several copies of one guide, "your guide" twice in the email,
    "five guides, five chances", "guide" meaning both the document and
    the purchase in the admin, and held guide numbers in the alerts.
-2. How long does a winner have to respond before the prize is forfeit?
-3. What happens to an unclaimed prize: redrawn, rolled into the next
-   game, or kept by the shop?
-4. Is there any limit by state or residency beyond being 21?
+2. Answered 25 September: the winner has one week from being contacted;
+   an unclaimed prize is sold in store only and never listed online
+   again; there is no state limit beyond the eligibility paragraph.
+3. The early draw: the client deleted it from the rules, but the checkout
+   terms and the admin still allow it. One of them has to change.
+4. Should clause 02 ("You must be able to receive a firearm lawfully…")
+   stay now that the client's eligibility paragraph (clause 03) covers it?
 5. Should the guide mention the drawing at all, or stay purely about the
    piece? It currently says nothing about it, deliberately, because that
    wording is unsettled.

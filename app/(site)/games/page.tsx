@@ -4,7 +4,7 @@ import { getAllGames } from "@/lib/games/queries";
 import GameCard from "@/components/games/GameCard";
 import EmptyState from "@/components/ui/EmptyState";
 import { SHOP_NAME } from "@/lib/brand";
-import { ELIGIBILITY_SUMMARY } from "@/lib/games/rules";
+import { DROPS_INTRO, ELIGIBILITY_SUMMARY } from "@/lib/games/rules";
 
 export const dynamic = "force-dynamic";
 
@@ -26,10 +26,7 @@ export default async function GamesPage() {
         NUMBER.
       </h1>
       <p className="mt-8 max-w-[54ch] text-muted">
-        Every drop sells a set number of guides to its featured piece, at a
-        set price, and each guide comes with entry into the drawing. When
-        the last guide goes, the winner is drawn. No end date, no
-        countdown. It runs until it sells out.
+        {DROPS_INTRO}
       </p>
 
       {/* ------------------------------------------------- open */}

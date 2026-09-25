@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { RULES } from "@/lib/games/rules";
+import { NO_REFUNDS, RULES } from "@/lib/games/rules";
 import { SHOP_NAME, SHOP_PHONE_DISPLAY, SHOP_PHONE_HREF } from "@/lib/brand";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/sweepstakes-rules" },
-  title: "Sweepstakes Rules",
+  title: "Official Sweepstakes Rules",
   description: `Official sweepstakes rules for ${SHOP_NAME}, El Paso, TX.`,
   // Stays noindex until the shop launches. Nothing about the copy is
   // provisional; this is a launch switch, not a disclaimer.
@@ -33,13 +33,20 @@ export default function SweepstakesRulesPage() {
     <div className="px-page pb-24 pt-[calc(72px+4rem)]">
       <p className="label text-acid">Legal</p>
       <h1 className="display mt-6 max-w-3xl text-[clamp(2.25rem,5vw,4rem)]">
-        OFFICIAL SWEEPSTAKES RULES.
+        Official Sweepstakes Rules
       </h1>
 
       <p className="mt-8 max-w-[58ch] leading-relaxed text-muted">
         These rules apply to every featured drop run by {SHOP_NAME} in El
         Paso, Texas. They describe exactly how a drop works, how the winner
         is picked, and what happens next. Read them before you buy a guide.
+      </p>
+
+      {/* Said first and at display size, at the client's instruction:
+          not something a buyer should find in the small print. It is
+          clause 06 below as well. */}
+      <p data-no-refunds className="display mt-10 max-w-3xl border-l-4 border-amber pl-5 text-2xl text-amber">
+        {NO_REFUNDS}
       </p>
 
       <div className="mt-14 border-t hairline">
@@ -65,12 +72,15 @@ export default function SweepstakesRulesPage() {
                       {clause.text && (
                         <p
                           className={
-                            clause.verbatim
-                              ? // The attorney's wording. Given its own
-                                // rule so it reads as quoted rather than
-                                // paraphrased, and never reflowed.
-                                "border-l-2 border-acid pl-5 leading-relaxed"
-                              : "leading-relaxed"
+                            clause.prominent
+                              ? "display text-2xl text-amber"
+                              : clause.verbatim
+                                ? // Wording quoted exactly (the attorney's
+                                  // disclaimer, the client's eligibility
+                                  // paragraph). Given its own rule so it
+                                  // reads as quoted, and never reflowed.
+                                  "border-l-2 border-acid pl-5 leading-relaxed"
+                                : "leading-relaxed"
                           }
                         >
                           {clause.text}
@@ -78,33 +88,14 @@ export default function SweepstakesRulesPage() {
                       )}
 
                       {clause.pending && (
-                        /* An answer only the shop can give. Marked in
-                           place rather than as a banner at the top: the
-                           rest of the page is finished, and a reader
-                           should meet the gap in the clause it belongs
-                           to rather than be warned about the whole
-                           document. */
-                        <p
-                          className={`text-amber ${clause.text ? "mt-3" : ""}`}
-                        >
-                          <span className="label">To be confirmed · </span>
+                        /* Wording not settled yet. Says what the clause
+                           covers and nothing more, marked in place so a
+                           reader meets the gap in the clause it belongs
+                           to rather than a warning about the whole page. */
+                        <p data-pending-wording className="text-amber">
+                          <span className="label">Wording to be confirmed · </span>
                           <span className="leading-relaxed">
                             {clause.pending}
-                          </span>
-                        </p>
-                      )}
-
-                      {clause.attorney && (
-                        /* Legal wording the attorney has not returned
-                           since the terminology ruling. Says what the
-                           clause covers and nothing more: the words are
-                           his to write, not ours. */
-                        <p data-awaiting-attorney className="text-amber">
-                          <span className="label">
-                            Awaiting the attorney&apos;s wording ·{" "}
-                          </span>
-                          <span className="leading-relaxed">
-                            {clause.attorney}
                           </span>
                         </p>
                       )}

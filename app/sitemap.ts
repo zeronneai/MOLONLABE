@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/brand";
 import { getSupabase } from "@/lib/supabase/server";
+import { getLockedPrizeItemIds } from "@/lib/games/queries";
 import { logDbError } from "@/lib/db/log";
 
 // Rebuilt per request: inventory turns over, and a stale sitemap pointing
@@ -32,9 +33,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Archived items are excluded by RLS already; the filter is belt and
   // braces so a policy change can't quietly publish them.
+  // Featured pieces are left out: a running drop's piece is not for
+  // sale, and a drawn one is never listed again.
+  const prizes = new Set(await getLockedPrizeItemIds());
   const { data, error } = await sb
     .from("items")
-    .select("slug, updated_at, status")
+    .select("id, slug, updated_at, status")
     .neq("status", "hidden")
     .order("updated_at", { ascending: false });
   if (error) {
@@ -43,6 +47,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   for (const item of data ?? []) {
+    if (prizes.has(item.id)) continue;
     entries.push({
       url: `${SITE_URL}/inventory/${item.slug}`,
       lastModified: item.updated_at ? new Date(item.updated_at) : now,

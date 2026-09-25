@@ -322,7 +322,12 @@ sanity bound on untrusted localStorage is now 10,000, which is the
 largest a game may be (`games_spots_sane`) rather than a number picked to
 look sensible.
 
-## 14. The three answers the shop owes the rules
+## 14. The three answers the shop owed the rules (answered 25 September)
+
+All three were answered by the client on 25 September 2026 and are now
+clauses: one week to claim, unclaimed prizes sold in store only and never
+listed online again (enforced in code, not just stated), and no state
+limit beyond his eligibility paragraph. What follows is the history.
 
 The sweepstakes rules are written as finished copy. Three clauses cannot
 be: they are decisions only the shop can make, and inventing them would
@@ -339,9 +344,9 @@ rather than be warned about the whole thing.
 | 2 | **What happens to an unclaimed prize.** Redrawn from the remaining sold spots, kept by the shop, or something else. If it is redrawn, say from what pool. | Rules → Claiming a prize |
 | 3 | **Any limit by state or residency beyond the age requirement.** The rules already require that a winner can lawfully receive a firearm; this is about whether the shop will refuse entrants from particular states outright. | Rules → Who can take part |
 
-All three live in `RULES_NEEDS_SHOP` in `lib/games/rules.ts`. Answering
-one means replacing its entry with a clause; the amber marker disappears
-with it and nothing else needs touching.
+They lived in `RULES_NEEDS_SHOP` in `lib/games/rules.ts`, which is gone
+now that all three are answered. Clauses still to be settled are in
+`RULES_PENDING_WORDING` in the same file.
 
 **What the shop should know before answering 2:** the drawing is
 reproducible from the recorded seed, but a *redraw* is a new drawing and

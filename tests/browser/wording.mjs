@@ -183,10 +183,11 @@ check("the sold-out alert went out", Boolean(full));
 hits.push(...found("ALERT game_full", `${full?.subject}\n${full?.summary}`));
 for (const path of ["/", "/games", "/featured"]) await sweep(c, "PUBLIC sold out", path);
 
-// The rules: frozen clauses are placeholders, and there are sixteen.
+// The rules: what is not settled is marked, not guessed at. Eight left
+// after the client's edits of 2026-09-25 (tests/browser/rules.mjs names them).
 await c.goto(`${APP}/sweepstakes-rules`, { waitUntil: "networkidle" });
-const awaiting = await c.locator("[data-awaiting-attorney]").count();
-check("the rules page marks every clause awaiting the attorney", awaiting === 16, `${awaiting}`);
+const pendingCount = await c.locator("[data-pending-wording]").count();
+check("the rules page marks the clauses still to be confirmed", pendingCount === 8, `${pendingCount}`);
 
 // ====================================================================
 // STAFF

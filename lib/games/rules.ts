@@ -38,64 +38,53 @@
 import { FIREARM_DISCLAIMER, PICKUP_NOTICE } from "@/lib/legal";
 
 /**
- * Three things only the shop can decide. They are rendered in place,
- * inside the clause they belong to, rather than collected in a warning
- * box at the top — a reader meets each one exactly where it matters, and
- * the rest of the page reads as finished because it is.
+ * Clauses whose wording is still being settled.
  *
- * Listed in docs/content-needed.md as well, so they are visible to
- * whoever is chasing the shop rather than only to whoever opens the page.
+ * Since the terminology ruling, a clause that used one of the old words
+ * ("spot", "ticket") is not reworded here. It shows a line saying what
+ * it covers and that its wording is to be confirmed. The client returned
+ * wording for most of them on 2026-09-25 (applied below); these are the
+ * ones still open. Their previous text is in docs/wording.md.
+ *
+ * `seed` is held on purpose. The client's draft said names go on a wheel
+ * that is spun and picked by hand, which is not how the drawing works:
+ * one guide number is picked by a recorded random seed. Publishing that
+ * would describe a drawing that does not happen.
  */
-export const RULES_NEEDS_SHOP = {
-  claimWindow: "How long the winner has to respond — the shop to confirm.",
-  unclaimed: "What happens to an unclaimed prize — the shop to confirm.",
-  eligibility:
-    "Any limit by state or residency beyond the age requirement — the shop to confirm.",
-} as const;
-
-/**
- * Clauses waiting on the attorney since the terminology ruling.
- *
- * The ruling: what a customer buys is a guide to the featured piece, and
- * entry into the drawing comes with it. Every clause below that used one
- * of the old words ("spot", "ticket") was legal wording, frozen until the
- * attorney returns it, so it has NOT been reworded here. Each is replaced
- * by a line saying what the clause covers and that its wording is
- * awaited. Nothing on this list is a statement of the rules.
- *
- * The previous text of each, for the attorney to work from, is in
- * docs/wording.md. It is not kept here because it is exactly the wording
- * that may no longer be shown, and scripts/check-copy.mjs would rightly
- * refuse it.
- */
-export const RULES_NEEDS_ATTORNEY = {
-  age: "Minimum age to buy a guide and to win.",
+export const RULES_PENDING_WORDING = {
   fixedPool: "How many guides a drop offers and at what price, and that neither changes while it runs.",
-  purchase: "That buying a guide is a purchase, and how sales tax applies to it.",
-  finalSale: "Refunds, exchanges and transfers.",
-  limits: "Limits on how many guides one person or one order may buy.",
   numbering: "How guide numbers are assigned.",
   cartMerge: "Adding more guides to a cart that already holds some from the same drop.",
   holds: "Guide numbers held during checkout, and released if the payment does not complete.",
-  noFreeRoute: "Whether there is any way to enter the drawing without buying a guide.",
-  duration: "How long a drop runs.",
-  earlyDraw: "Holding the drawing before every guide is sold.",
   pool: "Which guides are in the drawing.",
   odds: "Each guide's chance of winning.",
-  seed: "The recorded random seed, and how a drawing can be checked afterwards.",
-  contact: "How the shop contacts the winner, and keeping contact details current.",
+  seed: "How the winner is picked, and how a drawing can be checked afterwards.",
   publicNames: "Whether buyers' names appear anywhere public.",
-  summaryFinalSale: "Final-sale sentence",
 } as const;
+
+/**
+ * The client's eligibility paragraph, verbatim (2026-09-25). Never
+ * reflowed or edited; tests/browser/rules.mjs checks it character for
+ * character.
+ */
+export const CLIENT_ELIGIBILITY =
+  "Prize eligibility and transfer are subject to all applicable federal, state, and local laws. The potential winner must be legally eligible to receive and possess the firearm in their jurisdiction. Any required firearm transfer will be completed through a Federal Firearms Licensee (FFL) in accordance with applicable law. No firearm will be transferred or delivered where prohibited by law.";
+
+/** The Drops page's description. The client's wording, 2026-09-25, verbatim. */
+export const DROPS_INTRO =
+  "Every drop sells a set number of guides to its featured piece, at a set price, and each guide comes with entry into the drawing. When the last guide goes, the winner is drawn. No end date, no countdown. It runs until all guides are out.";
+
+/** Stated plainly and prominently, at the client's instruction. */
+export const NO_REFUNDS = "No refunds or exchanges.";
 
 export type RuleClause = {
   text: string;
-  /** Rendered inline, marked as outstanding. */
+  /** Rendered inline, marked as wording still to be confirmed. */
   pending?: string;
-  /** Rendered inline, marked as waiting on the attorney's wording. */
-  attorney?: string;
-  /** Set for the attorney's wording, which is never reflowed or edited. */
+  /** Set for wording that is quoted exactly and never reflowed or edited. */
   verbatim?: boolean;
+  /** Set it apart at display size rather than as body copy. */
+  prominent?: boolean;
 };
 
 export type RuleSection = {
@@ -126,52 +115,42 @@ export const RULES: RuleSection[] = [
   {
     heading: "Who can take part",
     clauses: [
-      { text: "", attorney: RULES_NEEDS_ATTORNEY.age },
+      { text: "You must be 21 years or older to buy a guide and to win." },
       {
         text: "You must be able to receive a firearm lawfully under federal, state and local law. If you cannot, you cannot take part.",
       },
-      {
-        text: "",
-        pending: RULES_NEEDS_SHOP.eligibility,
-      },
+      { text: CLIENT_ELIGIBILITY, verbatim: true },
     ],
   },
   {
     heading: "How guides work",
     clauses: [
-      { text: "", attorney: RULES_NEEDS_ATTORNEY.fixedPool },
-      { text: "", attorney: RULES_NEEDS_ATTORNEY.purchase },
-      { text: "", attorney: RULES_NEEDS_ATTORNEY.finalSale },
+      { text: "", pending: RULES_PENDING_WORDING.fixedPool },
+      { text: `All purchases are subject to Texas sales tax at ${SALES_TAX_DISPLAY}.` },
+      { text: NO_REFUNDS, prominent: true },
       {
-        // Fact for the attorney: there is no limit per person or per
-        // order. The only bound is how many guides are left.
-        text: "",
-        attorney: RULES_NEEDS_ATTORNEY.limits,
+        // The system's only bound is how many guides are left, which is
+        // never more than the drop's total.
+        text: "A person may buy as many guides as they want, up to the total offered in that drop.",
       },
-      { text: "", attorney: RULES_NEEDS_ATTORNEY.numbering },
-      { text: "", attorney: RULES_NEEDS_ATTORNEY.cartMerge },
-      { text: "", attorney: RULES_NEEDS_ATTORNEY.holds },
-      {
-        // Fact for the attorney: there is no free or alternative route.
-        // The shop decided that deliberately; see lib/legal.ts.
-        text: "",
-        attorney: RULES_NEEDS_ATTORNEY.noFreeRoute,
-      },
+      { text: "", pending: RULES_PENDING_WORDING.numbering },
+      { text: "", pending: RULES_PENDING_WORDING.cartMerge },
+      { text: "", pending: RULES_PENDING_WORDING.holds },
+      { text: "Entry requires purchasing a guide. There are no free entries." },
     ],
   },
   {
     heading: "When a game closes",
     clauses: [
-      { text: "", attorney: RULES_NEEDS_ATTORNEY.duration },
-      { text: "", attorney: RULES_NEEDS_ATTORNEY.earlyDraw },
+      { text: "A drop runs until every guide is purchased." },
     ],
   },
   {
     heading: "How the winner is chosen",
     clauses: [
-      { text: "", attorney: RULES_NEEDS_ATTORNEY.pool },
-      { text: "", attorney: RULES_NEEDS_ATTORNEY.odds },
-      { text: "", attorney: RULES_NEEDS_ATTORNEY.seed },
+      { text: "", pending: RULES_PENDING_WORDING.pool },
+      { text: "", pending: RULES_PENDING_WORDING.odds },
+      { text: "", pending: RULES_PENDING_WORDING.seed },
       {
         text: "A game is drawn once. A game that already has a winner cannot be drawn again.",
       },
@@ -180,14 +159,16 @@ export const RULES: RuleSection[] = [
   {
     heading: "Claiming a prize",
     clauses: [
-      { text: "", attorney: RULES_NEEDS_ATTORNEY.contact },
       {
-        text: "",
-        pending: RULES_NEEDS_SHOP.claimWindow,
+        text: "By purchasing a guide, the buyer agrees to provide their full name, email and phone number so the shop can contact them if they win.",
       },
       {
-        text: "",
-        pending: RULES_NEEDS_SHOP.unclaimed,
+        text: "The winner has one week from being contacted to confirm and claim the prize. If they do not, the prize returns to the shop.",
+      },
+      {
+        // Enforced, not just stated: a drawn featured piece never returns
+        // to the website (getPrizeItemStates in lib/games/queries.ts).
+        text: "Unclaimed prizes are sold in store only and are not listed on the website again.",
       },
     ],
   },
@@ -209,9 +190,9 @@ export const RULES: RuleSection[] = [
   {
     heading: "Your name and details",
     clauses: [
-      { text: "", attorney: RULES_NEEDS_ATTORNEY.publicNames },
+      { text: "", pending: RULES_PENDING_WORDING.publicNames },
       {
-        text: "A winner is published the same way — first name and last initial, nothing more.",
+        text: "A winner is published the same way: first name and last initial, nothing more.",
       },
     ],
   },
@@ -226,4 +207,4 @@ export const RULES: RuleSection[] = [
  * lawful-possession requirement — and there is one copy of it.
  */
 export const ELIGIBILITY_SUMMARY =
-  "Open to entrants 21 or older who may lawfully take possession of a firearm under federal, state and local law. [Final-sale sentence: awaiting the attorney's wording.] Void where prohibited.";
+  `Open to entrants 21 or older who may lawfully take possession of a firearm under federal, state and local law. ${NO_REFUNDS} Void where prohibited.`;

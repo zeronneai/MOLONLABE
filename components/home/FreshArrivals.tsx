@@ -37,7 +37,7 @@ export default async function FreshArrivals() {
           <EmptyState
             label="Being stocked"
             headline="THE SHELVES ARE BEING FILLED."
-            body="Nothing is priced for sale yet. Anything with a price lands here as it goes up — until then, the counter is the fastest way to see what is in."
+            body="New arrivals show up here as they go on sale. Until then, the counter is the fastest way to see what is in."
             action={{ href: "/visit", text: "Find us" }}
           />
         </div>

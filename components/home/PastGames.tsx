@@ -46,14 +46,14 @@ export default async function PastGames() {
 
         {finished.length === 0 ? (
           <Reveal delay={60}>
-            <div className="mt-12 max-w-[52ch] border-l-2 border-acid pl-6">
+            <div data-empty-state className="mt-12 max-w-[52ch] border-l-2 border-acid pl-6">
               <p className="text-muted">
                 No drop has been drawn yet. When one sells out and the winner
                 is picked, it lands here: the featured piece, how many guides
                 sold, and the date.
               </p>
               <p className="mt-4 text-muted">
-                This section fills itself. Nothing needs doing.
+                Winners are shown by first name and last initial.
               </p>
               <Link href="/games" className="cta-secondary mt-8">
                 See what&apos;s running →

@@ -45,7 +45,7 @@ export default async function InTheCasePage() {
           <EmptyState
             label="Empty case"
             headline="THE CASE IS EMPTY."
-            body="Nothing is listed right now. Stock moves fast and this page only shows what is genuinely on hand — the counter is the fastest way to see what has just landed."
+            body="Nothing is listed right now. Stock moves fast and this page only shows what is genuinely on hand. The counter is the fastest way to see what has just landed."
             action={{ href: "/visit", text: "Find us" }}
           />
         )}

@@ -67,7 +67,7 @@ export default function InventoryBrowser({ items }: { items: IndexItem[] }) {
             headline={
               active === "all" ? "THE CASE IS EMPTY." : "NOTHING HERE RIGHT NOW."
             }
-            body="Stock moves fast and the site only shows what's actually on hand. Call the shop — what's coming in isn't listed yet."
+            body="Stock moves fast and the site only shows what's actually on hand. Call the shop: what's coming in isn't listed yet."
             action={{ href: "/visit", text: "Find us" }}
           />
         )}

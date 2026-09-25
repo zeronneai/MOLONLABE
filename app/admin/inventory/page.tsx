@@ -196,7 +196,7 @@ export default async function AdminInventory({
             surface="games"
             id="prizes"
             heading="Items used as prizes"
-            blurb="These are the featured pieces in drops. While their drop is open or sold out they are out of the Shop and out of the case, and they cannot be bought outright: customers are buying guides to them, with entry into the drawing. They go back to normal once the drop is drawn."
+            blurb="These are the featured pieces in drops. They are out of the Shop and out of the case, and cannot be bought online: customers buy guides to them, with entry into the drawing. After the draw they never return to the website. The piece is hidden until the winner claims it, then sold. An unclaimed piece is sold in the shop only."
             count={asPrize.length}
           >
             {asPrize.map((item) => {

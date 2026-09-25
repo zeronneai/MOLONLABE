@@ -50,52 +50,61 @@ on them when they were placed (order lines such as "September Rifle
 Game — 3 spots", and the terms text the buyer accepted). That is a
 record of what the buyer saw, and it is not rewritten.
 
-## Clauses waiting on the attorney
+## The rules, after the client's edits (25 September)
 
-Every rules clause that used the old words was legal wording, frozen
-until the attorney returns it. None has been reworded. Each shows on
-`/sweepstakes-rules` as **"Awaiting the attorney's wording"** with a line
-naming its subject, from `RULES_NEEDS_ATTORNEY` in `lib/games/rules.ts`.
-Their previous text, for the attorney to work from:
+The client returned wording for most of the clauses that had been
+frozen since the terminology ruling. Applied as sent, with his notes
+turned into sentences where he wrote notes:
 
-| # | Subject shown | Previous text |
+| # | Now reads |
+| --- | --- |
+| 01 | You must be 21 years or older to buy a guide and to win. |
+| 03 | His eligibility paragraph, verbatim (`CLIENT_ELIGIBILITY`). Replaces the state-limit question. |
+| 05 | All purchases are subject to Texas sales tax at 8.25%. |
+| 06 | No refunds or exchanges. Also shown at display size under the page intro. |
+| 07 | A person may buy as many guides as they want, up to the total offered in that drop. |
+| 11 | Entry requires purchasing a guide. There are no free entries. |
+| 12 | A drop runs until every guide is purchased. |
+| 17 | By purchasing a guide, the buyer agrees to provide their full name, email and phone number so the shop can contact them if they win. |
+| 18 | The winner has one week from being contacted to confirm and claim the prize. If they do not, the prize returns to the shop. |
+| 19 | Unclaimed prizes are sold in store only and are not listed on the website again. |
+
+The early-draw clause was deleted at his instruction. Numbers from 13
+onward moved up by one.
+
+**Still to be confirmed**, shown as "Wording to be confirmed" with the
+subject only (`RULES_PENDING_WORDING` in `lib/games/rules.ts`):
+
+| # (now) | Subject | Previous text |
 | --- | --- | --- |
-| 01 | Minimum age to buy a guide and to win | You must be 21 or older to buy a spot or to win a prize. |
 | 04 | How many guides a drop offers and at what price | Each game offers a fixed number of spots at a fixed price. Both are set when the game opens and neither changes while it runs. |
-| 05 | That buying a guide is a purchase, and how sales tax applies | Buying a spot is a purchase, not an entry fee. Texas sales tax is added at checkout at the rate in force at the time — currently 8.25%. The total shown at checkout is the amount you pay. |
-| 06 | Refunds, exchanges and transfers | Spot purchases are final. No refunds, no exchanges, no transfers. This applies whether or not you win. |
-| 07 | Limits on how many guides one person or order may buy | You may buy as many spots as you like, up to however many are left in the game. There is no limit per person and no limit per order. |
 | 08 | How guide numbers are assigned | Spot numbers are assigned when you buy — you do not choose them. You get the lowest numbers still free, so if spots 2 and 4 have gone and you take three, you get 1, 3 and 5. |
 | 09 | Adding more guides to a cart | Adding more spots to your cart for the same game adds to what is already there. Your cart shows the running total before you pay. |
 | 10 | Guide numbers held during checkout | Your spots are held while you check out and are released back to the game if the payment does not complete. A spot is only yours once payment succeeds. |
-| 11 | Whether there is any way to enter without buying | A spot can only be bought. There is no free or alternative way to get one. |
-| 12 | How long a drop runs | A game runs until every spot is sold. There is no end date and no countdown. |
-| 13 | Holding the drawing before every guide is sold | The shop may hold the drawing before every spot is sold, at its sole discretion. Where that happens, the number of spots left unsold is recorded and shown on the game. |
-| 14 | Which guides are in the drawing | One spot is drawn at random from the spots that have sold. Unsold spots are not in the drawing. |
-| 15 | Each guide's chance of winning | Every sold spot has the same chance. Someone holding five spots therefore has five times the chance of someone holding one. |
-| 16 | The recorded random seed | The drawing uses a recorded random seed. The shop keeps that seed, the winning spot number and the number of spots sold, so the drawing can be run again from the record and checked against the result that was announced. |
-| 18 | How the shop contacts the winner | The shop contacts the winner directly, using the name, email address and phone number given when the spots were bought. Keep those details current — they are the only way the shop has to reach you. |
-| 24 | Whether buyers' names appear anywhere public | Spots are anonymous on the public board by default. A first name and last initial appear only if you ticked the box at checkout asking for that. Your email address and phone number are never shown. |
+| 13 | Which guides are in the drawing | One spot is drawn at random from the spots that have sold. Unsold spots are not in the drawing. |
+| 14 | Each guide's chance of winning | Every sold spot has the same chance. Someone holding five spots therefore has five times the chance of someone holding one. |
+| 15 | How the winner is picked **(held)** | The drawing uses a recorded random seed. The shop keeps that seed, the winning spot number and the number of spots sold, so the drawing can be run again from the record and checked against the result that was announced. |
+| 23 | Whether buyers' names appear anywhere public | Spots are anonymous on the public board by default. A first name and last initial appear only if you ticked the box at checkout asking for that. Your email address and phone number are never shown. |
 
-Also in `lib/games/rules.ts`:
+**15 is held on purpose.** The client's draft said names go on a wheel
+that is spun and picked by hand. The system picks one guide number with
+a recorded random seed and shows it on the draw presentation. Publishing
+the wheel description would describe a drawing that does not happen.
 
-- **The eligibility summary** under every "Official rules" link: "Spot
-  purchases are final." is replaced with "[Final-sale sentence: awaiting
-  the attorney's wording.]" The rest of that line is unchanged.
-- **One heading changed**: "How spots work" is now "How guides work".
-  A heading, not a clause, and it only applies the ruling; listed so it
-  can be overruled.
-- **Left as written, because they contain none of the four words** but
-  still say "game": the heading "When a game closes" and clause 17, "A
-  game is drawn once. A game that already has a winner cannot be drawn
-  again."
+**Unedited and worth a look:** the heading "When a game closes" and
+clause 16, "A game is drawn once. A game that already has a winner cannot
+be drawn again", still say "game". Clause 24, "A winner is published the
+same way", follows clause 23, which is still to be confirmed. Its em dash
+became a colon.
 
-**Not placeholdered, deliberately: the checkout terms** in
-`lib/games/terms.ts`. They are the agency's wording, not the attorney's,
-and the text is stored on each order as what the buyer agreed to, so a
-placeholder there would be recorded as the buyer's consent. They were
-changed by word substitution only (spot to guide, game to drop), and
-`GAME_TERMS_VERSION` moved to `2026-09-agency-3`.
+**Checkout terms still allow an early draw.** The rules no longer
+mention one, but `lib/games/terms.ts` says "The shop may draw earlier at
+its discretion" and the admin still allows it. One of them has to change.
+
+The checkout terms (`lib/games/terms.ts`) are the agency's wording and
+are stored on each order as what the buyer agreed to, so they were
+changed by word substitution only; `GAME_TERMS_VERSION` is
+`2026-09-agency-3`.
 
 ## Where "guide" reads worse
 

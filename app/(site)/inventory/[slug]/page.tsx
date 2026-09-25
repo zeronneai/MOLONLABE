@@ -17,7 +17,7 @@ import { ProductJsonLd } from "@/components/seo/StructuredData";
 import TrackView from "@/components/analytics/TrackView";
 import PurchasePanel from "@/components/inventory/PurchasePanel";
 import { getItemVariants } from "@/lib/db/items";
-import { getLockedPrizeItemIds } from "@/lib/games/queries";
+import { getPrizeItemStates } from "@/lib/games/queries";
 import { needsFirearmDisclaimer } from "@/lib/admin/constants";
 
 
@@ -46,6 +46,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   // Renders the 404 screen with its noindex. See the note on `revalidate`
   // above for why the HTTP status stays 200 here.
   if (!item) notFound();
+  if ((await getPrizeItemStates()).get(item.id) === "drawn") notFound();
   return {
     title: item.name,
     description: item.short_desc ?? undefined,
@@ -78,7 +79,11 @@ export default async function ItemPage({ params }: Params) {
   // Is this item the prize in a game that has not been drawn? If so the
   // page stays reachable and sells nothing. The cart refuses it as well —
   // this is the explanation, that is the guard.
-  const isPrize = (await getLockedPrizeItemIds()).includes(item.id);
+  const prizeState = (await getPrizeItemStates()).get(item.id);
+  // Drawn: off the website entirely, page included. Claimed, it is the
+  // winner's; unclaimed, it is sold in the shop only.
+  if (prizeState === "drawn") notFound();
+  const isPrize = prizeState === "running";
 
   return (
     <div className="lg:flex">

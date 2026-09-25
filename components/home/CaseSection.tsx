@@ -83,7 +83,7 @@ export default async function CaseSection() {
           </>
         ) : (
           <Reveal delay={60}>
-            <div className="mt-12 max-w-[52ch] border-l-2 border-acid pl-6">
+            <div data-empty-state className="mt-12 max-w-[52ch] border-l-2 border-acid pl-6">
               <p className="text-muted">
                 Nothing is listed in the case right now. Stock moves, and
                 this only shows what is genuinely on hand.

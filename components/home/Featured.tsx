@@ -11,7 +11,7 @@ export default async function Featured() {
 
   if (!game) {
     return (
-      <section className="ground-acid px-page flex min-h-[40vh] flex-col justify-center py-20">
+      <section data-empty-state className="ground-acid px-page flex min-h-[40vh] flex-col justify-center py-20">
         <Reveal>
           <p className="label">Featured drop</p>
           <h2 className="display mt-6 max-w-2xl text-[clamp(2rem,4vw,3.5rem)]">

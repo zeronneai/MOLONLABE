@@ -4,6 +4,7 @@ import GameForm from "@/components/admin/GameForm";
 import DrawPanel from "@/components/admin/DrawPanel";
 import SpotLedger from "@/components/admin/SpotLedger";
 import BackLink from "@/components/admin/BackLink";
+import PrizeClaim from "@/components/admin/PrizeClaim";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,9 @@ export default async function EditGamePage({
         .select("spot_number, first_name, last_name, email, phone, order_id")
         .eq("id", winner.spot_id)
         .maybeSingle()
+    : { data: null };
+  const { data: prize } = winner && game.item_id
+    ? await sb.from("items").select("name, status").eq("id", game.item_id).maybeSingle()
     : { data: null };
   const { data: winningOrder } = contact?.order_id
     ? await sb.from("orders").select("order_number").eq("id", contact.order_id).maybeSingle()
@@ -123,6 +127,9 @@ export default async function EditGamePage({
               contact details to show. The list of guides sold above has every
               buyer.
             </p>
+          )}
+          {prize && (
+            <PrizeClaim gameId={game.id} pieceName={prize.name} claimed={prize.status === "sold"} />
           )}
         </section>
       )}

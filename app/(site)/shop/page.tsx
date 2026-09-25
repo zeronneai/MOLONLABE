@@ -61,7 +61,7 @@ export default async function ShopPage() {
           <EmptyState
             label="Shop"
             headline="Nothing here yet"
-            body="Nothing is priced for sale yet. In the meantime, the case is worth a look."
+            body="Nothing is for sale online right now. In the meantime, the case is worth a look."
             action={{ href: "/in-the-case", text: "See the case" }}
           />
         </div>

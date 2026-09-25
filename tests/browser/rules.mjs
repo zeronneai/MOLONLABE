@@ -36,6 +36,11 @@ const FIREARM_DISCLAIMER = readFileSync(
   join(ROOT, "lib/legal.ts"),
   "utf8",
 ).match(/FIREARM_DISCLAIMER =\s*"([\s\S]*?)";/)[1];
+// The client's eligibility paragraph exactly as he sent it (2026-09-25).
+// Held here as a literal rather than read from the page's source, so an
+// edit to the source cannot also edit what it is checked against.
+const CLIENT_ELIGIBILITY =
+  "Prize eligibility and transfer are subject to all applicable federal, state, and local laws. The potential winner must be legally eligible to receive and possess the firearm in their jurisdiction. Any required firearm transfer will be completed through a Federal Firearms Licensee (FFL) in accordance with applicable law. No firearm will be transferred or delivered where prohibited by law.";
 
 await reset();
 const browser = await chromium.launch({ executablePath: CHROMIUM });
@@ -62,47 +67,70 @@ check("does not describe itself as unreviewed",
   !/has not been reviewed|needs? an? (lawyer|attorney)/i.test(text));
 
 // ------------------------------------------------- the operative clauses
-// Since the terminology ruling, every clause that used "spot" is legal
-// wording waiting on the attorney, and shows a placeholder naming its
-// subject instead (lib/games/rules.ts, RULES_NEEDS_ATTORNEY). What is
-// still stated as written is checked as written; what is waiting is
-// checked as waiting, by subject, so a clause cannot quietly vanish.
-const stated = [
-  [/federally licensed firearms dealer/i, "the FFL transfer condition"],
-  [/first name and last initial/i, "how a winner is published"],
-  [/cannot be drawn again/i, "a drop is drawn once"],
+// The client's edits of 2026-09-25, as published. Clause numbers are the
+// page's own continuous numbering.
+const clauses = (await page.locator("main ol li").allInnerTexts())
+  .map((t) => t.replace(/\s+/g, " ").trim());
+const clause = (n) => clauses.find((c) => c.startsWith(String(n).padStart(2, "0"))) ?? "";
+const exact = [
+  [1, "You must be 21 years or older to buy a guide and to win."],
+  [3, CLIENT_ELIGIBILITY],
+  [5, "All purchases are subject to Texas sales tax at 8.25%."],
+  [6, "No refunds or exchanges."],
+  [7, "A person may buy as many guides as they want, up to the total offered in that drop."],
+  [11, "Entry requires purchasing a guide. There are no free entries."],
+  [12, "A drop runs until every guide is purchased."],
+  [17, "By purchasing a guide, the buyer agrees to provide their full name, email and phone number so the shop can contact them if they win."],
+  [18, "The winner has one week from being contacted to confirm and claim the prize. If they do not, the prize returns to the shop."],
+  [19, "Unclaimed prizes are sold in store only and are not listed on the website again."],
 ];
-for (const [re, what] of stated) {
-  check(`states ${what}`, re.test(text),
-    (text.match(re) ?? ["MISSING"])[0].toString().slice(0, 50));
+for (const [n, want] of exact) {
+  check(`clause ${String(n).padStart(2, "0")} reads as the client wrote it`,
+    clause(n).includes(want), clause(n).slice(0, 90) || "MISSING");
 }
-const waiting = [
-  "Minimum age to buy a guide and to win",
+check("the client's eligibility paragraph appears exactly once, verbatim",
+  text.split(CLIENT_ELIGIBILITY).length === 2);
+check("the early-draw clause is gone", !/sole discretion|before every guide is sold/i.test(text));
+check("the state-limit question is gone", !/state or residency/i.test(text));
+
+const pendingWording = await page.locator("[data-pending-wording]").allInnerTexts();
+const stillOpen = [
   "How many guides a drop offers",
-  "how sales tax applies",
-  "Refunds, exchanges and transfers",
-  "Limits on how many guides",
   "How guide numbers are assigned",
   "Adding more guides to a cart",
   "held during checkout",
-  "any way to enter the drawing without buying",
-  "How long a drop runs",
-  "Holding the drawing before every guide is sold",
   "Which guides are in the drawing",
   "chance of winning",
-  "recorded random seed",
-  "How the shop contacts the winner",
+  "How the winner is picked",
   "names appear anywhere public",
 ];
-const placeholders = await page.locator("[data-awaiting-attorney]").allInnerTexts();
-check("sixteen clauses are marked as awaiting the attorney's wording",
-  placeholders.length === 16, `${placeholders.length}`);
-for (const topic of waiting) {
-  check(`awaiting the attorney: ${topic}`,
-    placeholders.some((p) => p.toLowerCase().includes(topic.toLowerCase()) &&
-      /awaiting the attorney/i.test(p)),
-    placeholders.find((p) => p.toLowerCase().includes(topic.toLowerCase()))?.slice(0, 80) ?? "MISSING");
+check("eight clauses are still marked as wording to be confirmed",
+  pendingWording.length === 8, `${pendingWording.length}`);
+for (const topic of stillOpen) {
+  check(`still open: ${topic}`,
+    pendingWording.some((p) => p.toLowerCase().includes(topic.toLowerCase())),
+    pendingWording.find((p) => p.toLowerCase().includes(topic.toLowerCase()))?.slice(0, 80) ?? "MISSING");
 }
+check("clause 15, how the winner is picked, is still held: nothing about a wheel",
+  /to be confirmed/i.test(clause(15)) && !/wheel|by hand|spun/i.test(text), clause(15).slice(0, 90));
+
+// ---------------------------------------------- how the page presents it
+check("the title is the client's", /^Official Sweepstakes Rules$/m.test(text),
+  (text.match(/[^\n]*sweepstakes rules[^\n]*/i) ?? ["MISSING"])[0]);
+check("the tab title is the client's",
+  /Official Sweepstakes Rules/.test(await page.title()), await page.title());
+const noRefunds = page.locator("[data-no-refunds]");
+check("no refunds is said at display size near the top, not as fine print",
+  (await noRefunds.count()) === 1 &&
+    parseFloat(await noRefunds.evaluate((el) => getComputedStyle(el).fontSize)) >= 20,
+  await noRefunds.evaluate((el) => getComputedStyle(el).fontSize).catch(() => "absent"));
+const html = await page.evaluate(() => {
+  const c = document.body.cloneNode(true);
+  for (const el of c.querySelectorAll("script, style")) el.remove();
+  return c.textContent;
+});
+check("there is no em dash anywhere on the page", !html.includes("\u2014"),
+  (html.match(/.{0,40}\u2014.{0,40}/) ?? ["none"])[0]);
 
 // ------------------------------- the attorney's wording, character exact
 // The single most important assertion on this page. His text appears in
@@ -130,14 +158,6 @@ check("states no per-order spot cap, because there is none",
   !/\b25\b[^\n]{0,30}(order|transaction)/i.test(text),
   (text.match(/[^\n]*\b25\b[^\n]*/) ?? ["no stale cap"])[0].slice(0, 60));
 
-// ------------------------------------------------- the three open items
-const pending = (text.match(/to be confirmed/gi) ?? []).length;
-check("exactly three items are marked as the shop's to answer",
-  pending === 3, `${pending} found`);
-check("the claim window is one of them", /how long the winner has to respond/i.test(text));
-check("the unclaimed prize is one of them", /unclaimed prize/i.test(text));
-check("eligibility limits are one of them", /state or residency/i.test(text));
-
 // ------------------------------------------------------- noindex holds
 const robots = await page
   .locator('meta[name="robots"]')
@@ -151,9 +171,14 @@ check("the page is still noindex", /noindex/i.test(robots ?? ""), String(robots)
 await page.goto(`${APP}/featured`, { waitUntil: "networkidle" });
 const buy = await page.locator("body").innerText();
 
-check("the buy control mentions the early draw, as the rules do",
-  /draw earlier|may draw earlier|earlier at its discretion/i.test(buy),
-  (buy.match(/[^\n]*earlier[^\n]*/i) ?? ["NOT MENTIONED"])[0].slice(0, 80));
+// KNOWN DISAGREEMENT, reported rather than hidden: the client deleted the
+// early-draw clause from the rules, but the checkout terms still say the
+// shop may draw earlier, and the admin still allows it. Which one changes
+// is the client's decision. This records the state so it cannot drift
+// further without somebody noticing.
+note(/earlier at its discretion/i.test(buy) && !/sole discretion/i.test(text)
+  ? "OPEN: the checkout terms allow an early draw; the rules no longer mention one"
+  : "early-draw wording now agrees between the checkout terms and the rules");
 check("the buy control does NOT promise a draw only when the last guide sells",
   /drawn once the last guide sells/i.test(buy) &&
     !/drawn once the last guide sells\.(?!\s*The shop may)/i.test(buy));

@@ -103,7 +103,7 @@ const REJECTION = {
   sizeGone: "That size has sold out.",
   noSizes: "No sizes are in stock.",
   oneGame: "Guides from one drop at a time. This cart already holds another.",
-  isPrize: "This is the featured piece in a drop that is running. It is not for sale until the drop is drawn.",
+  isPrize: "This is the featured piece in a drop. It is not sold online.",
   gameClosed: "That drop has sold out. Nothing has been charged.",
 } as const;
 
@@ -263,15 +263,15 @@ export async function priceCart(
       itemIds.length > 0
         ? sb.from("items").select("*").in("id", itemIds)
         : Promise.resolve({ data: [], error: null }),
-      // Which of these are the prize in a game that has not been drawn.
-      // This is THE guard against buying a prize outright while other
-      // people are paying for a chance at it — the Shop listing merely
-      // hides it, and a direct URL bypasses a listing.
+      // Which of these are a drop's featured piece, running or drawn.
+      // This is THE guard against buying one online: the listings merely
+      // hide it, and a direct URL or an old cart bypasses a listing. A
+      // drawn piece is never sold online again (lib/games/queries.ts).
       itemIds.length > 0
         ? sb
             .from("games")
             .select("item_id")
-            .in("status", ["open", "full"])
+            .in("status", ["open", "full", "drawn"])
             .in("item_id", itemIds)
         : Promise.resolve({ data: [], error: null }),
     ]);

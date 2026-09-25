@@ -16,7 +16,7 @@ export default function EmptyState({
   action?: { href: string; text: string };
 }) {
   return (
-    <div className="border-t hairline py-20">
+    <div data-empty-state className="border-t hairline py-20">
       <p className="label text-acid">{label}</p>
       <p className="display mt-5 max-w-[24ch] text-[clamp(1.75rem,3.5vw,2.75rem)]">
         {headline}

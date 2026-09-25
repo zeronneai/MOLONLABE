@@ -1099,7 +1099,7 @@ export async function commitDraw(
   // because total_spots is fixed at creation and cannot drift.
   const { data: gameRow } = await sb
     .from("games")
-    .select("total_spots, title")
+    .select("total_spots, title, item_id")
     .eq("id", gameId)
     .maybeSingle();
   const totalSpots = gameRow?.total_spots ?? spots.length;
@@ -1232,6 +1232,30 @@ export async function commitDraw(
       ...(unsold > 0 ? { drawnEarly: true, unsoldSpots: unsold } : {}),
     } as Json,
   });
+
+  // The featured piece leaves the website for good. It is hidden now,
+  // because nobody has claimed it yet; the owner marks it sold when the
+  // winner does (markPrizeClaimed). Either way the public pages already
+  // exclude it by the drop's status, so this is the owner's bookkeeping,
+  // not the lock, and a failure here is logged rather than undoing a draw
+  // that is already recorded.
+  if (gameRow?.item_id) {
+    const { data: prize } = await sb
+      .from("items").select("name, status").eq("id", gameRow.item_id).maybeSingle();
+    if (prize && prize.status !== ARCHIVED_STATUS && prize.status !== "sold") {
+      const { error: hideError } = await sb
+        .from("items")
+        .update({ status: ARCHIVED_STATUS, updated_by_name: session.name })
+        .eq("id", gameRow.item_id);
+      if (hideError) logDbError("commitDraw hide prize", hideError);
+      else {
+        await logActivity(sb, session, {
+          action: "status", entity: "item", entityId: gameRow.item_id, entityLabel: prize.name,
+          field: "status", before: prize.status, after: ARCHIVED_STATUS,
+        });
+      }
+    }
+  }
   revalidatePublic();
   revalidatePath("/admin/games");
   // The detail page is where the draw happens, and a dynamic child is
@@ -1505,4 +1529,51 @@ export async function sendTestAlert(
     return { status: "error", message: `Asked for ${asked}. The script says it sent to ${got}.` };
   }
   return { status: "success", message: `Sent. The script says it went to ${got}.` };
+}
+
+// ---------------------------------------------------------------------
+// After the draw
+// ---------------------------------------------------------------------
+
+/**
+ * The winner has claimed the prize: its item becomes sold.
+ *
+ * Staff, not owner only: running the draw and contacting the winner are
+ * the manager's job, and so is recording the outcome. It does not put
+ * the item back on the website. Nothing does; a drawn featured piece is
+ * kept off the public pages by the drop's status (lib/games/queries.ts).
+ */
+export async function markPrizeClaimed(gameId: string): Promise<ActionState> {
+  const session = await requireSession();
+  if (!session) return { status: "error", message: "Not signed in." };
+  const { sb } = session;
+
+  const { data: game } = await sb
+    .from("games").select("title, status, item_id").eq("id", gameId).maybeSingle();
+  if (!game || game.status !== "drawn") {
+    return { status: "error", message: "This drop has not been drawn yet." };
+  }
+  if (!game.item_id) {
+    return { status: "error", message: "This drop has no featured piece to mark." };
+  }
+  const { data: prize } = await sb
+    .from("items").select("name, status").eq("id", game.item_id).maybeSingle();
+  if (!prize) return { status: "error", message: "The featured piece no longer exists." };
+  if (prize.status === "sold") return { status: "idle", message: "Already marked as claimed." };
+
+  const { error } = await sb
+    .from("items")
+    .update({ status: "sold", updated_by_name: session.name })
+    .eq("id", game.item_id);
+  if (error) {
+    logDbError("markPrizeClaimed", error);
+    return { status: "error", message: "Could not mark it claimed. Try again." };
+  }
+  await logActivity(sb, session, {
+    action: "status", entity: "item", entityId: game.item_id, entityLabel: prize.name,
+    field: "status", before: prize.status, after: "sold",
+  });
+  revalidatePath(`/admin/games/${gameId}`);
+  revalidatePath("/admin/inventory");
+  return { status: "success", message: "Marked as claimed. The piece is recorded as sold." };
 }

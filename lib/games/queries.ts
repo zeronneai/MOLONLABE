@@ -207,40 +207,56 @@ export async function getAllGames(): Promise<{
 }
 
 /**
- * Items that are the prize in a game that has not been drawn.
+ * Where each featured piece stands: in a drop that is still running, or
+ * in one that has been drawn.
  *
- * While a game is open or full, its prize is a PRIZE and nothing else.
- * It comes out of the Shop and out of the case, and it cannot be bought
- * — see `isPrizeLocked` and the rejection in lib/cart/pricing.ts. People
- * are paying for a chance at that exact item; letting somebody else buy
- * it outright is the worst thing this system could do.
+ * RUNNING (open or sold out): the piece is out of the Shop and out of
+ * the case, its page says NOT FOR SALE, and the cart refuses it. People
+ * are buying guides with entry into a drawing for that exact item;
+ * letting somebody buy it outright is the worst thing this could do.
  *
- * DRAWN GAMES ARE NOT INCLUDED, and that reverses an earlier decision.
- * This used to return every game's item, so a prize never came back —
- * the reasoning being that a drawn item "has an owner now". That holds
- * for a one-off firearm and not for stock: an apparel prize is a line the
- * shop keeps selling, and a drawn game should not retire it forever. The
- * item returns to its normal surface once the game is drawn.
+ * DRAWN: the piece never comes back to the website. The client's rule:
+ * a claimed prize is the winner's, and an unclaimed one is sold in the
+ * shop only, never listed online again. Its page is gone as well, not
+ * just its listing. The draw sets the item to hidden and the owner marks
+ * it sold when the winner claims it (lib/admin: markPrizeClaimed), but
+ * this is what keeps it off the site whatever its status says, so an
+ * owner setting it back to "available" to sell over the counter does not
+ * republish it.
  *
- * There is no "cancelled" status — a game the owner abandons is deleted,
- * and deleting it drops the reference, so the item returns that way too.
+ * This reverses an earlier decision, which returned a drawn prize to its
+ * normal surface so that a stock line used as a prize (a shirt with
+ * sizes) kept selling. It no longer does: a drop's featured piece should
+ * be its own item, not a product line the Shop depends on.
  */
-export async function getLockedPrizeItemIds(): Promise<string[]> {
+export type PrizeState = "running" | "drawn";
+
+export async function getPrizeItemStates(): Promise<Map<string, PrizeState>> {
+  const out = new Map<string, PrizeState>();
   const sb = getSupabase();
-  if (!sb) return [];
+  if (!sb) return out;
   const { data, error } = await sb
     .from("games")
-    .select("item_id")
-    .in("status", ["open", "full"])
+    .select("item_id, status")
+    .in("status", ["open", "full", "drawn"])
     .not("item_id", "is", null);
   if (error) {
-    // An error here must not open the shop to selling a prize, so the
-    // caller is told nothing is available rather than nothing is locked.
-    // See the callers: each treats null as "could not determine".
-    logDbError("getLockedPrizeItemIds", error);
-    return [];
+    logDbError("getPrizeItemStates", error);
+    return out;
   }
-  return (data ?? []).map((r) => r.item_id).filter((id): id is string => Boolean(id));
+  for (const row of data ?? []) {
+    if (!row.item_id) continue;
+    // A piece in a running drop is running, even if an older drop that
+    // used it has been drawn.
+    const state: PrizeState = row.status === "drawn" ? "drawn" : "running";
+    if (out.get(row.item_id) !== "running") out.set(row.item_id, state);
+  }
+  return out;
+}
+
+/** Every featured piece kept off the public listings: running or drawn. */
+export async function getLockedPrizeItemIds(): Promise<string[]> {
+  return [...(await getPrizeItemStates()).keys()];
 }
 
 /**

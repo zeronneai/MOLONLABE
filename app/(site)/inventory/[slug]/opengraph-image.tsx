@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { getItemBySlug, itemImages } from "@/lib/db/items";
+import { getPrizeItemStates } from "@/lib/games/queries";
 import { SHOP_SHORT_NAME } from "@/lib/brand";
 import { archivoFonts } from "@/lib/og";
 
@@ -22,7 +23,14 @@ export default async function ItemOpengraphImage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const [item, fonts] = await Promise.all([getItemBySlug(slug), archivoFonts()]);
+  const [found, fonts, prizes] = await Promise.all([
+    getItemBySlug(slug),
+    archivoFonts(),
+    getPrizeItemStates(),
+  ]);
+  // A drawn featured piece is off the website, share card included: the
+  // plain card rather than its photograph and name.
+  const item = found && prizes.get(found.id) === "drawn" ? null : found;
   const image = item ? itemImages(item)[0] : undefined;
   const name = item?.name ?? SHOP_SHORT_NAME;
   const status = item?.status ?? "available";
