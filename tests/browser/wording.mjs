@@ -24,6 +24,7 @@ import {
   browser,
   dump,
   managerPage,
+  throughRoster,
   page as newPage,
   reset,
   suite,
@@ -187,7 +188,7 @@ for (const path of ["/", "/games", "/featured"]) await sweep(c, "PUBLIC sold out
 // after the client's edits of 2026-09-25 (tests/browser/rules.mjs names them).
 await c.goto(`${APP}/sweepstakes-rules`, { waitUntil: "networkidle" });
 const pendingCount = await c.locator("[data-pending-wording]").count();
-check("the rules page marks the clauses still to be confirmed", pendingCount === 8, `${pendingCount}`);
+check("the rules page marks the clauses still to be confirmed", pendingCount === 7, `${pendingCount}`);
 
 // ====================================================================
 // STAFF
@@ -234,9 +235,14 @@ for (const o of ORIENTATIONS) {
   await p.screenshot({ path: join(SHOTS, `draw-${o.label}-1-setup.png`) });
 
   await p.getByRole("button", { name: /start the draw|replay the draw/i }).click();
+  await p.locator("[data-roster-page]").waitFor();
+  hits.push(...found(`DRAW ${o.label} roster`, await readable(p)));
+  await p.screenshot({ path: join(SHOTS, `draw-${o.label}-2-roster.png`) });
+  const { rows } = await throughRoster(p);
+  check(`DRAW ${o.label}: the roster was read before the spin`, rows.length > 0, `${rows.length} rows`);
   const seen = new Set();
-  const shotAt = { 2000: "2-pool", 6000: "3-spin" };
-  for (let t = 0; t <= 12500; t += 150) {
+  const shotAt = { 1500: "3-spin-early", 5000: "3-spin-late" };
+  for (let t = 0; t <= 9500; t += 150) {
     const text = await p.evaluate(() => document.body.innerText);
     seen.add(text);
     frames += 1;
@@ -254,7 +260,7 @@ for (const o of ORIENTATIONS) {
   await p.screenshot({ path: join(SHOTS, `draw-${o.label}-4-result.png`) });
   check(`DRAW ${o.label}: the result names the winning guide`,
     /winning guide\s*#\d+/i.test(locked), (locked.match(/[^\n]*winning guide[^\n]*/i) ?? ["NOT SHOWN"])[0]);
-  check(`DRAW ${o.label}: tiles and spin were sampled`, seen.size > 5, `${seen.size} distinct frames`);
+  check(`DRAW ${o.label}: the spin was sampled`, seen.size > 3, `${seen.size} distinct frames`);
 
   // The summary the owner copies to post with the video.
   await p.context().grantPermissions(["clipboard-read", "clipboard-write"], { origin: APP });
@@ -279,6 +285,8 @@ note(`${frames} draw frames sampled; screenshots in ${SHOTS}`);
   await p.getByRole("button", { name: "Rehearsal" }).click();
   await p.getByRole("button", { name: /start rehearsal/i }).click();
   const seen = new Set();
+  seen.add(await p.evaluate(() => document.body.innerText));
+  await throughRoster(p);
   for (let t = 0; t <= 12000; t += 300) {
     seen.add(await p.evaluate(() => document.body.innerText));
     await p.waitForTimeout(300);

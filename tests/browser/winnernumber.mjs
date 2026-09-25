@@ -12,6 +12,7 @@
 
 import { chromium } from "playwright";
 import { APP, DOUBLE, CHROMIUM } from "../lib/config.mjs";
+import { throughRoster } from "../lib/harness.mjs";
 
 
 
@@ -116,7 +117,8 @@ await page.emulateMedia({ reducedMotion: "reduce" });
 const start = page.getByRole("button", { name: /draw|start|reveal/i }).first();
 if (await start.count()) {
   await start.click().catch(() => {});
-  await page.waitForTimeout(4000);
+  await throughRoster(page);
+  await page.waitForTimeout(1500);
 }
 const stage = await page.locator("body").innerText();
 check("PRESENTATION: reaches the winner", /winner/i.test(stage),

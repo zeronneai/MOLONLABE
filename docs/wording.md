@@ -40,7 +40,7 @@ Two checks, and neither depends on anybody remembering.
    alt, aria-label, placeholder, hidden menus), the confirmation email as
    sent, every owner alert, the guide PDF's own text, the CSV export and
    its filename, the stored order line, and the draw presentation sampled
-   every 150 ms through setup, pool, spin and result in 9:16 and 16:9,
+   every 150 ms through setup, roster, wheel and result in 9:16 and 16:9,
    plus the summary the owner copies. Planting "spot" in a drop's
    description turns it red on eight surfaces.
 
@@ -72,7 +72,7 @@ turned into sentences where he wrote notes:
 The early-draw clause was deleted at his instruction. Numbers from 13
 onward moved up by one.
 
-**Still to be confirmed**, shown as "Wording to be confirmed" with the
+**Still to be confirmed (seven)**, shown as "Wording to be confirmed" with the
 subject only (`RULES_PENDING_WORDING` in `lib/games/rules.ts`):
 
 | # (now) | Subject | Previous text |
@@ -83,13 +83,13 @@ subject only (`RULES_PENDING_WORDING` in `lib/games/rules.ts`):
 | 10 | Guide numbers held during checkout | Your spots are held while you check out and are released back to the game if the payment does not complete. A spot is only yours once payment succeeds. |
 | 13 | Which guides are in the drawing | One spot is drawn at random from the spots that have sold. Unsold spots are not in the drawing. |
 | 14 | Each guide's chance of winning | Every sold spot has the same chance. Someone holding five spots therefore has five times the chance of someone holding one. |
-| 15 | How the winner is picked **(held)** | The drawing uses a recorded random seed. The shop keeps that seed, the winning spot number and the number of spots sold, so the drawing can be run again from the record and checked against the result that was announced. |
 | 23 | Whether buyers' names appear anywhere public | Spots are anonymous on the public board by default. A first name and last initial appear only if you ticked the box at checkout asking for that. Your email address and phone number are never shown. |
 
-**15 is held on purpose.** The client's draft said names go on a wheel
-that is spun and picked by hand. The system picks one guide number with
-a recorded random seed and shows it on the draw presentation. Publishing
-the wheel description would describe a drawing that does not happen.
+**15 was decided by the client on 25 September** and is published
+verbatim: an electronic name wheel weighted by guides held, run at the
+shop, broadcast on Instagram and saved as a reel, with every entry shown
+before the wheel is spun. The draw presentation now does each of those
+things; see "The draw" in `docs/handover.md`.
 
 **Unedited and worth a look:** the heading "When a game closes" and
 clause 16, "A game is drawn once. A game that already has a winner cannot

@@ -133,7 +133,14 @@ the screen says so in red.
 The export is owner only.
 
 **Draw a winner.** Two ways: a full-screen presentation at a separate
-address for filming, or a plain button. Drawing twice returns the same
+address for filming, or a plain button. The presentation plays what rules
+clause 15 promises. First a roster of every buyer (first name and last
+initial, with their guide count and the total against guides sold), paged,
+with nothing left off; the Spin button does not exist until every page has
+been on screen. Then a wheel with one wedge per buyer, sized by the guides
+they hold, which stops on the winner. The draw is recorded when Spin is
+pressed, before the wheel turns, and is refused if any guide sold after the
+roster was shown. Drawing twice returns the same
 winner rather than picking a second one. Drawing before a drop sells out
 asks for confirmation and records that it was early. After the draw the
 drop's page shows the winner's name, email, phone, guide number and order number,
@@ -221,10 +228,8 @@ reached. Owner only.
 1. Confirm the two shipping prices. They are currently $10 standard and
    $20 oversize, both invented.
 2. Confirm the sales tax rate of 8.25%.
-3. Confirm the wording of rules clause 15, how the winner is picked. The
-   draft described a wheel spun by hand, which is not how the drawing
-   works, so it is held. Seven other clauses are still to be confirmed;
-   `docs/wording.md` lists them.
+3. Seven rules clauses are still to be confirmed; `docs/wording.md` lists
+   them. Clause 15, how the winner is picked, was decided on 25 September.
    Decide the early draw: the rules no longer mention one, but the
    checkout terms still say the shop may draw early and the admin still
    allows it.
@@ -249,6 +254,13 @@ reached. Owner only.
     email address his account should use, before 15 October.
 
 ### The client's attorney
+
+**Before the first filmed draw: buyers' names on a public broadcast.**
+Rules clause 15 puts every buyer's first name and last initial on screen
+in a video posted to Instagram. The privacy policy says buyer details are
+used to answer them and to contact the winner, and checkout does not
+mention the broadcast at all. Buyers who have already paid were not told.
+The privacy policy and a line at checkout need the attorney's wording.
 
 1. Review and approve the sweepstakes rules, after the client has
    answered the three questions above.

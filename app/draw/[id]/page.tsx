@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getStaff } from "@/lib/admin/staff";
+import { buildRoster } from "@/lib/draw/roster";
 import DrawStage from "@/components/draw/DrawStage";
-import { ticketsFor } from "@/lib/draw/select";
-import type { PoolMember } from "@/lib/draw/presentation";
 
 // Deliberately outside both the public (site) group and the /admin
 // segment: no site chrome, no admin shell, no navigation of any kind. The
@@ -50,30 +49,20 @@ export default async function DrawPresentation({
       : Promise.resolve({ data: null }),
     sb
       .from("game_spots")
-      .select("id, spot_number")
+      .select("spot_number, first_name, last_name, email")
       .eq("game_id", id)
       .eq("status", "sold")
       .order("spot_number"),
     sb.from("winners").select("id").eq("game_id", id).maybeSingle(),
   ]);
 
-  // One tile per sold spot, weight one. Somebody holding five spots
-  // occupies five tiles because they own five of them, not because of any
-  // arithmetic about weights.
-  //
-  // Numbers, never names. This is filmed and posted publicly, and there
-  // is no opt-in any more for a buyer to have agreed to that with — so
-  // the tiles carry the one thing that identifies a spot without
-  // identifying a person.
-  //
-  // No name is fetched at all, rather than fetched and not rendered.
-  // Nothing that gets broadcast can contain a name that never left the
-  // database.
-  const pool: PoolMember[] = (spots ?? []).map((sp) => ({
-    id: sp.id,
-    name: `Guide #${sp.spot_number}`,
-    weight: 1,
-  }));
+  // Every buyer, once, with their guide count: the roster shown before
+  // the wheel spins, and the wheel's wedges. Built here, on the server,
+  // so what reaches the screen being filmed is first name and last
+  // initial only. The email that groups a buyer's guides never leaves
+  // this function.
+  const roster = buildRoster(spots ?? []);
+  const shownGuides = (spots ?? []).map((sp) => sp.spot_number);
 
   const images = Array.isArray(item?.images) ? (item.images as unknown[]) : [];
   const prizeImage = typeof images[0] === "string" ? (images[0] as string) : null;
@@ -83,12 +72,11 @@ export default async function DrawPresentation({
       gameId={game.id}
       prizeName={item?.name ?? game.title}
       prizeImage={prizeImage}
-      closesLabel={`${pool.length} of ${game.total_spots} guides sold`}
-      pool={pool}
-      entries={pool.length}
-      entrants={new Set((spots ?? []).map((sp) => sp.spot_number)).size}
+      closesLabel={`${shownGuides.length} of ${game.total_spots} guides sold`}
+      roster={roster}
+      shownGuides={shownGuides}
       alreadyDrawn={Boolean(winner)}
-      unsoldSpots={Math.max(0, game.total_spots - pool.length)}
+      unsoldSpots={Math.max(0, game.total_spots - shownGuides.length)}
     />
   );
 }

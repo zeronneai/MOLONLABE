@@ -14,6 +14,7 @@
 
 import { chromium } from "playwright";
 import { APP, DOUBLE, CHROMIUM } from "../lib/config.mjs";
+import { throughRoster } from "../lib/harness.mjs";
 
 
 
@@ -89,7 +90,8 @@ check("PRESENTATION: the button says replay rather than draw",
   await page.getByRole("button", { name: /replay the draw/i }).count() > 0);
 
 await page.getByRole("button", { name: /replay the draw/i }).click();
-await page.waitForTimeout(6000);
+await throughRoster(page);
+await page.waitForTimeout(9500);
 
 const afterReplay = await winners();
 check("REPLAY: still exactly one winner row", afterReplay.length === 1,
@@ -111,7 +113,8 @@ check("REPLAY: and the original seed, so the record on camera is unchanged",
 for (let i = 0; i < 2; i++) {
   await page.goto(`${APP}/draw/${GAME}`, { waitUntil: "networkidle" });
   await page.getByRole("button", { name: /replay the draw/i }).click();
-  await page.waitForTimeout(5000);
+  await throughRoster(page);
+  await page.waitForTimeout(9500);
 }
 const afterThree = await winners();
 check("REPLAY: three replays later, still one unchanged row",

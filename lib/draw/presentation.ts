@@ -5,12 +5,13 @@
 // is no email, no phone number and no surname in any type in this file,
 // because the screen it feeds is going to be broadcast.
 
+import type { RosterEntry } from "./roster";
+
+/** A fake buyer for rehearsal. `weight` is how many guides they hold. */
 export type PoolMember = {
-  /** Opaque. Only used to key the tiles and to match the winner. */
   id: string;
   /** First name plus last initial. Never anything else. */
   name: string;
-  /** Tickets held. Drives how many times the name appears in the pool. */
   weight: number;
 };
 
@@ -46,15 +47,53 @@ export type Reveal = {
   total: number;
   seed: string;
   drawnAt: string;
+  /** Whose wedge the wheel stops on. */
+  winnerKey: string;
+  /** How far the wheel turns, in degrees, to stop there. */
+  rotation: number;
 };
 
 export type Orientation = "vertical" | "horizontal";
 
 // Timings. Collected here because the sequence is a piece of choreography
 // and reading it in one place is the only way to judge the pacing.
-export const POOL_FILL_MS = 1800;
-export const POOL_HOLD_MS = 1000;
+
+/**
+ * How long each roster page stays up before turning by itself. Long
+ * enough to read a page of names on a phone watching the reel, or to
+ * pause the video on it.
+ */
+export const ROSTER_PAGE_MS = 4500;
+
+/**
+ * The least time a page must be on screen to count as shown. The owner
+ * can step through faster than the automatic turn with the arrow keys,
+ * but not so fast a page never makes it into a frame worth reading.
+ */
+export const ROSTER_MIN_MS = 1500;
+
+/**
+ * Buyers per roster page, as columns x rows, measured against each frame
+ * so that a full page fits with nothing clipped. tests/browser/drawroster.mjs
+ * checks every row of every page sits inside the frame.
+ */
+export const ROSTER_LAYOUT = {
+  vertical: { cols: 2, rows: 24 },
+  horizontal: { cols: 3, rows: 10 },
+} as const;
+
+/**
+ * Up to this many buyers, the roster is one column in large type: a small
+ * drop shown as two lines of body copy in an empty frame reads as though
+ * something failed to load.
+ */
+export const ROSTER_LARGE_MAX = 12;
+
+/** The wheel's spin, start to stop. */
 export const SPIN_MS = 8000;
+
+/** Whole turns before the wheel settles. */
+export const WHEEL_TURNS = 6;
 
 /**
  * How long the post-reveal controls stay up once summoned. Long enough to
@@ -64,41 +103,14 @@ export const SPIN_MS = 8000;
 export const CONTROLS_HIDE_MS = 3800;
 
 /**
- * Name changes across the spin. With the cubic ease-out below this opens
- * at roughly 37 changes a second — fast enough to read as a blur — and
- * puts the last three changes at about 5.8s, 6.3s and 8.0s. That widening
- * final gap is the whole effect; the number is tuned for it, not picked
- * for roundness.
+ * 1 - (1-t)^4. A wheel that is spun hard and coasts: most of the turning
+ * happens early, and the last quarter-turn takes seconds, which is where
+ * everybody watching leans in.
  */
-export const SPIN_TICKS = 100;
-
-/** 1 - (1-t)^3. Front-loaded, with a long tail where the tension lives. */
-export function spinEase(t: number): number {
+export function wheelEase(t: number): number {
   const inv = 1 - t;
-  return 1 - inv * inv * inv;
+  return 1 - inv * inv * inv * inv;
 }
-
-/**
- * Ceiling on rendered pool tiles, and the single biggest lever on frame
- * rate during the spin. Past this the pool is sampled proportionally — a
- * ten-entry entrant is still ten times as likely to appear in the sample
- * as a one-entry entrant, so what the moment communicates survives the cap.
- *
- * Measured, not guessed. With the pool hidden entirely the spin holds 60fps
- * on a 6x-throttled CPU with essentially no long frames; at 280 tiles about
- * a third of frames in the first half of the spin run long. Tile count is
- * what costs, and it is nearly free to lower because `tileScale` in
- * DrawStage grows the type to compensate — 160 large names fill the frame
- * exactly as well as 280 small ones. The only thing given up is sampling
- * granularity on a very large pot, and the screen states the real total
- * rather than implying the sample is the whole thing.
- *
- * Raise this only with a frame-timing measurement in hand.
- */
-export const MAX_TILES = 160;
-
-/** Names cycled during the spin. More than this and the reel is padding. */
-export const MAX_REEL = 120;
 
 const REHEARSAL_FIRST = [
   "Marcus", "Elena", "Dante", "Priya", "Cole", "Rosa", "Aaron", "Nadia",
@@ -126,4 +138,18 @@ export function rehearsalPool(count = 64): PoolMember[] {
     members.push({ id: `rehearsal-${i}`, name: `${first} ${initial}.`, weight });
   }
   return members;
+}
+
+/**
+ * The rehearsal pool as a roster: each fake buyer holds `weight` guides,
+ * numbered in order, so a practice run looks and behaves like a real one.
+ */
+export function rehearsalRoster(count = 64): RosterEntry[] {
+  let next = 1;
+  return rehearsalPool(count)
+    .map((m) => {
+      const numbers = Array.from({ length: Math.max(1, m.weight) }, () => next++);
+      return { key: m.id, name: m.name, count: numbers.length, numbers };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 }

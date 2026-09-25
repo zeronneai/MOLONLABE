@@ -1,5 +1,11 @@
 # Testing the draw presentation on a phone
 
+**Superseded in part (25 September 2026).** The tile pool and the cycling
+name this measured were replaced by the roster and the wheel. The wheel
+was measured in `tests/browser/drawroster.mjs`: 300 wedges, 421 frames,
+none over 34 ms, median 16.7 ms, unthrottled. The phone checklist below
+still applies; the throttled numbers are for the old animation.
+
 The sandbox this was built in is not a phone, so the frame rate had to be
 measured under CPU throttling rather than on the real device. This is what
 was measured, what to look for on the actual hardware, and what counts as

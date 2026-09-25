@@ -178,3 +178,32 @@ export function artifacts() {
 
 export const has = (haystack, needle) =>
   String(haystack).toLowerCase().includes(String(needle).toLowerCase());
+
+/**
+ * The draw presentation, from the roster screen onward: reads every
+ * roster page as it goes, steps to the next one once the current one has
+ * been up long enough to count as shown, and presses Spin once the
+ * button appears (it does not exist until every page has been shown).
+ *
+ * Returns every roster row read, in order, and how many pages there were.
+ */
+export async function throughRoster(p, { spin = true } = {}) {
+  await p.locator("[data-roster-page]").waitFor({ timeout: 15000 });
+  const rows = [];
+  const pagesRead = new Set();
+  for (let guard = 0; guard < 4000; guard += 1) {
+    const pageNo = await p.locator("[data-roster-page]").getAttribute("data-roster-page");
+    if (!pagesRead.has(pageNo)) {
+      pagesRead.add(pageNo);
+      rows.push(...(await p.locator("[data-roster-entry]").allInnerTexts()));
+    }
+    const go = p.getByRole("button", { name: /spin the wheel/i });
+    if (await go.count()) {
+      if (spin) await go.click();
+      return { rows, pages: pagesRead.size };
+    }
+    await p.waitForTimeout(1600);
+    await p.keyboard.press("ArrowRight");
+  }
+  throw new Error("The roster never offered Spin.");
+}

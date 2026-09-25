@@ -11,7 +11,7 @@
 
 import { chromium } from "playwright";
 import { APP, CHROMIUM } from "../lib/config.mjs";
-import { suite, reset, insertReturning, insert, update, dump, adminPage, page as newPage } from "../lib/harness.mjs";
+import { suite, reset, insertReturning, insert, update, dump, adminPage, page as newPage, throughRoster } from "../lib/harness.mjs";
 
 const { check, note, report } = suite();
 const GAME = "55555555-5555-4555-8555-555555555555";
@@ -146,7 +146,8 @@ const browser = await chromium.launch({ executablePath: CHROMIUM });
     !(await startBtn.isDisabled()));
 
   await startBtn.click();
-  await page.waitForTimeout(6000);
+  await throughRoster(page);
+  await page.waitForTimeout(2500);
   const winners = (await dump()).winners;
   check("PRESENTATION: the draw runs and is marked early",
     winners.length === 1 && winners[0]?.drawn_early === true,

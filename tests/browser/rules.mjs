@@ -101,18 +101,21 @@ const stillOpen = [
   "held during checkout",
   "Which guides are in the drawing",
   "chance of winning",
-  "How the winner is picked",
   "names appear anywhere public",
 ];
-check("eight clauses are still marked as wording to be confirmed",
-  pendingWording.length === 8, `${pendingWording.length}`);
+check("seven clauses are still marked as wording to be confirmed",
+  pendingWording.length === 7, `${pendingWording.length}`);
 for (const topic of stillOpen) {
   check(`still open: ${topic}`,
     pendingWording.some((p) => p.toLowerCase().includes(topic.toLowerCase())),
     pendingWording.find((p) => p.toLowerCase().includes(topic.toLowerCase()))?.slice(0, 80) ?? "MISSING");
 }
-check("clause 15, how the winner is picked, is still held: nothing about a wheel",
-  /to be confirmed/i.test(clause(15)) && !/wheel|by hand|spun/i.test(text), clause(15).slice(0, 90));
+// Clause 15 as the client decided it (2026-09-25), held as a literal
+// here so an edit to the source cannot also edit the check.
+const DRAW_METHOD =
+  "The winner is selected by an electronic name wheel, weighted by the number of guides each person holds. The drawing is run at the shop, broadcast live on our Instagram, @molonlabe.fa, and saved as a reel. Before the wheel is spun, every entry is shown on screen so viewers can confirm all buyers were included. The result is recorded.";
+check("clause 15 is the client's wording, verbatim", clause(15).includes(DRAW_METHOD),
+  clause(15).slice(0, 90));
 
 // ---------------------------------------------- how the page presents it
 check("the title is the client's", /^Official Sweepstakes Rules$/m.test(text),

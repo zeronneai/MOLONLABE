@@ -1011,6 +1011,14 @@ export async function saveGame(
 export async function commitDraw(
   gameId: string,
   acknowledgedEarly = false,
+  /**
+   * The guide numbers the presentation's roster showed on camera. When
+   * given, the draw only runs if the sold guides are exactly these. The
+   * published rule says every entry is shown before the wheel spins; if a
+   * checkout completed in between, the video would not show everyone in
+   * the draw, so nothing is drawn and the owner starts again.
+   */
+  shownGuides?: number[],
 ): Promise<DrawRecord> {
   const session = await requireSession();
   if (!session) return { ok: false, error: "Not signed in." };
@@ -1067,6 +1075,21 @@ export async function commitDraw(
         "Couldn't read the guides sold for this drop. Nothing has been drawn. " +
         "Reload and try again; if it keeps happening, call Purple Roots.",
     };
+  }
+
+  if (shownGuides) {
+    const sold = (spots ?? []).map((s) => s.spot_number).sort((a, b) => a - b);
+    const shown = [...shownGuides].sort((a, b) => a - b);
+    if (sold.length !== shown.length || sold.some((n, i) => n !== shown[i])) {
+      return {
+        ok: false,
+        error:
+          `The list of buyers changed after it was shown: ${shown.length} ` +
+          `${shown.length === 1 ? "guide was" : "guides were"} on screen and ` +
+          `${sold.length} ${sold.length === 1 ? "is" : "are"} sold now. Nothing has been ` +
+          "drawn. Go back and start again so the video shows everyone.",
+      };
+    }
   }
 
   if (!spots || spots.length === 0) {

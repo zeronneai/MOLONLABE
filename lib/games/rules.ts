@@ -45,11 +45,6 @@ import { FIREARM_DISCLAIMER, PICKUP_NOTICE } from "@/lib/legal";
  * it covers and that its wording is to be confirmed. The client returned
  * wording for most of them on 2026-09-25 (applied below); these are the
  * ones still open. Their previous text is in docs/wording.md.
- *
- * `seed` is held on purpose. The client's draft said names go on a wheel
- * that is spun and picked by hand, which is not how the drawing works:
- * one guide number is picked by a recorded random seed. Publishing that
- * would describe a drawing that does not happen.
  */
 export const RULES_PENDING_WORDING = {
   fixedPool: "How many guides a drop offers and at what price, and that neither changes while it runs.",
@@ -58,7 +53,6 @@ export const RULES_PENDING_WORDING = {
   holds: "Guide numbers held during checkout, and released if the payment does not complete.",
   pool: "Which guides are in the drawing.",
   odds: "Each guide's chance of winning.",
-  seed: "How the winner is picked, and how a drawing can be checked afterwards.",
   publicNames: "Whether buyers' names appear anywhere public.",
 } as const;
 
@@ -69,6 +63,21 @@ export const RULES_PENDING_WORDING = {
  */
 export const CLIENT_ELIGIBILITY =
   "Prize eligibility and transfer are subject to all applicable federal, state, and local laws. The potential winner must be legally eligible to receive and possess the firearm in their jurisdiction. Any required firearm transfer will be completed through a Federal Firearms Licensee (FFL) in accordance with applicable law. No firearm will be transferred or delivered where prohibited by law.";
+
+/**
+ * How the winner is picked. The client's wording, 2026-09-25, verbatim.
+ *
+ * Every sentence is a behaviour of the draw presentation, and the last
+ * one before "The result is recorded" is a promise it keeps by
+ * construction: the roster screen shows every buyer and their guide count
+ * before the wheel can be spun, and the draw refuses to run if the guides
+ * sold changed after the roster was shown (components/draw/DrawStage.tsx,
+ * commitDraw). The wheel's wedges are sized by guides held, which is the
+ * weighting; the pick itself is the seeded selection, recorded before the
+ * wheel turns, and the wheel is steered to it.
+ */
+export const CLIENT_DRAW_METHOD =
+  "The winner is selected by an electronic name wheel, weighted by the number of guides each person holds. The drawing is run at the shop, broadcast live on our Instagram, @molonlabe.fa, and saved as a reel. Before the wheel is spun, every entry is shown on screen so viewers can confirm all buyers were included. The result is recorded.";
 
 /** The Drops page's description. The client's wording, 2026-09-25, verbatim. */
 export const DROPS_INTRO =
@@ -150,7 +159,7 @@ export const RULES: RuleSection[] = [
     clauses: [
       { text: "", pending: RULES_PENDING_WORDING.pool },
       { text: "", pending: RULES_PENDING_WORDING.odds },
-      { text: "", pending: RULES_PENDING_WORDING.seed },
+      { text: CLIENT_DRAW_METHOD, verbatim: true },
       {
         text: "A game is drawn once. A game that already has a winner cannot be drawn again.",
       },
