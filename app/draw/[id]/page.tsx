@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getStaff } from "@/lib/admin/staff";
 import { buildRoster } from "@/lib/draw/roster";
+import { loadSoldGuides } from "@/lib/draw/soldGuides";
 import DrawStage from "@/components/draw/DrawStage";
 
 // Deliberately outside both the public (site) group and the /admin
@@ -43,26 +44,27 @@ export default async function DrawPresentation({
     .maybeSingle();
   if (!game) notFound();
 
-  const [{ data: item }, { data: spots }, { data: winner }] = await Promise.all([
+  const [{ data: item }, sold, { data: winner }] = await Promise.all([
     game.item_id
       ? sb.from("items").select("name, images").eq("id", game.item_id).maybeSingle()
       : Promise.resolve({ data: null }),
-    sb
-      .from("game_spots")
-      .select("spot_number, first_name, last_name, email")
-      .eq("game_id", id)
-      .eq("status", "sold")
-      .order("spot_number"),
+    loadSoldGuides(sb, id),
     sb.from("winners").select("id").eq("game_id", id).maybeSingle(),
   ]);
+  if (!sold.ok) {
+    console.error("draw roster:", sold.error);
+    throw new Error("Couldn't read the buyers for this drop. Nothing has been drawn. Reload the page.");
+  }
+  const spots = sold.guides;
 
   // Every buyer, once, with their guide count: the roster shown before
   // the wheel spins, and the wheel's wedges. Built here, on the server,
   // so what reaches the screen being filmed is first name and last
-  // initial only. The email that groups a buyer's guides never leaves
-  // this function.
-  const roster = buildRoster(spots ?? []);
-  const shownGuides = (spots ?? []).map((sp) => sp.spot_number);
+  // initial only, and only for buyers who agreed to be named on the
+  // broadcast. The email that groups a buyer's guides, and the order
+  // terms that say who agreed, never leave this function.
+  const roster = buildRoster(spots);
+  const shownGuides = spots.map((sp) => sp.spot_number);
 
   const images = Array.isArray(item?.images) ? (item.images as unknown[]) : [];
   const prizeImage = typeof images[0] === "string" ? (images[0] as string) : null;

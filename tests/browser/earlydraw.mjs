@@ -1,177 +1,137 @@
-// Drawing a game that has not sold out.
+// There is no early draw.
 //
-// The owner is allowed to. The terms buyers accepted are not — they say
-// the game runs until the last spot sells — so the point of this is that
-// it cannot happen by accident, that the shortfall is named back to him
-// before he confirms, and that it is recorded rather than remembered.
+// The client's rules say a drop runs until every guide is purchased, and
+// the checkout terms say the same. The manager runs the site alone for a
+// month and must not be able to draw a drop that has not sold out, so
+// this is checked for the manager as well as the owner, on every route:
 //
-// Both routes are covered, because they ask differently on purpose: the
-// admin uses a modal, and the filmed presentation asks on the setup
-// screen instead, before anything is recorded.
+//   the admin panel      no draw control at all until the drop is full
+//   the presentation     Start is blocked; its handler, called anyway,
+//                        reaches the server and the server refuses
+//   the database         tests/db/noearlydraw.mjs, which writes a winner
+//                        directly as the manager and is refused
+//
+// And that rehearsal still works on a drop that has not sold out, because
+// that is when the owner practises.
 
-import { chromium } from "playwright";
-import { APP, CHROMIUM } from "../lib/config.mjs";
-import { suite, reset, insertReturning, insert, update, dump, adminPage, page as newPage, throughRoster } from "../lib/harness.mjs";
+import { APP } from "../lib/config.mjs";
+import {
+  adminPage, browser, dump, insertReturning, managerPage, reset, suite, throughRoster, update,
+} from "../lib/harness.mjs";
 
-const { check, note, report } = suite();
+const { check, report } = suite();
 const GAME = "55555555-5555-4555-8555-555555555555";
 const TOTAL = 5;
 const SOLD = 2; // three short, deliberately
 
-await reset();
-const order = await insertReturning("orders", {
-  order_number: "MLF-EARLY1",
-  confirmation_token: "t",
-});
-for (let n = 1; n <= SOLD; n++) {
-  await update("game_spots", `game_id=eq.${GAME}&spot_number=eq.${n}`, {
-    status: "sold",
-    order_id: order.id,
-    first_name: "Dana",
-    last_name: "Ruiz",
-    email: "dana@example.com",
-    sold_at: new Date().toISOString(),
+/** Runs a disabled button's own click handler, as a tampered client could. */
+const invoke = (locator) =>
+  locator.evaluate((el) => {
+    const key = Object.keys(el).find((k) => k.startsWith("__reactProps"));
+    el[key].onClick({ preventDefault() {}, stopPropagation() {} });
   });
-}
 
-const browser = await chromium.launch({ executablePath: CHROMIUM });
-
-// ------------------------------------------------------------- the admin
-{
-  const page = await adminPage(browser);
-  await page.goto(`${APP}/admin/games/${GAME}`, { waitUntil: "networkidle" });
-  await page.getByRole("button", { name: /draw without ceremony/i }).click();
-  await page.waitForTimeout(400);
-  await page.locator('[role="dialog"] button').first().click();
-  await page.waitForTimeout(2500);
-
-  const body = await page.locator("body").innerText();
-  const unsold = TOTAL - SOLD;
-
-  check("ADMIN: the first confirmation does not draw a short game",
-    (await dump()).winners.length === 0,
-    `${(await dump()).winners.length} winners after the first confirm`);
-  check("ADMIN: a second confirmation names the shortfall",
-    new RegExp(`${unsold}\\s*of\\s*${TOTAL}`, "i").test(body),
-    (body.match(/\d+ OF \d+ GUIDES UNSOLD[^\n]*/i) ?? ["NOT NAMED"])[0]);
-  check("ADMIN: and says why it matters, not just 'are you sure'",
-    /against the terms/i.test(body));
-
-  // Backing out must leave the game untouched.
-  await page.getByRole("button", { name: /wait for the rest/i }).click();
-  await page.waitForTimeout(600);
-  check("ADMIN: backing out draws nothing",
-    (await dump()).winners.length === 0);
-
-  // Now go through.
-  await page.getByRole("button", { name: /draw without ceremony/i }).click();
-  await page.waitForTimeout(400);
-  await page.locator('[role="dialog"] button').first().click();
-  await page.waitForTimeout(1200);
-  await page.getByRole("button", { name: /draw anyway/i }).click();
-  await page.waitForTimeout(2500);
-
-  const winners = (await dump()).winners;
-  check("ADMIN: confirming draws the game", winners.length === 1,
-    `${winners.length} winners`);
-  check("ADMIN: the winner records that it was early",
-    winners[0]?.drawn_early === true, String(winners[0]?.drawn_early));
-  check("ADMIN: and how many were unsold",
-    winners[0]?.unsold_spots === unsold,
-    `${winners[0]?.unsold_spots} recorded, ${unsold} actual`);
-  check("ADMIN: the winner still came from a SOLD spot",
-    (winners[0]?.ticket ?? 0) <= SOLD,
-    `spot ${winners[0]?.ticket} of ${SOLD} sold`);
-
-  await page.context().close();
-}
-
-// ------------------------------------------- a full game asks nothing
-{
-  await reset();
-  const o = await insertReturning("orders", {
-    order_number: "MLF-FULL1", confirmation_token: "t",
+async function sell(upTo) {
+  const order = await insertReturning("orders", {
+    order_number: `MLF-EARLY${upTo}`, confirmation_token: "t",
   });
-  for (let n = 1; n <= TOTAL; n++) {
+  for (let n = 1; n <= upTo; n++) {
     await update("game_spots", `game_id=eq.${GAME}&spot_number=eq.${n}`, {
-      status: "sold", order_id: o.id, first_name: "Alma", last_name: "Castillo",
-      email: "alma@example.com", sold_at: new Date().toISOString(),
-    });
-  }
-  const page = await adminPage(browser);
-  await page.goto(`${APP}/admin/games/${GAME}`, { waitUntil: "networkidle" });
-  await page.getByRole("button", { name: /draw without ceremony/i }).click();
-  await page.waitForTimeout(400);
-  await page.locator('[role="dialog"] button').first().click();
-  await page.waitForTimeout(2500);
-
-  const winners = (await dump()).winners;
-  check("FULL GAME: draws on one confirmation, no extra question",
-    winners.length === 1, `${winners.length} winners`);
-  check("FULL GAME: is not marked early",
-    winners[0]?.drawn_early === false, String(winners[0]?.drawn_early));
-  check("FULL GAME: records zero unsold",
-    (winners[0]?.unsold_spots ?? 0) === 0, String(winners[0]?.unsold_spots));
-  await page.context().close();
-}
-
-// -------------------------------------- the filmed presentation screen
-{
-  await reset();
-  const o = await insertReturning("orders", {
-    order_number: "MLF-EARLY2", confirmation_token: "t",
-  });
-  for (let n = 1; n <= SOLD; n++) {
-    await update("game_spots", `game_id=eq.${GAME}&spot_number=eq.${n}`, {
-      status: "sold", order_id: o.id, first_name: "Dana", last_name: "Ruiz",
+      status: "sold", order_id: order.id, first_name: "Dana", last_name: "Ruiz",
       email: "dana@example.com", sold_at: new Date().toISOString(),
     });
   }
-  const page = await adminPage(browser, { reducedMotion: "reduce" });
-  await page.goto(`${APP}/draw/${GAME}`, { waitUntil: "networkidle" });
-  const setup = await page.locator("body").innerText();
+}
 
-  check("PRESENTATION: the shortfall is on the SETUP screen, before filming",
-    /\bunsold\b/i.test(setup) && /terms/i.test(setup) && /\b3\b/.test(setup),
+const b = await browser();
+
+for (const [who, open] of [["OWNER", adminPage], ["MANAGER", managerPage]]) {
+  await reset();
+  await sell(SOLD);
+
+  // ----------------------------------------------------------- the admin
+  const p = await open(b, { viewport: { width: 1280, height: 1200 } });
+  await p.goto(`${APP}/admin/games/${GAME}`, { waitUntil: "networkidle" });
+  const panel = await p.locator("body").innerText();
+  check(`${who} ADMIN: no draw button on a drop that has not sold out`,
+    (await p.getByRole("button", { name: /draw without ceremony|draw anyway|^draw$/i }).count()) === 0);
+  check(`${who} ADMIN: says how many are sold and when it will be drawn`,
+    new RegExp(`${SOLD} of ${TOTAL} guides sold`, "i").test(panel) && /drawn once\s+every guide sells/i.test(panel),
+    (panel.match(/[^\n]*guides sold[^\n]*/i) ?? ["NOT SHOWN"])[0].slice(0, 100));
+  check(`${who} ADMIN: nothing on the page offers an early draw`,
+    !/draw (anyway|short|early)|draw before/i.test(panel),
+    (panel.match(/[^\n]*draw (anyway|short|early)[^\n]*/i) ?? ["clean"])[0].slice(0, 80));
+  check(`${who} ADMIN: the presentation is offered for rehearsal`,
+    (await p.getByRole("link", { name: /rehearse the presentation/i }).count()) === 1);
+
+  // ---------------------------------------------------- the presentation
+  await p.goto(`${APP}/draw/${GAME}`, { waitUntil: "networkidle" });
+  const setup = await p.locator("body").innerText();
+  const start = p.locator(".draw-start");
+  check(`${who} PRESENTATION: Start is blocked on a drop that has not sold out`,
+    await start.isDisabled(), await start.innerText());
+  check(`${who} PRESENTATION: says why, before anything is filmed`,
+    /3 of\s*5 guides are\s+still unsold/i.test(setup.replace(/\s+/g, " ")) || /still unsold/i.test(setup),
     (setup.match(/[^\n]*unsold[^\n]*/i) ?? ["NOT SHOWN"])[0].slice(0, 100));
+  check(`${who} PRESENTATION: no box to tick past it`,
+    (await p.locator("input[type=checkbox]").count()) === 0);
 
-  const startBtn = page.locator(".draw-start");
-  check("PRESENTATION: the start control is blocked until acknowledged",
-    await startBtn.isDisabled(),
-    await startBtn.innerText());
+  // A tampered client runs Start's handler anyway. The roster comes up
+  // (it is only a list), and the spin asks the server, which refuses.
+  await invoke(start);
+  await throughRoster(p);
+  await p.waitForTimeout(2500);
+  const refused = await p.locator("body").innerText();
+  check(`${who} SERVER: refuses the draw and says why`,
+    new RegExp(`${SOLD} of ${TOTAL} guides sold`, "i").test(refused) && /nothing has been drawn/i.test(refused),
+    (refused.match(/[^\n]*guides sold[^\n]*/i) ?? ["NO MESSAGE"])[0].slice(0, 110));
+  check(`${who} SERVER: and no winner was written`, (await dump()).winners.length === 0,
+    `${(await dump()).winners.length} winners`);
 
-  await page.locator(".draw-note-ack input[type=checkbox]").check();
-  await page.waitForTimeout(300);
-  check("PRESENTATION: ticking the box unblocks it",
-    !(await startBtn.isDisabled()));
-
-  await startBtn.click();
-  await throughRoster(page);
-  await page.waitForTimeout(2500);
-  const winners = (await dump()).winners;
-  check("PRESENTATION: the draw runs and is marked early",
-    winners.length === 1 && winners[0]?.drawn_early === true,
-    `${winners.length} winners, early=${winners[0]?.drawn_early}`);
-
-  // The filmed screen must not put the terms dialog mid-take.
-  const stage = await page.locator("body").innerText();
-  check("PRESENTATION: no confirmation dialog appeared during the draw",
-    (await page.locator('[role="dialog"]').count()) === 0);
-  note(`winning spot ${winners[0]?.ticket}, ${winners[0]?.unsold_spots} unsold`);
-
-  await page.context().close();
+  // Rehearsal is still open on a short drop.
+  await p.goto(`${APP}/draw/${GAME}`, { waitUntil: "networkidle" });
+  await p.getByRole("button", { name: "Rehearsal" }).click();
+  check(`${who} REHEARSAL: can be started on a drop that has not sold out`,
+    !(await p.locator(".draw-start").isDisabled()));
+  await p.locator(".draw-start").click();
+  await throughRoster(p);
+  await p.waitForTimeout(9500);
+  check(`${who} REHEARSAL: runs to a result and records nothing`,
+    /winning guide/i.test(await p.locator("body").innerText()) && (await dump()).winners.length === 0);
+  await p.context().close();
 }
 
-// -------------------------------------- it is shown publicly afterwards
+// ------------------------------------------ a full drop draws as before
 {
-  const page = await newPage(browser);
-  await page.goto(`${APP}/games`, { waitUntil: "networkidle" });
-  const games = await page.locator("body").innerText();
-  check("PUBLIC: a game drawn short says so on its card",
-    /drawn with \d+ unsold/i.test(games),
-    (games.match(/drawn with \d+ unsold/i) ?? ["NOT SHOWN"])[0]);
-  await page.context().close();
+  await reset();
+  await sell(TOTAL);
+  const p = await managerPage(b, { viewport: { width: 1280, height: 1200 } });
+  await p.goto(`${APP}/admin/games/${GAME}`, { waitUntil: "networkidle" });
+  await p.getByRole("button", { name: /draw without ceremony/i }).click();
+  await p.waitForTimeout(400);
+  await p.locator('[role="dialog"] button').first().click();
+  await p.waitForTimeout(2500);
+  const winners = (await dump()).winners;
+  check("FULL DROP: the manager draws it on one confirmation", winners.length === 1,
+    `${winners.length} winners`);
+  check("FULL DROP: recorded as not early, nothing unsold",
+    winners[0]?.drawn_early === false && (winners[0]?.unsold_spots ?? 0) === 0,
+    `early=${winners[0]?.drawn_early}, unsold=${winners[0]?.unsold_spots}`);
+  await p.context().close();
 }
 
-await browser.close();
+// --------------------------------------------- the terms a buyer agrees to
+{
+  await reset();
+  const p = await (await b.newContext()).newPage();
+  await p.goto(`${APP}/featured`, { waitUntil: "networkidle" });
+  const buy = await p.locator("body").innerText();
+  check("TERMS: the buy control no longer says the shop may draw early",
+    !/draw earlier|at its discretion/i.test(buy));
+  check("TERMS: it says the winner is drawn once the last guide sells",
+    /drawn once the last guide sells\./i.test(buy));
+  await p.context().close();
+}
+
+await b.close();
 report();

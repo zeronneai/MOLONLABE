@@ -16,14 +16,40 @@
 //   - the wheel stops with the pointer inside the recorded winner's wedge,
 //     and says the recorded winner's name
 //   - a replay stops in the same place
-//   - if a guide sells after the roster was shown, nothing is drawn
+//   - if the sold guides change after the roster was shown, nothing is drawn
+//   - a buyer who has not agreed to be named on the broadcast (everyone
+//     who paid before checkout asked) is on the roster and the wheel by
+//     guide number, never by name, including when they win
 
+import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { APP, ARTIFACTS } from "../lib/config.mjs";
-import { adminPage, browser, dump, insert, reset, suite, update } from "../lib/harness.mjs";
+import { adminPage, browser, dump, insert, reset, suite, throughRoster, update } from "../lib/harness.mjs";
 
 const { check, note, report } = suite();
+
+// The client's acknowledgement, verbatim, as stored on an order placed
+// since checkout asked. An order without it is treated as not agreed.
+const BROADCAST =
+  "The drawing is broadcast live on Instagram and saved as a reel. Your first name and last initial will appear on screen.";
+const TERMS_BEFORE =
+  "This drop runs until every guide is sold. There is no end date and no countdown. All guide purchases are final. No refunds, no exchanges, no transfers. The winner is drawn once the last guide sells. The shop may draw earlier at its discretion; if it does, the drop says so.";
+const TERMS_NOW =
+  "This drop runs until every guide is sold. There is no end date and no countdown. All guide purchases are final. No refunds, no exchanges, no transfers. The winner is drawn once the last guide sells. " + BROADCAST;
+
+/** An order, with or without the acknowledgement. Returns its id. */
+let orderNo = 0;
+async function order(agreed) {
+  const id = randomUUID();
+  orderNo += 1;
+  await insert("orders", {
+    id, order_number: `MLF-R${orderNo}`, confirmation_token: `t${orderNo}`, status: "paid",
+    game_terms_accepted_at: new Date().toISOString(),
+    game_terms_text: agreed ? TERMS_NOW : TERMS_BEFORE,
+  });
+  return id;
+}
 const SHOTS = join(ARTIFACTS, "drawroster");
 mkdirSync(SHOTS, { recursive: true });
 
@@ -42,11 +68,21 @@ for (let i = 0; i < 300; i += 1) {
   const first = FIRST[i % FIRST.length];
   const last = `${String.fromCharCode(65 + (i % 7))}zzsurname${i}`;
   const numbers = Array.from({ length: count }, () => ++n);
-  buyers.push({ email: `buyer${i}@example.com`, first, last, numbers });
+  // Twelve of them paid before checkout asked about the broadcast.
+  const agreed = i % 25 !== 3;
+  buyers.push({ email: `buyer${i}@example.com`, first, last, numbers, agreed,
+    orders: numbers.map(() => null) });
 }
 // One buyer who came back and bought again in a second order: one line.
 buyers[5].numbers.push(++n, ++n);
+buyers[5].orders.push(null, null);
 const TOTAL = n;
+for (const buyer of buyers) {
+  const id = await order(buyer.agreed);
+  buyer.orders = buyer.orders.map(() => id);
+}
+const UNNAMED = buyers.filter((x) => !x.agreed).length;
+const label = (x) => (x.agreed ? `${x.first} ${x.last[0]}.` : `Holder of guide #${Math.min(...x.numbers)}`);
 
 await insert("games", {
   id: BIG, title: "Big Drop", item_id: null, description: null, status: "full",
@@ -54,16 +90,16 @@ await insert("games", {
   guide_why: "x".repeat(60), guide_care: "x".repeat(60), guide_pairs: "x".repeat(60),
   created_at: new Date().toISOString(),
 });
-const rows = buyers.flatMap((b) => b.numbers.map((num) => ({
-  game_id: BIG, spot_number: num, status: "sold", order_id: null,
+const rows = buyers.flatMap((b) => b.numbers.map((num, k) => ({
+  game_id: BIG, spot_number: num, status: "sold", order_id: b.orders[k],
   first_name: b.first, last_name: b.last, email: b.email, phone: null,
   held_at: null, sold_at: new Date().toISOString(),
 })));
 for (let i = 0; i < rows.length; i += 200) await insert("game_spots", rows.slice(i, i + 200));
 const expected = buyers
-  .map((b) => `${b.first} ${b.last[0]}.|${b.numbers.length}`)
+  .map((b) => `${label(b)}|${b.numbers.length}`)
   .sort();
-note(`${buyers.length} buyers, ${TOTAL} guides`);
+note(`${buyers.length} buyers, ${TOTAL} guides, ${UNNAMED} not named`);
 
 const b = await browser();
 
@@ -146,6 +182,13 @@ async function stopped(p) {
 
 // =================================================== 9:16, the real draw
 const p = await adminPage(b, { viewport: { width: 540, height: 960 } });
+
+// The owner is told beforehand how many buyers will not be named.
+await p.goto(`${APP}/admin/games/${BIG}`, { waitUntil: "networkidle" });
+const panel = (await p.locator("[data-unnamed-buyers]").innerText().catch(() => "")).replace(/\s+/g, " ");
+check("the drop page says how many buyers will appear by guide number",
+  new RegExp(`^${UNNAMED} buyers have not agreed to be named`).test(panel), panel || "NOT SHOWN");
+
 await p.goto(`${APP}/draw/${BIG}`, { waitUntil: "networkidle" });
 const html = await p.content();
 check("no buyer's email reaches the page", !html.includes("@example.com"));
@@ -159,6 +202,9 @@ check("pressing Space on the first page draws nothing", (await dump()).winners.l
 const vertical = await readRoster(p, "9x16");
 const footV = await p.locator("[data-roster-total]").innerText();
 judge("9:16", vertical, footV);
+const unnamedNote = await p.locator("[data-roster-unnamed]").innerText().catch(() => "");
+check("the roster says why some buyers are shown by guide number",
+  new RegExp(`${UNNAMED} buyers are shown by\\s+guide number`, "i").test(unnamedNote), unnamedNote || "NOT SHOWN");
 
 const measure = p.evaluate(() => new Promise((resolve) => {
   const deltas = [];
@@ -188,9 +234,9 @@ check("one wedge per buyer", s1.wedges === buyers.length, `${s1.wedges}`);
 check("the wheel stops with the pointer inside the winner's wedge",
   s1.underIsWinner, `under ${s1.under}, ${s1.margin.toFixed(2)}° from its edge`);
 check("well inside it, not on a line", s1.margin > 0.05, `${s1.margin.toFixed(3)}°`);
-check("the name on screen is the recorded winner",
-  s1.readout === winner?.display_name && s1.readout === `${holder.first} ${holder.last[0]}.`,
-  `${s1.readout} / recorded ${winner?.display_name}`);
+check("the name on screen is the recorded winner, as the roster shows them",
+  s1.readout === label(holder) && (!holder.agreed || s1.readout === winner?.display_name),
+  `${s1.readout} / recorded ${winner?.display_name}${holder.agreed ? "" : " (not named)"}`);
 const long = deltas.filter((x) => x > 34).length;
 check("the spin holds its frame rate with 300 wedges",
   long / deltas.length < 0.1, `${long} of ${deltas.length} frames over 34 ms`);
@@ -228,11 +274,12 @@ check("and stops exactly where the take did", s2.rot === s1.rot && s2.readout ==
     "Evangelina", "Fitzgerald", "Genevieve", "Leopoldina", "Montgomery", "Ximena"];
   let num = 0;
   const small = [];
+  const agreedOrder = await order(true);
   for (const [i, first] of names.entries()) {
     const count = i < 8 ? 2 : 1;
     for (let k = 0; k < count; k += 1) {
       num += 1;
-      small.push({ game_id: SMALL, spot_number: num, status: "sold", order_id: null,
+      small.push({ game_id: SMALL, spot_number: num, status: "sold", order_id: agreedOrder,
         first_name: first, last_name: "Quintanilla", email: `s${i}@example.com`, phone: null,
         held_at: null, sold_at: new Date().toISOString() });
     }
@@ -255,34 +302,72 @@ check("and stops exactly where the take did", s2.rot === s1.rot && s2.readout ==
   }
 }
 
-// ============================== a guide sells after the roster was shown
+// ========================= the sold guides change after the roster was shown
+// With no early draw a full drop cannot sell another guide, but a sale can
+// still be taken back (a refund, a correction) while the roster is up.
 {
   await reset();
   const GAME = "55555555-5555-4555-8555-555555555555";
-  for (const num of [1, 2, 3]) {
+  const agreedOrder = await order(true);
+  for (const num of [1, 2, 3, 4, 5]) {
     await update("game_spots", `game_id=eq.${GAME}&spot_number=eq.${num}`, {
-      status: "sold", first_name: "Ana", last_name: `Lopez${num}`, email: `a${num}@example.com`,
-      sold_at: new Date().toISOString(),
+      status: "sold", order_id: agreedOrder, first_name: "Ana", last_name: `Lopez${num}`,
+      email: `a${num}@example.com`, sold_at: new Date().toISOString(),
     });
   }
   const q = await adminPage(b, { viewport: { width: 540, height: 960 } });
   await q.goto(`${APP}/draw/${GAME}`, { waitUntil: "networkidle" });
-  await q.locator(".draw-note-ack input[type=checkbox]").check();
   await q.getByRole("button", { name: /start the draw/i }).click();
   await q.locator("[data-roster-page]").waitFor();
-  // A checkout completes while the roster is on screen.
-  await update("game_spots", `game_id=eq.${GAME}&spot_number=eq.4`, {
-    status: "sold", first_name: "Late", last_name: "Buyer", email: "late@example.com",
-    sold_at: new Date().toISOString(),
+  await update("game_spots", `game_id=eq.${GAME}&spot_number=eq.5`, {
+    status: "open", order_id: null, first_name: null, last_name: null, email: null, sold_at: null,
   });
   await q.waitForTimeout(1700);
   await q.getByRole("button", { name: /spin the wheel/i }).click();
   await q.waitForTimeout(1500);
   const text = await q.locator("body").innerText();
-  check("a guide sold after the roster was shown: nothing is drawn",
+  check("the sold guides changed after the roster was shown: nothing is drawn",
     (await dump()).winners.length === 0, `${(await dump()).winners.length} winners`);
   check("and the screen says why",
     /changed after it was shown/i.test(text), (text.match(/[^\n]*changed[^\n]*/i) ?? ["NOTHING SAID"])[0]);
+  await q.context().close();
+}
+
+// ================ nobody agreed to be named: the winner is not named either
+{
+  await reset();
+  const GAME = "55555555-5555-4555-8555-555555555555";
+  const before = await order(false);
+  const people = [["Dana", "Ruiz"], ["Dana", "Ruiz"], ["Marisol", "Trevino"], ["Marisol", "Trevino"], ["Octavio", "Bustamante"]];
+  for (const [i, [first, last]] of people.entries()) {
+    await update("game_spots", `game_id=eq.${GAME}&spot_number=eq.${i + 1}`, {
+      status: "sold", order_id: before, first_name: first, last_name: last,
+      email: `${first.toLowerCase()}@example.com`, sold_at: new Date().toISOString(),
+    });
+  }
+  const q = await adminPage(b, { viewport: { width: 540, height: 960 } });
+  await q.goto(`${APP}/draw/${GAME}`, { waitUntil: "networkidle" });
+  const html = await q.content();
+  check("NOT AGREED: no buyer's name reaches the page at all",
+    !/Dana|Ruiz|Marisol|Trevino|Octavio|Bustamante/.test(html),
+    (html.match(/.{0,30}(Dana|Marisol|Octavio).{0,30}/) ?? ["clean"])[0]);
+  await q.getByRole("button", { name: /start the draw/i }).click();
+  const { rows: seen } = await throughRoster(q, { spin: false });
+  check("NOT AGREED: every buyer is still on the roster, by guide number",
+    seen.length === 3 && seen.every((r) => /Holder of guide #\d+/.test(r)),
+    seen.map((r) => r.replace(/\s+/g, " ")).join(" | "));
+  await q.getByRole("button", { name: /spin the wheel/i }).click();
+  await q.waitForTimeout(9500);
+  const readout = await q.locator("[data-readout]").innerText();
+  const w = (await dump()).winners[0];
+  check("NOT AGREED: the winner is revealed by guide number, not by name",
+    /^Holder of guide #\d+$/.test(readout.trim()) && !/Dana|Marisol|Octavio/.test(await q.locator("body").innerText()),
+    `${readout} (guide #${w?.ticket})`);
+  const wedgeLabels = await q.locator(".draw-wheel svg text").allTextContents();
+  check("NOT AGREED: the wheel labels them by guide number, short enough to read",
+    wedgeLabels.length === 3 && wedgeLabels.every((t) => /^#\d+$/.test(t.trim())), wedgeLabels.join(", "));
+  await q.screenshot({ path: join(SHOTS, "not-agreed-result.png") });
+  await q.context().close();
 }
 
 await b.close();

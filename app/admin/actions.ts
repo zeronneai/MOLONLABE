@@ -1002,15 +1002,14 @@ export async function saveGame(
  * without touching the result.
  */
 /**
- * `acknowledgedEarly` is the owner having read the shortfall and said to
- * go anyway. It is not a convenience flag: the terms buyers accepted say
- * the game runs until the last spot sells, so drawing at 12 of 100 goes
- * against what they agreed to. The count is named back to him before he
- * confirms, and recorded on the winner afterwards.
+ * There is no early draw. The rules say a drop runs until every guide is
+ * purchased, and so do the checkout terms, so a drop with any guide
+ * unsold is refused here, for the owner and the manager alike. The
+ * database refuses it too (refuse_early_draw, on winners), which is what
+ * holds for anyone calling it without this action.
  */
 export async function commitDraw(
   gameId: string,
-  acknowledgedEarly = false,
   /**
    * The guide numbers the presentation's roster showed on camera. When
    * given, the draw only runs if the sold guides are exactly these. The
@@ -1118,25 +1117,29 @@ export async function commitDraw(
     };
   }
 
-  // How short the game is. Read from the game rather than counting rows,
-  // because total_spots is fixed at creation and cannot drift.
-  const { data: gameRow } = await sb
+  // Read from the game rather than counting rows, because total_spots is
+  // fixed at creation and cannot drift. If it cannot be read, nothing is
+  // drawn: guessing the total is how a short drop would get through.
+  const { data: gameRow, error: gameError } = await sb
     .from("games")
     .select("total_spots, title, item_id")
     .eq("id", gameId)
     .maybeSingle();
-  const totalSpots = gameRow?.total_spots ?? spots.length;
-  const unsold = Math.max(0, totalSpots - spots.length);
-
-  if (unsold > 0 && !acknowledgedEarly) {
+  if (gameError || !gameRow) {
+    if (gameError) logDbError("commitDraw game", gameError);
     return {
       ok: false,
-      needsEarlyConfirmation: true,
-      unsold,
-      totalSpots,
+      error: "Couldn't read this drop, so nothing has been drawn. Reload and try again.",
+    };
+  }
+  const totalSpots = gameRow.total_spots;
+  const unsold = Math.max(0, totalSpots - spots.length);
+  if (unsold > 0) {
+    return {
+      ok: false,
       error:
-        `This drop has ${unsold} of ${totalSpots} guides unsold. Drawing now ` +
-        "goes against the terms buyers agreed to. Continue?",
+        `This drop has ${spots.length} of ${totalSpots} guides sold. A drop is ` +
+        "drawn once every guide sells. Nothing has been drawn.",
     };
   }
 
@@ -1215,8 +1218,8 @@ export async function commitDraw(
       ticket_index: result.ticket,
       pool,
       entry_total: result.total,
-      drawn_early: unsold > 0,
-      unsold_spots: unsold,
+      drawn_early: false,
+      unsold_spots: 0,
     })
     .select("drawn_at")
     .maybeSingle();
@@ -1252,7 +1255,6 @@ export async function commitDraw(
       ticketIndex: result.ticket,
       total: result.total,
       seed: result.seed,
-      ...(unsold > 0 ? { drawnEarly: true, unsoldSpots: unsold } : {}),
     } as Json,
   });
 
@@ -1309,11 +1311,8 @@ export async function commitDraw(
  * quietly closing and nothing happening — on the one day he is about to
  * go live, that is the worst possible failure mode.
  */
-export async function drawWinner(
-  gameId: string,
-  acknowledgedEarly = false,
-): Promise<DrawRecord> {
-  const record = await commitDraw(gameId, acknowledgedEarly);
+export async function drawWinner(gameId: string): Promise<DrawRecord> {
+  const record = await commitDraw(gameId);
   if (!record.ok) console.error("drawWinner:", record.error);
   return record;
 }

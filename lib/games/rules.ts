@@ -12,17 +12,21 @@
 // were written against the code, not against a template of what rules
 // usually say, and each one can be pointed at its implementation:
 //
-//   fixed spots, fixed price   games.total_spots, games.spot_price_cents
+//   fixed count, fixed price   games.total_spots, games.spot_price_cents,
+//                              locked by refuse_pool_change
 //   sales tax                  lib/cart/pricing.ts, settings.commerce
 //   final sale                 lib/games/terms.ts, lib/legal.ts
 //   no per-order limit         removed; the bound is what is left
 //   numbers assigned           claim_game_spots, lowest open first
-//   spots held then released   claim_game_spots / release_game_spots
+//   one drop per cart, merged  lib/cart/store.tsx addSpots, lib/cart/pricing.ts
+//   held then released         claim_game_spots / release_game_spots, and
+//                              stale holds after 15 minutes
 //   runs until it fills        games.status open -> full
-//   early drawing              winners.drawn_early, winners.unsold_spots
-//   one entry per sold spot    lib/draw/select.ts, weight 1 per spot
-//   recorded seed              winners.seed / ticket / entry_total / pool
-//   names on the board         game_spots.show_name, opt-in, off by default
+//   no early draw              commitDraw, and refuse_early_draw on winners
+//   one entry per sold guide   lib/draw/select.ts, weight 1 per guide
+//   the wheel and the roster   components/draw/DrawStage.tsx, lib/draw/roster.ts
+//   names on the broadcast     BROADCAST_NOTICE at checkout, stored on the
+//                              order; no acknowledgement, no name
 //   winner shown redacted      redactName in lib/draw/select.ts
 //
 // Nothing here promises a thing that is not built. There is no clause
@@ -38,22 +42,34 @@
 import { FIREARM_DISCLAIMER, PICKUP_NOTICE } from "@/lib/legal";
 
 /**
- * Clauses whose wording is still being settled.
+ * Clauses drafted by the agency on 2026-09-26 from how the system
+ * actually behaves, for the client to confirm as one set.
  *
- * Since the terminology ruling, a clause that used one of the old words
- * ("spot", "ticket") is not reworded here. It shows a line saying what
- * it covers and that its wording is to be confirmed. The client returned
- * wording for most of them on 2026-09-25 (applied below); these are the
- * ones still open. Their previous text is in docs/wording.md.
+ * Each was a placeholder since the terminology ruling. They describe
+ * mechanics, not legal judgments, and each can be pointed at the code
+ * listed at the top of this file. They are published with a "Wording to
+ * be confirmed" marker until the client approves them; approving one
+ * means removing `pending` from its clause below, nothing else.
+ *
+ * 12 and 13 are written to agree with the client's clause 14 (the wheel):
+ * every sold guide is one entry, and a person's share of the wheel is the
+ * number of guides they hold.
  */
-export const RULES_PENDING_WORDING = {
-  fixedPool: "How many guides a drop offers and at what price, and that neither changes while it runs.",
-  numbering: "How guide numbers are assigned.",
-  cartMerge: "Adding more guides to a cart that already holds some from the same drop.",
-  holds: "Guide numbers held during checkout, and released if the payment does not complete.",
-  pool: "Which guides are in the drawing.",
-  odds: "Each guide's chance of winning.",
-  publicNames: "Whether buyers' names appear anywhere public.",
+export const RULES_DRAFTS = {
+  fixedPool:
+    "Each drop offers a set number of guides at a set price per guide. Both are fixed when the drop is created and do not change while it runs.",
+  numbering:
+    "Each guide in a drop has a number, from 1 up to the number of guides offered. Numbers are assigned automatically at checkout from those still available, lowest first. A buyer cannot choose them, and a buyer who gets several may not get consecutive numbers.",
+  cartMerge:
+    "Adding more guides from the same drop to a cart adds them to the guides already there, and the cart shows the running total before payment. A cart holds guides from one drop at a time. If fewer guides are left than the cart holds, the cart is reduced to the number left before payment.",
+  holds:
+    "Guide numbers are set aside when the buyer submits payment and are held while the payment is processed. If the payment does not go through, they are released at once. If the payment is interrupted, they are released after 15 minutes. A guide belongs to the buyer only once payment succeeds.",
+  pool:
+    "A drop is drawn only after every guide has been sold, and every guide sold is in the drawing.",
+  odds:
+    "Each guide is one entry, and every entry has the same chance of winning. A person holding five guides has five times the chance of a person holding one, and five times the share of the wheel.",
+  publicNames:
+    "This website shows how many guides a drop has left, never who bought them. During the drawing, each buyer's first name and last initial appear on screen, as stated at checkout. A buyer who bought before checkout stated this appears by guide number instead. Email addresses, phone numbers and full surnames are never shown.",
 } as const;
 
 /**
@@ -88,8 +104,8 @@ export const NO_REFUNDS = "No refunds or exchanges.";
 
 export type RuleClause = {
   text: string;
-  /** Rendered inline, marked as wording still to be confirmed. */
-  pending?: string;
+  /** A draft, published with a "Wording to be confirmed" marker. */
+  pending?: boolean;
   /** Set for wording that is quoted exactly and never reflowed or edited. */
   verbatim?: boolean;
   /** Set it apart at display size rather than as body copy. */
@@ -125,16 +141,15 @@ export const RULES: RuleSection[] = [
     heading: "Who can take part",
     clauses: [
       { text: "You must be 21 years or older to buy a guide and to win." },
-      {
-        text: "You must be able to receive a firearm lawfully under federal, state and local law. If you cannot, you cannot take part.",
-      },
+      // The lawful-possession clause that stood here was cut on 2026-09-26
+      // at the client's instruction: it repeated this paragraph.
       { text: CLIENT_ELIGIBILITY, verbatim: true },
     ],
   },
   {
     heading: "How guides work",
     clauses: [
-      { text: "", pending: RULES_PENDING_WORDING.fixedPool },
+      { text: RULES_DRAFTS.fixedPool, pending: true },
       { text: `All purchases are subject to Texas sales tax at ${SALES_TAX_DISPLAY}.` },
       { text: NO_REFUNDS, prominent: true },
       {
@@ -142,14 +157,14 @@ export const RULES: RuleSection[] = [
         // never more than the drop's total.
         text: "A person may buy as many guides as they want, up to the total offered in that drop.",
       },
-      { text: "", pending: RULES_PENDING_WORDING.numbering },
-      { text: "", pending: RULES_PENDING_WORDING.cartMerge },
-      { text: "", pending: RULES_PENDING_WORDING.holds },
+      { text: RULES_DRAFTS.numbering, pending: true },
+      { text: RULES_DRAFTS.cartMerge, pending: true },
+      { text: RULES_DRAFTS.holds, pending: true },
       { text: "Entry requires purchasing a guide. There are no free entries." },
     ],
   },
   {
-    heading: "When a game closes",
+    heading: "When a drop closes",
     clauses: [
       { text: "A drop runs until every guide is purchased." },
     ],
@@ -157,11 +172,11 @@ export const RULES: RuleSection[] = [
   {
     heading: "How the winner is chosen",
     clauses: [
-      { text: "", pending: RULES_PENDING_WORDING.pool },
-      { text: "", pending: RULES_PENDING_WORDING.odds },
+      { text: RULES_DRAFTS.pool, pending: true },
+      { text: RULES_DRAFTS.odds, pending: true },
       { text: CLIENT_DRAW_METHOD, verbatim: true },
       {
-        text: "A game is drawn once. A game that already has a winner cannot be drawn again.",
+        text: "A drop is drawn once. A drop that already has a winner cannot be drawn again.",
       },
     ],
   },
@@ -199,7 +214,7 @@ export const RULES: RuleSection[] = [
   {
     heading: "Your name and details",
     clauses: [
-      { text: "", pending: RULES_PENDING_WORDING.publicNames },
+      { text: RULES_DRAFTS.publicNames, pending: true },
       {
         text: "A winner is published the same way: first name and last initial, nothing more.",
       },

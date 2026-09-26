@@ -48,7 +48,7 @@ export default async function Featured() {
       <div className="pl-page order-2 flex flex-col justify-center py-16 pr-8 lg:order-1 lg:py-24">
         <Reveal>
           <p className="label">
-            {awaiting ? "Sold out — awaiting the draw" : "Featured drop"}
+            {awaiting ? "Sold out, awaiting the draw" : "Featured drop"}
           </p>
           <h2 className="display mt-6 text-[clamp(2.25rem,4.5vw,4.5rem)]">
             {name.toUpperCase()}

@@ -59,7 +59,7 @@ export default function CartView() {
             <ul className="mt-3 space-y-1 text-sm text-muted">
               {cart.rejected.map((r) => (
                 <li key={r.key}>
-                  <span className="text-bone">{r.name ?? "An item"}</span> —{" "}
+                  <span className="text-bone">{r.name ?? "An item"}</span>:{" "}
                   {r.reason}
                 </li>
               ))}

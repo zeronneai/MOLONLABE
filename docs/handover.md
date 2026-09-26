@@ -134,15 +134,20 @@ The export is owner only.
 
 **Draw a winner.** Two ways: a full-screen presentation at a separate
 address for filming, or a plain button. The presentation plays what rules
-clause 15 promises. First a roster of every buyer (first name and last
+clause 14 promises. First a roster of every buyer (first name and last
 initial, with their guide count and the total against guides sold), paged,
 with nothing left off; the Spin button does not exist until every page has
 been on screen. Then a wheel with one wedge per buyer, sized by the guides
 they hold, which stops on the winner. The draw is recorded when Spin is
 pressed, before the wheel turns, and is refused if any guide sold after the
 roster was shown. Drawing twice returns the same
-winner rather than picking a second one. Drawing before a drop sells out
-asks for confirmation and records that it was early. After the draw the
+winner rather than picking a second one. There is no early draw: until
+every guide is sold the drop page offers only a rehearsal of the
+presentation, the server refuses a draw, and the database refuses to
+record a winner, for the owner and the manager alike. Buyers who have not
+agreed at checkout to be named on the broadcast (everyone who paid before
+26 September) are on the roster and the wheel by guide number, and the
+drop page says how many there are before filming. After the draw the
 drop's page shows the winner's name, email, phone, guide number and order number,
 so whoever ran the draw can contact them.
 
@@ -177,9 +182,13 @@ reached. Owner only.
 
 1. Apply migration `20260927100000_guide_image_count.sql` to the live
    database. It was missing; the admin's photograph count depends on it.
-   Then apply `20260928100000_staff_roles.sql`, the newest of 22. Steps
-   and checks are in `docs/roles.md`. Every account that exists when it
-   runs becomes an owner.
+   Then apply `20260928100000_staff_roles.sql`. Steps and checks are in
+   `docs/roles.md`. Every account that exists when it runs becomes an
+   owner. Then apply `20260929100000_no_early_draw.sql`, the newest of
+   23: it is what stops a winner being recorded before a drop sells out,
+   for anyone, and without it the manager could still do that by calling
+   the database directly. It changes no data. `npm run check:schema`
+   checks columns only and will not notice if it is missing.
 2. **Before 15 October**, create the manager's account and give it the
    manager role, in that order and after step 1. `docs/roles.md`,
    "Creating the manager's account". Then sign in as him once and check
@@ -200,7 +209,11 @@ reached. Owner only.
    Authorize.net API Login ID, Transaction Key and Public Client Key in
    the deployment's environment.
 9. Set `NEXT_PUBLIC_SITE_URL` to the live domain before the build runs,
-   not after.
+   not after. The domain is molonlabeguns.com. Production already builds
+   with `https://molonlabeguns.com`, but Vercel redirects that address to
+   `https://www.molonlabeguns.com`, so every canonical link and every
+   sitemap entry points at a redirect. Either make the bare domain the
+   primary one in Vercel, or set this to the `www` address and rebuild.
 10. Set `GOOGLE_SCRIPT_URL` to the deployed Apps Script, and confirm a
    test order produces both the customer email and the owner
    notification.
@@ -228,11 +241,10 @@ reached. Owner only.
 1. Confirm the two shipping prices. They are currently $10 standard and
    $20 oversize, both invented.
 2. Confirm the sales tax rate of 8.25%.
-3. Seven rules clauses are still to be confirmed; `docs/wording.md` lists
-   them. Clause 15, how the winner is picked, was decided on 25 September.
-   Decide the early draw: the rules no longer mention one, but the
-   checkout terms still say the shop may draw early and the admin still
-   allows it.
+3. Confirm the seven rules clauses drafted on 26 September (03, 07, 08,
+   09, 12, 13 and 22). They are published marked "Wording to be
+   confirmed"; `docs/wording.md` has the text. Clause 14, how the winner
+   is picked, was decided on 25 September.
 4. Supply the final wording for the refund line. It currently reads "All
    sales are final. No refunds or exchanges." and that is our wording,
    not theirs.
@@ -255,12 +267,14 @@ reached. Owner only.
 
 ### The client's attorney
 
-**Before the first filmed draw: buyers' names on a public broadcast.**
-Rules clause 15 puts every buyer's first name and last initial on screen
-in a video posted to Instagram. The privacy policy says buyer details are
-used to answer them and to contact the winner, and checkout does not
-mention the broadcast at all. Buyers who have already paid were not told.
-The privacy policy and a line at checkout need the attorney's wording.
+**Buyers' names on a public broadcast.** Rules clause 14 puts buyers'
+first names and last initials on screen in a video posted to Instagram.
+Since 26 September checkout asks every buyer to acknowledge it, in the
+client's words, with its own required box, and the acknowledgement is
+stored on the order with the other terms. The privacy policy says the
+same. Buyers who paid before then did not agree, and appear on the
+roster and wheel by guide number instead of by name. The attorney should
+review the acknowledgement and the privacy policy section.
 
 1. Review and approve the sweepstakes rules, after the client has
    answered the three questions above.
@@ -269,11 +283,12 @@ The privacy policy and a line at checkout need the attorney's wording.
 3. Approve or rewrite the refund line.
 4. Approve or rewrite the pickup notice, which says that paying online
    does not complete a firearm sale. That wording is ours.
-5. Review the rules as the client edited them on 25 September, and the
-   eight clauses still marked "Wording to be confirmed". `docs/wording.md`
-   lists what changed and what is open.
-6. Confirm the checkout terms, which were changed by word substitution
-   only (spot to guide, game to drop). They are stored on every order.
+5. Review the rules as the client edited them on 25 and 26 September,
+   and the seven drafts marked "Wording to be confirmed".
+   `docs/wording.md` lists what changed and what is open.
+6. Confirm the checkout terms (`2026-09-agency-4`): the early-draw
+   sentence is gone and the broadcast acknowledgement is new. They are
+   stored on every order.
 
 ---
 
@@ -286,10 +301,12 @@ The privacy policy and a line at checkout need the attorney's wording.
 2. Answered 25 September: the winner has one week from being contacted;
    an unclaimed prize is sold in store only and never listed online
    again; there is no state limit beyond the eligibility paragraph.
-3. The early draw: the client deleted it from the rules, but the checkout
-   terms and the admin still allow it. One of them has to change.
-4. Should clause 02 ("You must be able to receive a firearm lawfully…")
-   stay now that the client's eligibility paragraph (clause 03) covers it?
+3. Answered 26 September: there is no early draw anywhere, and clause
+   02 is cut because the eligibility paragraph covers it.
+4. The privacy policy said no address or payment details were collected
+   and that only the owner could see submissions. Neither was still
+   true; both were corrected on 26 September. The attorney should read
+   the whole page again rather than only the new section.
 5. Should the guide mention the drawing at all, or stay purely about the
    piece? It currently says nothing about it, deliberately, because that
    wording is unsettled.

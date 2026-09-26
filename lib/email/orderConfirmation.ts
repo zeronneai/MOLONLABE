@@ -187,7 +187,7 @@ function panel(accent: string, textColor: string, inner: string): string {
 // ----------------------------------------------------------------- render
 
 export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
-  const subject = `Order ${order.orderNumber} — ${SHOP_NAME}`;
+  const subject = `Order ${order.orderNumber} | ${SHOP_NAME}`;
   const receipt = receiptUrl(order.orderNumber, order.confirmationToken);
   const guide = guideUrl(order.orderNumber, order.confirmationToken);
   const collecting = order.pickupLines.length > 0;
@@ -249,7 +249,7 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
           order.spots.numbers.length === 1
             ? "Your guide"
             : `${order.spots.numbers.length} guides`
-        }</strong> from ${escapeHtml(order.spots.game)} —
+        }</strong> from ${escapeHtml(order.spots.game)}:
          ${
            order.spots.numbers.length === 1
              ? `guide number <strong style="color:${C.acid}">${order.spots.numbers[0]}</strong>`
@@ -275,7 +275,7 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
         C.bone,
         `<strong style="color:${C.bone}">Your guide to the ${escapeHtml(order.guideFor)}</strong>
          <div style="height:10px;line-height:10px">&nbsp;</div>
-         <span style="${SMALL};color:${C.muted}">Written by the shop — what it is,
+         <span style="${SMALL};color:${C.muted}">Written by the shop: what it is,
          why we picked it, how to look after it and what we would put on it.
          <a href="${guide}" style="color:${C.acid};text-decoration:underline">Open your guide</a>.</span>`,
       )
@@ -378,7 +378,7 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
       </td></tr>
     </table>
     <p class="ml-muted" style="${SMALL};margin:12px 0 0;color:${C.muted}">
-      Keep this email — the link is how you get back to it, and it works
+      Keep this email. The link is how you get back to it, and it works
       for ${escapeHtml(RECEIPT_TTL_LABEL)}. Anyone with the link can see
       the order, so treat it like a receipt.
     </p>
@@ -509,7 +509,7 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
           ``,
           `YOUR GUIDE`,
           RULE,
-          `Your guide to the ${order.guideFor}. Written by the shop —`,
+          `Your guide to the ${order.guideFor}. Written by the shop:`,
           `what it is, why we picked it, how to look after it and what`,
           `we would put on it.`,
           ``,
@@ -521,7 +521,7 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
     RULE,
     receipt,
     ``,
-    `Keep this email — the link is how you get back to it, and it works`,
+    `Keep this email. The link is how you get back to it, and it works`,
     `for ${RECEIPT_TTL_LABEL}. Anyone with the link can see the order, so`,
     `treat it like a receipt.`,
     ``,

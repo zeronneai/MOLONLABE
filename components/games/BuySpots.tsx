@@ -13,7 +13,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useCart } from "@/lib/cart/store";
 import { formatUsd } from "@/lib/money";
-import { GAME_TERMS } from "@/lib/games/terms";
+import { BROADCAST_NOTICE, GAME_TERMS } from "@/lib/games/terms";
 
 /**
  * Below this, the count is stated next to the control rather than left
@@ -148,7 +148,7 @@ export default function BuySpots({
           that blocks payment; this is here so nobody reaches it
           surprised. */}
       <ul className="mt-10 max-w-[56ch] space-y-2 border-t hairline pt-6">
-        {GAME_TERMS.map((line) => (
+        {[...GAME_TERMS, BROADCAST_NOTICE].map((line) => (
           <li key={line} className="text-sm leading-relaxed text-amber">
             {line}
           </li>

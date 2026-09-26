@@ -30,7 +30,7 @@ export default async function InTheCasePage() {
       </h1>
       <p className="mt-6 max-w-[52ch] text-muted">
         Firearms on hand at the shop. These are not sold through the
-        basket — every transfer goes through the counter, the background
+        basket. Every transfer goes through the counter, the background
         check and the paperwork. Ask about anything here and we will hold
         it for you.
       </p>

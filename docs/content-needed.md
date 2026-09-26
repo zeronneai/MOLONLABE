@@ -173,53 +173,17 @@ carries across drawings, the schema would need to change to match.
 | **The new categories** | `shotgun`, `ammunition`, `magazine` and `apparel` were added. Suppressors and other NFA items were deliberately left out: they need an SOT and a different transfer process, and listing them would imply the shop can sell them. Confirm that is right. |
 | **Sizes are free text** | No fixed S–XXL list, so a one-size hat, a 34 waist and a 9.5 boot all fit. The cost is that "Med" and "Medium" are different sizes to the database; the form warns on an exact repeat but cannot catch a near-miss. |
 
-## 10. Early draw — permitted in the rules, refinements still open
+## 10. Early draw: removed (26 September)
 
-**Closed in the rules. Still worth the attorney's eye.**
-
-The rules now say, in the section on when a game closes, that the shop
-may hold the drawing before every spot is sold, at its sole discretion,
-and that the shortfall is recorded and shown. The checkout terms say it
-too — `GAME_TERMS` used to promise "the winner is drawn once the last
-spot sells" full stop, which was a promise the admin could break, and
-every buyer who ticked the old consent had been told something the system
-does not guarantee. Both now say both halves, and `GAME_TERMS_VERSION`
-moved to `2026-09-agency-2` so orders can be grouped by which wording
-they accepted.
-
-What is written is the bare permission. These are the refinements only
-the shop or its attorney can decide, and none of them is in the rules:
-
-- That the sponsor may draw before every spot sells, at its discretion.
-- What happens to the odds when it does — a buyer who took one of 12 sold
-  spots has a one-in-twelve chance, not one-in-a-hundred, which is better
-  for them and should be said rather than left to be worked out.
-- Whether there is any floor: a minimum number sold, or a minimum time
-  open, before an early draw is allowed at all.
-- Whether buyers are told in advance, and how.
-
-**What the build already does**, so the attorney is writing rules for
-behaviour that exists rather than in the abstract:
-
-- The owner cannot draw early by accident. A second confirmation names
-  the shortfall — "This game has 88 of 100 spots unsold. Drawing now goes
-  against the terms buyers agreed to. Continue?" — and on the filmed
-  presentation screen the acknowledgement is a checkbox on the setup
-  page, before recording starts, rather than a dialog mid-take.
-- Every early draw is recorded: `winners.drawn_early` and
-  `winners.unsold_spots`. It is not a matter of memory.
-- It is shown publicly. A game drawn short carries "Drawn with N unsold"
-  on its card, so the history does not quietly present it as a game that
-  filled.
-
-The honest position now is that the shop has the capability and has
-given itself permission, with no floor and no advance notice. That is
-defensible because it is disclosed before purchase rather than after,
-but a floor would be better than none.
-
-**Going to the attorney at the same time:** §12, where magazines and
-ammunition may lawfully be shipped. They are the two open legal items and
-neither is a copy change.
+**Closed.** The client decided there is no early draw. A drop runs until
+every guide is sold, as the rules say. The sentence allowing one is gone
+from the checkout terms (`GAME_TERMS_VERSION` `2026-09-agency-4`), the
+admin has no control for it, the server refuses it, and the database
+refuses to record a winner for a drop that has not sold out
+(`supabase/migrations/20260929100000_no_early_draw.sql`), for the owner
+and the manager alike. `winners.drawn_early` and `winners.unsold_spots`
+stay as the record of any draw made before, and a drop drawn short
+before then still says so on its card.
 
 ## 11. Copy for the three surfaces
 

@@ -43,7 +43,7 @@ export default function ShopStory() {
             Molon Labe Firearms runs out of SunCity Outdoors on Montana Avenue.
             Everything on this site sits in the case behind the counter. Come
             handle it, ask questions, and if it&apos;s the one, it goes home
-            with you the legal way — in person, through a licensed dealer.
+            with you the legal way: in person, through a licensed dealer.
           </p>
         </Reveal>
 

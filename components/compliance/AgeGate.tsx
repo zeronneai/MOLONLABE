@@ -132,7 +132,7 @@ export default function AgeGate() {
             </h2>
             <p className="mt-4 text-sm leading-relaxed text-muted">
               You have to be {MIN_AGE} to browse what&apos;s in the case. Nothing
-              personal — it&apos;s the law we work under.
+              personal. It&apos;s the law we work under.
             </p>
             <div className="mt-8">
               <button

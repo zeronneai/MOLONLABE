@@ -49,7 +49,7 @@ export default async function ShopPage() {
       </h1>
       <p className="mt-8 max-w-[56ch] text-muted">
         Apparel, accessories, ammunition and glass. Everything here has a
-        price and goes in the basket — firearms do not, and are{" "}
+        price and goes in the basket. Firearms do not, and are{" "}
         <a href="/in-the-case" className="underline hover:text-acid">
           in the case
         </a>{" "}

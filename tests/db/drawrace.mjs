@@ -19,7 +19,11 @@ const db = await scratchDatabase("drawrace");
 try {
   await db.sql(`
     insert into public.games (id, title, status, total_spots, spot_price_cents)
-    values ('${GAME}', 'Race Game', 'full', 3, 3000)
+    values ('${GAME}', 'Race Game', 'full', 3, 3000);
+    -- Sold out, because a drop is only drawn once every guide is sold
+    -- (refuse_early_draw); this test is about the race, not that rule.
+    insert into public.game_spots (game_id, spot_number, status)
+    select '${GAME}', n, 'sold' from generate_series(1, 3) n;
   `);
 
   const results = await simultaneously(

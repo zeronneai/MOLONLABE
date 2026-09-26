@@ -118,7 +118,7 @@ export default async function ConfirmationPage({
       <p className="mt-6 max-w-[60ch] text-muted">
         {order.confirmation_sent_at
           ? `A copy is on its way to ${order.email}.`
-          : `We couldn't send the email copy — write this order number down, and call the shop if you need it resent.`}
+          : `We couldn't send the email copy. Write this order number down, and call the shop if you need it resent.`}
       </p>
 
       <div className="mt-14 max-w-2xl">
@@ -236,7 +236,7 @@ export default async function ConfirmationPage({
           <div className="mt-10 border-t hairline pt-8">
             <h2 className="label text-muted">Your guide</h2>
             <p className="mt-4 max-w-[56ch] text-sm leading-relaxed text-muted">
-              A guide to the {guideItem}, written by the shop — what it
+              A guide to the {guideItem}, written by the shop: what it
               is, why we picked it, how to look after it, and what we
               would put on it.
             </p>
@@ -345,7 +345,7 @@ function ExpiredReceipt({ orderNumber }: { orderNumber: string }) {
       </h1>
       <p className="mt-8 max-w-[52ch] leading-relaxed text-muted">
         Receipt links work for {RECEIPT_TTL_LABEL} from the date of the
-        order. Your order is still on file — call the shop with the order
+        order. Your order is still on file. Call the shop with the order
         number above and we&apos;ll pull it up.
       </p>
       <div className="mt-10 flex flex-wrap gap-3">

@@ -5,7 +5,8 @@
 // a spot, and legible.
 //
 // The fixture is built so the number cannot be mistaken for anything
-// else: a 20-spot game with only 12 sold, ids out of spot order. The
+// else: twelve guides sold out, numbered up to 20 with gaps, ids out of
+// guide order. The
 // winning spot number is therefore frequently LARGER than the pool size,
 // which breaks any wording of the form "N of TOTAL" — that phrasing came
 // from the per-dollar model where the ticket was an ordinal position.
@@ -37,7 +38,10 @@ const idFor = (n) =>
 await fetch(`${DOUBLE}/__reset`);
 await post("games", {
   id: GAME, title: "Number Game", status: "full",
-  total_spots: 20, spot_price_cents: 3000,
+  // Sold out: a drop is only drawn once every guide is sold. The guide
+  // numbers keep their gaps (the rows for 1-6, 10 and 17 are simply not
+  // here), which is what lets the winning number exceed the pool size.
+  total_spots: SOLD.length, spot_price_cents: 3000,
 });
 const orderRes = await fetch(`${DOUBLE}/rest/v1/orders`, {
   method: "POST", headers: { ...j, prefer: "return=representation" },
@@ -46,6 +50,7 @@ const orderRes = await fetch(`${DOUBLE}/rest/v1/orders`, {
 const orderId = (await orderRes.json())[0].id;
 for (let n = 1; n <= 20; n++) {
   const sold = SOLD.includes(n);
+  if (!sold) continue;
   await post("game_spots", {
     id: idFor(n), game_id: GAME, spot_number: n,
     status: sold ? "sold" : "open",
@@ -74,11 +79,9 @@ await page.getByRole("button", { name: /draw without ceremony/i }).click();
 await page.waitForTimeout(400);
 await page.locator('[role="dialog"] button').first().click();
 await page.waitForTimeout(1200);
-// Twelve of twenty sold, deliberately — that is what makes the winning
-// spot number exceed the pool size and exposes "Entry 16 of 12". It is
-// therefore an early draw, and the second confirmation applies.
-const early = page.getByRole("button", { name: /draw anyway/i });
-if (await early.count()) await early.click();
+// Guide numbers run up to 20 with a pool of twelve, deliberately: that is
+// what makes the winning number exceed the pool size and exposes
+// "Entry 16 of 12".
 await page.waitForTimeout(2500);
 
 const row = (await (await fetch(`${DOUBLE}/__dump`)).json()).winners[0];

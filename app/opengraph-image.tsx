@@ -4,7 +4,7 @@ import { archivoFonts } from "@/lib/og";
 
 // Default social card. Per-route cards override this by exporting their
 // own opengraph-image; the item detail one is generated from the row.
-export const alt = "Molon Labe Firearms x SunCity Outdoors — El Paso, TX";
+export const alt = "Molon Labe Firearms x SunCity Outdoors | El Paso, TX";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 

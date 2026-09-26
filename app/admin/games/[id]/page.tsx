@@ -5,6 +5,8 @@ import DrawPanel from "@/components/admin/DrawPanel";
 import SpotLedger from "@/components/admin/SpotLedger";
 import BackLink from "@/components/admin/BackLink";
 import PrizeClaim from "@/components/admin/PrizeClaim";
+import { loadSoldGuides } from "@/lib/draw/soldGuides";
+import { buildRoster } from "@/lib/draw/roster";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +59,15 @@ export default async function EditGamePage({
   const sold = rows.filter((s) => s.status === "sold");
   const buyers = new Set(sold.map((s) => (s.email ?? "").toLowerCase())).size;
 
+  // How many buyers will appear on the broadcast by guide number rather
+  // than by name, because they have not agreed to be named. The same
+  // roster the presentation builds, so this cannot say one number and
+  // the video show another.
+  const soldGuides = await loadSoldGuides(sb, id);
+  const unnamedBuyers = soldGuides.ok
+    ? buildRoster(soldGuides.guides).filter((r) => !r.named).length
+    : null;
+
   return (
     <div className="mx-auto max-w-2xl">
       <BackLink href="/admin/inventory" label="All drops" />
@@ -85,6 +96,7 @@ export default async function EditGamePage({
         spotsSold={sold.length}
         totalSpots={game.total_spots}
         buyers={buyers}
+        unnamedBuyers={unnamedBuyers}
         winnerName={winner?.display_name ?? null}
         winningSpot={winner?.ticket ?? null}
       />

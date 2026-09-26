@@ -808,23 +808,14 @@ textarea.field-input {
   color: var(--color-danger);
 }
 
-/* The early-draw acknowledgement. Amber rather than red: drawing short is
-   a decision the owner is allowed to make, not an error — it just has to
-   be made deliberately and on purpose. */
+/* A drop that has not sold out. Amber rather than red: nothing is wrong,
+   it is just not time yet. */
 .draw-note-caution {
   max-width: 48ch;
   border-left: 2px solid var(--color-amber);
   padding-left: calc(2 * var(--u));
   color: var(--color-bone);
   text-align: left;
-}
-.draw-note-ack {
-  display: flex;
-  align-items: center;
-  gap: calc(1.2 * var(--u));
-  margin-top: calc(1.6 * var(--u));
-  cursor: pointer;
-  color: var(--color-amber);
 }
 /* ---------------------------------------------------------------------
    Surface grounds
@@ -875,12 +866,6 @@ textarea.field-input {
 
 .ground-acid .text-muted {
   color: color-mix(in srgb, var(--color-bone) 72%, transparent);
-}
-
-.draw-note-ack input {
-  width: calc(2 * var(--u));
-  height: calc(2 * var(--u));
-  accent-color: var(--color-amber);
 }
 
 .draw-controls {

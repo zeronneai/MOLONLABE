@@ -16,7 +16,7 @@ export const heroCopy = {
     },
     { from: 0.6, to: 0.8, text: "COME GET YOURS." },
   ],
-  label: "Molon Labe Firearms × SunCity Outdoors — El Paso, TX",
+  label: "Molon Labe Firearms × SunCity Outdoors | El Paso, TX",
   headline: [IN_THE_CASE, "ON THE SITE.", "RIGHT NOW."],
   primaryCta: "View Inventory",
   secondaryCta: "Current Feature",

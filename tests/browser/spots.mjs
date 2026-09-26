@@ -66,7 +66,10 @@ async function buySpots(qty, { acceptTerms = true } = {}) {
   ]) if (await page.locator(k).count()) await page.fill(k, v);
   const boxes = page.getByRole("checkbox");
   await boxes.nth(0).check();
-  if (acceptTerms) await boxes.nth(1).check();
+  if (acceptTerms) {
+    await boxes.nth(1).check();
+    await boxes.nth(2).check();
+  }
   return boxes;
 }
 
@@ -75,11 +78,19 @@ async function buySpots(qty, { acceptTerms = true } = {}) {
   // Two, not three. The board opt-in was the third and is gone with the
   // board — there is no longer anywhere a buyer's name could appear, so
   // there is nothing to ask them about.
-  check("there are two checkboxes: sale terms and game terms",
-    (await boxes.count()) === 2, String(await boxes.count()));
-  check("the game terms start unchecked", !(await boxes.nth(1).isChecked()));
+  // Three: the sale terms, the drop's terms, and the broadcast
+  // acknowledgement (2026-09-26), which is its own box because agreeing to
+  // how a drop works is not agreeing to be named on a public video.
+  check("there are three checkboxes: sale terms, drop terms, broadcast",
+    (await boxes.count()) === 3, String(await boxes.count()));
+  check("the drop terms and the broadcast box start unchecked",
+    !(await boxes.nth(1).isChecked()) && !(await boxes.nth(2).isChecked()));
+  const broadcastText = await page.locator("[data-broadcast-notice]").innerText().catch(() => "");
+  check("the broadcast notice is the client's wording, exactly",
+    broadcastText === "The drawing is broadcast live on Instagram and saved as a reel. Your first name and last initial will appear on screen.",
+    broadcastText || "NOT SHOWN");
   const pay = page.getByRole("button", { name: /Pay \$/ });
-  check("payment is blocked until the game terms are accepted",
+  check("payment is blocked until the drop terms are accepted",
     await pay.isDisabled());
 
   const summary = await page.locator("body").innerText();
@@ -91,7 +102,9 @@ async function buySpots(qty, { acceptTerms = true } = {}) {
   check("the total is right", has(summary, "$97.43"));
 
   await page.getByRole("checkbox").nth(1).check();
-  check("accepting them unblocks payment", await pay.isEnabled());
+  check("the drop terms alone do not unblock payment", await pay.isDisabled());
+  await page.getByRole("checkbox").nth(2).check();
+  check("with the broadcast box ticked too, payment is unblocked", await pay.isEnabled());
   await pay.click();
   try {
     await page.waitForURL(/confirmation/, { timeout: 25000 });
@@ -113,6 +126,11 @@ check("they are the first three, in order",
 check("the order records which game", order1?.game_id === GAME);
 check("the game terms are stored with a timestamp",
   Boolean(order1?.game_terms_accepted_at) && has(order1?.game_terms_text, "no end date"));
+check("the broadcast acknowledgement is stored on the order with them",
+  has(order1?.game_terms_text, "broadcast live on Instagram and saved as a reel. Your first name and last initial will appear on screen."),
+  String(order1?.game_terms_text).slice(-120));
+check("the stored terms no longer allow an early draw",
+  !/draw earlier|at its discretion/i.test(order1?.game_terms_text ?? ""));
 check("the spot numbers are on the order line",
   (d1.order_items[0]?.spot_numbers ?? []).join(",") === "1,2,3",
   String(d1.order_items[0]?.spot_numbers));

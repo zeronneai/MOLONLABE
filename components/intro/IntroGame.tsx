@@ -570,7 +570,7 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
                     NICE SHOOTING.
                   </h2>
                   <p className="mt-6 max-w-xs text-center text-sm text-muted">
-                    You&apos;ve already claimed your code — it&apos;s one per
+                    You&apos;ve already claimed your code. It&apos;s one per
                     customer. Play as often as you like.
                   </p>
                 </>

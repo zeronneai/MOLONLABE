@@ -46,7 +46,7 @@ export default function ServicesPage() {
           ))}
         </ol>
         <p className="mt-8 max-w-[52ch] text-sm leading-relaxed text-muted">
-          More than this happens at the counter — if you need something and
+          More than this happens at the counter. If you need something and
           you don&apos;t see it here, call and ask. It&apos;s a short
           conversation.
         </p>

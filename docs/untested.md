@@ -223,18 +223,15 @@ case, a game's prize leaves the case. What no test can tell you is
 whether a visitor understands the three grounds as three contexts. That
 needs eyes, on a phone, scrolling.
 
-### ☐ The early-draw guard, used for real
+### ☐ No early draw, on the live database
 
-Covered by `tests/browser/earlydraw.mjs` in both routes, including that
-it is recorded and shown publicly. What is untested: whether the owner,
-on the day, reads the shortfall or taps through it. The second dialog is
-deliberately amber rather than red and names a number rather than asking
-"are you sure" — that is a judgement about how people read dialogs under
-time pressure, and it is a guess until watched.
-
-**The terms do not yet permit an early draw at all.** See
-`docs/content-needed.md` §10. Until the attorney adds it, this is a
-capability the shop has without permission to use.
+Covered by `tests/browser/earlydraw.mjs` (admin, presentation and server,
+as owner and as manager) and `tests/db/noearlydraw.mjs` (a winner written
+straight into the database as the manager, the owner and the service
+role). What is untested is the live database itself: the guard is a
+trigger, and it only exists once `20260929100000_no_early_draw.sql` has
+been applied there. `npm run check:schema` checks columns and will not
+notice it missing.
 
 ### ☐ The per-item postage override, against a real order
 

@@ -49,7 +49,7 @@ export const GUIDE_FIELDS: readonly GuideField[] = [
     prompt:
       "How to look after it. Cleaning interval, what to use, what to leave alone, anything about this model that catches people out.",
     placeholder:
-      "Strip it every five hundred rounds. A light oil on the rails and nothing at all in the firing pin channel — it collects and it will slow the pin down in the cold…",
+      "Strip it every five hundred rounds. A light oil on the rails and nothing at all in the firing pin channel. It collects and it will slow the pin down in the cold…",
     heading: "LOOKING AFTER IT",
   },
   {
@@ -80,7 +80,7 @@ export function guideFieldErrors(values: GuideValues): Partial<Record<GuideField
       errors[field.key] = `${field.label} is empty. This is what the customer is paying for.`;
     } else if (text.length < GUIDE_MIN_CHARS) {
       errors[field.key] =
-        `${field.label} is ${text.length} characters. It needs at least ${GUIDE_MIN_CHARS} — a sentence, not a note to yourself.`;
+        `${field.label} is ${text.length} characters. It needs at least ${GUIDE_MIN_CHARS}: a sentence, not a note to yourself.`;
     }
   }
   return errors;

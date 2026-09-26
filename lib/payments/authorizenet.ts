@@ -84,7 +84,7 @@ function lastFour(masked: string | undefined): string | null {
 const DECLINE_MESSAGE =
   "That card was declined. Check the number, expiry and billing ZIP, or try another card.";
 const GENERIC_MESSAGE =
-  "We couldn't complete the payment. Nothing has been charged — try again, or call the shop.";
+  "We couldn't complete the payment. Nothing has been charged. Try again, or call the shop.";
 
 export const authorizeNetProvider: PaymentProvider = {
   name: "authorize.net",
@@ -197,7 +197,7 @@ export const authorizeNetProvider: PaymentProvider = {
         ok: false,
         declined: false,
         message:
-          "We couldn't reach the card processor. Don't retry — call the shop and we'll confirm whether it went through.",
+          "We couldn't reach the card processor. Don't retry. Call the shop and we'll confirm whether it went through.",
         detail: `Gateway unreachable: ${err instanceof Error ? err.message : String(err)}`,
       };
     }
@@ -238,7 +238,7 @@ export const authorizeNetProvider: PaymentProvider = {
         ok: false,
         declined,
         message: held
-          ? "That payment is being reviewed by the processor. We'll be in touch — don't try the card again."
+          ? "That payment is being reviewed by the processor. We'll be in touch. Don't try the card again."
           : declined
             ? DECLINE_MESSAGE
             : GENERIC_MESSAGE,

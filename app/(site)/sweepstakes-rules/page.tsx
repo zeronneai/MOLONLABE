@@ -17,7 +17,7 @@ export const metadata: Metadata = {
  *
  * Deliberately not a wall of small print. Legal copy nobody reads
  * protects nobody, and this shop's whole pitch is that the draws are
- * real and checkable — so the terms are set at reading size in the same
+ * real and checkable, so the terms are set at reading size in the same
  * type system as the rest of the site, numbered so a clause can be
  * pointed at over the phone.
  *
@@ -44,7 +44,7 @@ export default function SweepstakesRulesPage() {
 
       {/* Said first and at display size, at the client's instruction:
           not something a buyer should find in the small print. It is
-          clause 06 below as well. */}
+          clause 05 below as well. */}
       <p data-no-refunds className="display mt-10 max-w-3xl border-l-4 border-amber pl-5 text-2xl text-amber">
         {NO_REFUNDS}
       </p>
@@ -68,37 +68,30 @@ export default function SweepstakesRulesPage() {
                       {String(n).padStart(2, "0")}
                     </span>
 
-                    <div className="max-w-[62ch]">
-                      {clause.text && (
-                        <p
-                          className={
-                            clause.prominent
-                              ? "display text-2xl text-amber"
-                              : clause.verbatim
-                                ? // Wording quoted exactly (the attorney's
-                                  // disclaimer, the client's eligibility
-                                  // paragraph). Given its own rule so it
-                                  // reads as quoted, and never reflowed.
-                                  "border-l-2 border-acid pl-5 leading-relaxed"
-                                : "leading-relaxed"
-                          }
-                        >
-                          {clause.text}
-                        </p>
-                      )}
-
+                    <div className="max-w-[62ch]" data-pending-wording={clause.pending ? "" : undefined}>
                       {clause.pending && (
-                        /* Wording not settled yet. Says what the clause
-                           covers and nothing more, marked in place so a
-                           reader meets the gap in the clause it belongs
-                           to rather than a warning about the whole page. */
-                        <p data-pending-wording className="text-amber">
-                          <span className="label">Wording to be confirmed · </span>
-                          <span className="leading-relaxed">
-                            {clause.pending}
-                          </span>
-                        </p>
+                        /* A draft awaiting the client. Marked in place, so a
+                           reader meets it in the clause it belongs to
+                           rather than as a warning about the whole page. */
+                        <p className="label mb-2 text-amber">Wording to be confirmed</p>
                       )}
+                      <p
+                        className={
+                          clause.prominent
+                            ? "display text-2xl text-amber"
+                            : clause.verbatim
+                              ? // Wording quoted exactly (the attorney's
+                                // disclaimer, the client's eligibility
+                                // paragraph). Given its own rule so it
+                                // reads as quoted, and never reflowed.
+                                "border-l-2 border-acid pl-5 leading-relaxed"
+                              : clause.pending
+                                ? "border-l-2 border-amber pl-5 leading-relaxed"
+                                : "leading-relaxed"
+                        }
+                      >
+                        {clause.text}
+                      </p>
                     </div>
                   </li>
                 );

@@ -72,5 +72,5 @@ are built from.
 It is read at **build** time for the statically generated routes —
 `robots.txt` and `sitemap.xml` among them — so it must be set in Vercel
 before the build, not added afterwards. Unset, everything falls back to
-`https://molonlabefirearms.com`, which is right for production and wrong
+`https://molonlabeguns.com`, which is right for production and wrong
 for a preview.

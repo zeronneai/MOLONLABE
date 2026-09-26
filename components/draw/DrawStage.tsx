@@ -110,7 +110,7 @@ function Wheel({ segments, winnerKey }: { segments: WheelSegment[]; winnerKey: s
         // carries the name.
         const labelled = span >= 5.5 && segments.length > 1;
         const size = Math.min(9, Math.max(3.2, (span / 360) * 2 * Math.PI * 62 * 0.55));
-        const name = seg.name.length > 14 ? `${seg.name.slice(0, 13)}…` : seg.name;
+        const name = seg.label.length > 14 ? `${seg.label.slice(0, 13)}…` : seg.label;
         return (
           <g
             key={seg.key}
@@ -165,7 +165,10 @@ export default function DrawStage({
   /** The sold guide numbers the roster was built from. */
   shownGuides: number[];
   alreadyDrawn: boolean;
-  /** Guides still unsold. Drawing with any left goes against the terms. */
+  /**
+   * Guides still unsold. A drop with any left cannot be drawn: the rules
+   * say it runs until every guide is purchased. It can still be rehearsed.
+   */
   unsoldSpots?: number;
 }) {
   const [orientation, setOrientation] = useState<Orientation>("vertical");
@@ -173,10 +176,6 @@ export default function DrawStage({
   const [phase, setPhase] = useState<Phase>("setup");
   const [reveal, setReveal] = useState<Reveal | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // An early draw is acknowledged HERE, on the setup screen, before
-  // anything is recorded. Asking later would put a dialog in the middle
-  // of the take, with the owner reading terms on camera.
-  const [earlyAccepted, setEarlyAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [controlsOn, setControlsOn] = useState(false);
@@ -218,6 +217,7 @@ export default function DrawStage({
     () => (rehearsal ? rehearsalRoster() : roster),
     [rehearsal, roster],
   );
+  const unnamedCount = useMemo(() => activeRoster.filter((r) => !r.named).length, [activeRoster]);
   const activeEntries = useMemo(() => rosterTotal(activeRoster), [activeRoster]);
   const activeEntrants = activeRoster.length;
   // The roster must add up to what was sold. If it ever does not, the
@@ -292,7 +292,7 @@ export default function DrawStage({
       };
     } else {
       setBusy(true);
-      const result = await commitDraw(gameId, earlyAccepted, shownGuides);
+      const result = await commitDraw(gameId, shownGuides);
       setBusy(false);
       if (!result.ok) {
         setError(result.error);
@@ -319,6 +319,10 @@ export default function DrawStage({
     }
     setReveal({
       ...record,
+      // The roster's name, not the recorded one: for a buyer who has not
+      // agreed to be named on the broadcast it is their guide number, and
+      // the reveal must not name somebody the roster did not.
+      name: holder.name,
       winnerKey: holder.key,
       rotation: landingRotation(segments, holder.key, record.seed, WHEEL_TURNS),
     });
@@ -328,9 +332,7 @@ export default function DrawStage({
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     setPhase(still ? "lock" : "spin");
-    // `earlyAccepted` must be in here, or this closes over its first value
-    // and the draw is sent unacknowledged however often the box is ticked.
-  }, [busy, allShown, totalsAgree, rehearsal, activeRoster, gameId, earlyAccepted, shownGuides, segments]);
+  }, [busy, allShown, totalsAgree, rehearsal, activeRoster, gameId, shownGuides, segments]);
 
   // Keys on the roster: arrows step pages (never faster than a page can
   // be shown), Space or Enter spins once every page has been.
@@ -386,7 +388,7 @@ export default function DrawStage({
   const summary = useCallback(() => {
     if (!reveal) return "";
     return [
-      `WINNER — ${prizeName}`,
+      `WINNER: ${prizeName}`,
       "",
       reveal.name,
       "",
@@ -489,23 +491,12 @@ export default function DrawStage({
               )}
 
               {!alreadyDrawn && !rehearsal && unsoldSpots > 0 && (
-                <div className="draw-note draw-note-caution">
-                  <p>
-                    <strong>{unsoldSpots}</strong> of{" "}
-                    <strong>{unsoldSpots + activeEntries}</strong> guides are
-                    unsold. The terms buyers agreed to say the drop runs until
-                    every guide sells, so drawing now goes against them. It will
-                    be recorded on the result.
-                  </p>
-                  <label className="draw-note-ack">
-                    <input
-                      type="checkbox"
-                      checked={earlyAccepted}
-                      onChange={(e) => setEarlyAccepted(e.target.checked)}
-                    />
-                    <span>I understand. Draw this drop short.</span>
-                  </label>
-                </div>
+                <p className="draw-note draw-note-caution" data-not-sold-out>
+                  <strong>{unsoldSpots}</strong> of{" "}
+                  <strong>{unsoldSpots + activeEntries}</strong> guides are
+                  still unsold. A drop is drawn once every guide sells.
+                  Rehearsal works now.
+                </p>
               )}
 
               {error && <p className="draw-error label">{error}</p>}
@@ -516,7 +507,7 @@ export default function DrawStage({
                   onClick={start}
                   disabled={
                     activeEntries === 0 ||
-                    (!alreadyDrawn && !rehearsal && unsoldSpots > 0 && !earlyAccepted)
+                    (!alreadyDrawn && !rehearsal && unsoldSpots > 0)
                   }
                   className="control control-caution draw-start"
                 >
@@ -526,8 +517,8 @@ export default function DrawStage({
                       ? "Start rehearsal"
                       : alreadyDrawn
                         ? "Replay the draw"
-                        : unsoldSpots > 0 && !earlyAccepted
-                          ? "Tick the box to draw short"
+                        : unsoldSpots > 0
+                          ? "Not sold out"
                           : "Start the draw"}
                 </button>
 
@@ -582,7 +573,7 @@ export default function DrawStage({
               start={firstIndex + 1}
             >
               {pages[page].map((r, i) => (
-                <li key={r.key} data-roster-entry>
+                <li key={r.key} data-roster-entry data-unnamed={r.named ? undefined : ""}>
                   <span className="draw-roster-n">{firstIndex + i + 1}</span>
                   <span className="draw-roster-name">{r.name}</span>
                   <span className="draw-roster-count">
@@ -605,6 +596,12 @@ export default function DrawStage({
                   </>
                 )}
               </p>
+              {unnamedCount > 0 && (
+                <p className="label" data-roster-unnamed>
+                  {unnamedCount} {unnamedCount === 1 ? "buyer is" : "buyers are"} shown by
+                  guide number. They bought before names were shown on the drawing.
+                </p>
+              )}
               <p className="label">
                 Page {page + 1} of {pages.length}
               </p>

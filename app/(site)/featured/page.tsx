@@ -63,7 +63,7 @@ export default async function FeaturedPage() {
       <section className="px-page">
         <Reveal>
           <p className="label text-acid">
-            {soldOut ? "Sold out — awaiting the draw" : "Open now"}
+            {soldOut ? "Sold out, awaiting the draw" : "Open now"}
           </p>
           <h1 className="display mt-6 max-w-3xl text-[clamp(2.25rem,5vw,4.5rem)]">
             {name.toUpperCase()}

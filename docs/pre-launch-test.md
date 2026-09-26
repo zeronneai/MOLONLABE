@@ -222,6 +222,7 @@ Two things worth adding to your pass:
 price field is not offered at all, and if you post one anyway the
 database refuses the row. Then confirm the rifle is not in `/shop`.
 
-**Try an early draw.** A game with spots left now asks a second time and
-names the shortfall. Back out of it once and confirm nothing was drawn,
-then go through and confirm the game's card says "Drawn with N unsold".
+**Try to draw early.** Open a drop with guides left, as the manager. The
+drop page offers only "Rehearse the presentation", and the presentation's
+Start button reads "Not sold out". Rehearse once and confirm nothing was
+recorded.

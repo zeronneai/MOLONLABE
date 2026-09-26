@@ -143,7 +143,7 @@ export default function ItemCtas({
                     messageLabel="Anything we should know"
                     messagePlaceholder="Timing, trade-in, questions…"
                     submitLabel="Send inquiry"
-                    successNote="Received. We'll confirm it's in the case and get back to you — usually same day during shop hours."
+                    successNote="Received. We'll confirm it's in the case and get back to you, usually same day during shop hours."
                   />
                 </div>
               </div>

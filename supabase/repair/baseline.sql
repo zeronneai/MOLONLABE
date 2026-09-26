@@ -2371,7 +2371,9 @@ create or replace function public.game_spots_remaining(p_game uuid)
 AS $function$
   select count(*)::int
   from public.game_spots
-  where game_id = p_game and status = 'open';
+  where game_id = p_game
+    and (status = 'open'
+         or (status = 'held' and held_at < now() - interval '15 minutes'));
 $function$;
 
 create or replace function public.is_owner()
@@ -2392,6 +2394,50 @@ create or replace function public.is_staff()
  SET search_path TO ''
 AS $function$
   select exists (select 1 from public.staff s where s.user_id = auth.uid())
+$function$;
+
+create or replace function public.refuse_early_draw()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_total integer;
+  v_sold  integer;
+begin
+  select total_spots into v_total from public.games where id = new.game_id;
+  if v_total is null then
+    raise exception 'There is no drop with id %.', new.game_id
+      using errcode = 'P0001';
+  end if;
+  select count(*) into v_sold
+    from public.game_spots
+   where game_id = new.game_id and status = 'sold';
+  if v_sold < v_total then
+    raise exception 'This drop has % of % guides sold. A drop is drawn only once every guide is sold.',
+      v_sold, v_total
+      using errcode = 'P0001';
+  end if;
+  new.drawn_early := false;
+  new.unsold_spots := 0;
+  return new;
+end;
+$function$;
+
+create or replace function public.refuse_pool_change()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+begin
+  if new.total_spots is distinct from old.total_spots
+     or new.spot_price_cents is distinct from old.spot_price_cents then
+    raise exception 'A drop''s number of guides and price are fixed when it is created.'
+      using errcode = 'P0001';
+  end if;
+  return new;
+end;
 $function$;
 
 create or replace function public.release_checkout(p_key text)
@@ -2563,6 +2609,8 @@ drop trigger if exists admin_activity_stamp_actor on public.admin_activity;
 CREATE TRIGGER admin_activity_stamp_actor BEFORE INSERT ON public.admin_activity FOR EACH ROW EXECUTE FUNCTION stamp_activity_actor();
 drop trigger if exists campaigns_stamp_authorship on public.games;
 CREATE TRIGGER campaigns_stamp_authorship BEFORE INSERT OR UPDATE ON public.games FOR EACH ROW EXECUTE FUNCTION stamp_authorship();
+drop trigger if exists games_refuse_pool_change on public.games;
+CREATE TRIGGER games_refuse_pool_change BEFORE UPDATE OF total_spots, spot_price_cents ON public.games FOR EACH ROW EXECUTE FUNCTION refuse_pool_change();
 drop trigger if exists items_set_updated_at on public.items;
 CREATE TRIGGER items_set_updated_at BEFORE UPDATE ON public.items FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 drop trigger if exists items_stamp_authorship on public.items;
@@ -2571,6 +2619,8 @@ drop trigger if exists settings_set_updated_at on public.settings;
 CREATE TRIGGER settings_set_updated_at BEFORE UPDATE ON public.settings FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 drop trigger if exists settings_stamp_authorship on public.settings;
 CREATE TRIGGER settings_stamp_authorship BEFORE INSERT OR UPDATE ON public.settings FOR EACH ROW EXECUTE FUNCTION stamp_authorship_updated_only();
+drop trigger if exists winners_refuse_early_draw on public.winners;
+CREATE TRIGGER winners_refuse_early_draw BEFORE INSERT OR UPDATE OF game_id ON public.winners FOR EACH ROW EXECUTE FUNCTION refuse_early_draw();
 
 -- ---------------------------------------------------------------------
 -- Comments
@@ -2846,6 +2896,8 @@ revoke execute on function public.finish_checkout(p_key text, p_order text, p_ou
 revoke execute on function public.game_spots_remaining(p_game uuid) from public;
 revoke execute on function public.is_owner() from public;
 revoke execute on function public.is_staff() from public;
+revoke execute on function public.refuse_early_draw() from public;
+revoke execute on function public.refuse_pool_change() from public;
 revoke execute on function public.release_checkout(p_key text) from public;
 revoke execute on function public.release_game_spots(p_game uuid, p_spots integer[]) from public;
 revoke execute on function public.release_variant_stock(p_variant uuid, p_qty integer) from public;
@@ -2874,6 +2926,10 @@ grant execute on function public.is_owner() to service_role;
 revoke execute on function public.is_staff() from anon;
 grant execute on function public.is_staff() to authenticated;
 grant execute on function public.is_staff() to service_role;
+revoke execute on function public.refuse_early_draw() from anon;
+revoke execute on function public.refuse_early_draw() from authenticated;
+revoke execute on function public.refuse_pool_change() from anon;
+revoke execute on function public.refuse_pool_change() from authenticated;
 revoke execute on function public.release_checkout(p_key text) from anon;
 revoke execute on function public.release_checkout(p_key text) from authenticated;
 revoke execute on function public.release_game_spots(p_game uuid, p_spots integer[]) from anon;

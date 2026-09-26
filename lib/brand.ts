@@ -79,5 +79,5 @@ export const INSTAGRAM_URL = "https://instagram.com/molonlabe.fa";
 
 /** Canonical origin. Set NEXT_PUBLIC_SITE_URL per environment. */
 export const SITE_URL = (
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://molonlabefirearms.com"
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://molonlabeguns.com"
 ).replace(/\/$/, "");

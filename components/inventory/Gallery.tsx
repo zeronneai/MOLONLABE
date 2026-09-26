@@ -77,7 +77,7 @@ export default function Gallery({
             <div key={src} className="relative aspect-[4/3] w-full shrink-0 snap-center">
               <Image
                 src={src}
-                alt={`${alt} — image ${i + 1}`}
+                alt={`${alt}, image ${i + 1}`}
                 fill
                 priority={i === 0}
                 sizes="100vw"

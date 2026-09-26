@@ -13,8 +13,8 @@
 //
 // WHAT IT READS
 //
-// Every string and every piece of JSX text in app/, components/ and
-// lib/, found by parsing the source rather than by searching it. That is
+// Every string and every piece of JSX text in app/, components/,
+// content/ and lib/, found by parsing the source rather than by searching it. That is
 // what lets the database keep its names: `game_spots`, `spot_number` and
 // `spotNumber` are identifiers, not copy, and a comment explaining the
 // history is not copy either. A word search would have to either miss
@@ -31,6 +31,16 @@
 //     for the rare string that is neither of the above and is never
 //     shown. The reason is required, and --list prints every one.
 //
+// EM DASHES
+//
+// The client does not want em dashes anywhere a customer reads: the
+// public pages, their titles and metadata, the cart and checkout and
+// every message they can show, the confirmation email, the guide PDF,
+// and the draw presentation, which is broadcast. The same parse flags
+// them in every file except the ones only staff ever see (EM_DASH_STAFF
+// below) and strings handed to a logger, which go to the server log.
+// tests/browser/wording.mjs reads the rendered public pages for them too.
+//
 // What it cannot see is text that lives in the database: a game title
 // the owner typed, or wording stored on an order when it was placed.
 // Those are the owner's words or a record of what a buyer agreed to, and
@@ -43,8 +53,31 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const DIRS = ["app", "components", "lib"];
+const DIRS = ["app", "components", "content", "lib"];
 const BANNED = /\b(spots?|tickets?|raffles?|lotter(?:y|ies))\b/i;
+const EM_DASH = "\u2014";
+
+/**
+ * Files only staff read: the admin, and the owner's alerts. Everything
+ * else in app/, components/, content/ and lib/ can reach a customer, directly or
+ * through a shared string, so it is checked for em dashes.
+ */
+const EM_DASH_STAFF = [/^app\/admin\//, /^components\/admin\//, /^lib\/admin\//, /^lib\/notify\.ts$/];
+
+/** A string passed to a logger goes to the server log, not to a person. */
+function isLogArgument(node) {
+  for (let n = node.parent; n; n = n.parent) {
+    if (ts.isCallExpression(n)) {
+      const c = n.expression;
+      const name = ts.isPropertyAccessExpression(c)
+        ? `${c.expression.getText()}.${c.name.text}`
+        : ts.isIdentifier(c) ? c.text : "";
+      if (/^console\.\w+$/.test(name) || /^\w*[lL]og$/.test(name)) return true;
+    }
+    if (ts.isFunctionLike(n) || ts.isBlock(n)) return false;
+  }
+  return false;
+}
 
 /** Query builder methods whose string arguments are table or column names. */
 const DB_METHODS = new Set([
@@ -91,6 +124,7 @@ function isPropertyName(node) {
 
 const hits = [];
 const allowed = [];
+const dashes = [];
 
 for (const file of DIRS.flatMap((d) => files(join(ROOT, d)))) {
   const rel = relative(ROOT, file);
@@ -98,6 +132,7 @@ for (const file of DIRS.flatMap((d) => files(join(ROOT, d)))) {
   if (rel === "lib/database.types.ts") continue;
   const src = readFileSync(file, "utf8");
   const lines = src.split("\n");
+  const checkDashes = !EM_DASH_STAFF.some((re) => re.test(rel));
   const sf = ts.createSourceFile(
     file, src, ts.ScriptTarget.Latest, true,
     file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
@@ -113,6 +148,10 @@ for (const file of DIRS.flatMap((d) => files(join(ROOT, d)))) {
       text = node.text;
     } else if (ts.isJsxText(node)) {
       text = node.text;
+    }
+    if (text && checkDashes && text.includes(EM_DASH) && !isLogArgument(node)) {
+      const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line;
+      dashes.push({ where: `${rel}:${line + 1}`, text: text.replace(/\s+/g, " ").trim().slice(0, 90) });
     }
     if (text && BANNED.test(text)) {
       const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line;
@@ -133,10 +172,20 @@ for (const file of DIRS.flatMap((d) => files(join(ROOT, d)))) {
 }
 
 if (process.argv.includes("--list")) {
+  for (const d of dashes) console.log(`DASH     ${d.where}  ${d.text}`);
   for (const h of hits) console.log(`HIT      ${h.where}  "${h.word}"  ${h.text}`);
   for (const a of allowed) console.log(`INTERNAL ${a.where}  "${a.word}"  (${a.reason})`);
   console.log(`\n${hits.length} in copy, ${allowed.length} marked internal`);
-  process.exit(hits.length ? 1 : 0);
+  process.exit(hits.length || dashes.length ? 1 : 0);
+}
+
+if (dashes.length) {
+  console.error(
+    `copy check: ${dashes.length} em dash(es) a customer could read. The client ` +
+      `does not want them in the copy; use a full stop, a colon or a comma.\n`,
+  );
+  for (const d of dashes) console.error(`  ${d.where}  ${d.text}`);
+  console.error("");
 }
 
 if (hits.length) {
@@ -152,4 +201,5 @@ if (hits.length) {
   );
   process.exit(1);
 }
-console.log(`copy check: no banned words in user-facing copy (${allowed.length} internal strings marked)`);
+if (dashes.length) process.exit(1);
+console.log(`copy check: no banned words and no em dashes in user-facing copy (${allowed.length} internal strings marked)`);

@@ -84,6 +84,7 @@ const checkoutSchema = z.object({
    * spot line between the page rendering and the post arriving.
    */
   gameTermsAccepted: z.boolean().optional(),
+  broadcastAccepted: z.boolean().optional(),
   /**
    * Opt-in, and it stays false unless the buyer ticked the box. Never
    * inferred from anything else.
@@ -251,6 +252,15 @@ export async function submitCheckout(
         message: "Accept the terms of this drop before we can take payment.",
       };
     }
+    // Required, like the terms. The stored text below includes the
+    // broadcast sentence, and that is only true if the buyer ticked it.
+    if (!data.broadcastAccepted) {
+      await releaseClaims(sb, claims);
+      return {
+        ok: false,
+        message: "Tick the box about the broadcast drawing before we can take payment.",
+      };
+    }
     const { data: spots, error } = await sb.rpc("claim_game_spots", {
       p_game: cart.spotGame.id,
       p_qty: cart.spotCount,
@@ -305,12 +315,15 @@ export async function submitCheckout(
 
     if (claim === "in_flight") {
       // Another request with this key is mid-charge. Refuse without
-      // touching the card, and do NOT release its claims — they belong
-      // to the attempt that is still running.
+      // touching the card. The stock and guides this request claimed
+      // above are its own, not the running attempt's (that one holds
+      // different rows), so they go back now rather than sitting held
+      // for fifteen minutes.
+      await releaseClaims(sb, claims);
       return {
         ok: false,
         message:
-          "This payment is already going through. Give it a few seconds — don't pay again.",
+          "This payment is already going through. Give it a few seconds. Don't pay again.",
       };
     }
   }
@@ -437,7 +450,7 @@ export async function submitCheckout(
         ...(cart.spotGame && claimedSpots.length > 0
           ? [
               {
-                name: `${cart.spotGame.title} — ${claimedSpots.length === 1 ? "guide number" : "guide numbers"} ${claimedSpots.join(", ")}`,
+                name: `${cart.spotGame.title}: ${claimedSpots.length === 1 ? "guide number" : "guide numbers"} ${claimedSpots.join(", ")}`,
                 size: null,
                 quantity: claimedSpots.length,
                 // copy-check: internal payload value the Apps Script reads (docs/email.md); the summary says it in words
@@ -450,7 +463,7 @@ export async function submitCheckout(
     return {
       ok: false,
       message:
-        "Your payment went through but we hit a problem saving the order. Don't pay again — call the shop with this number and we'll finish it by hand: " +
+        "Your payment went through but we hit a problem saving the order. Don't pay again. Call the shop with this number and we'll finish it by hand: " +
         number,
     };
   }

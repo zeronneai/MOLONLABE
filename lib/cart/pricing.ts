@@ -98,7 +98,7 @@ export function shippingFor(
 const REJECTION = {
   missing: "No longer listed.",
   unavailable: "No longer available.",
-  unpriced: "Not sold online — call the shop for this one.",
+  unpriced: "Not sold online. Call the shop for this one.",
   needsSize: "Pick a size for this one.",
   sizeGone: "That size has sold out.",
   noSizes: "No sizes are in stock.",
@@ -228,7 +228,7 @@ export async function priceCart(
           variantId: null,
           size: null,
           slug: `game-${game.id}`,
-          name: `${game.title} — ${spotCount === 1 ? "1 guide" : `${spotCount} guides`}`,
+          name: `${game.title}: ${spotCount === 1 ? "1 guide" : `${spotCount} guides`}`,
           image: null,
           unitPriceCents: game.spot_price_cents,
           quantity: spotCount,

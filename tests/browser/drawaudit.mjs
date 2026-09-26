@@ -46,10 +46,12 @@ const post = (t, b) =>
 
 await fetch(`${DOUBLE}/__reset`);
 
-// A game of six spots, five sold to two buyers.
+// Five guides sold to two buyers, numbered 1 and 3 to 6. Sold out (a drop
+// is only drawn once every guide is sold); the gap at 2 is what keeps the
+// selector's index and the guide number from coinciding.
 await post("games", {
   id: GAME, title: "Audit Game", status: "full",
-  total_spots: 6, spot_price_cents: 3000,
+  total_spots: 5, spot_price_cents: 3000,
 });
 const orderRes = await fetch(`${DOUBLE}/rest/v1/orders`, {
   method: "POST", headers: { ...j, prefer: "return=representation" },
@@ -58,6 +60,7 @@ const orderRes = await fetch(`${DOUBLE}/rest/v1/orders`, {
 const orderId = (await orderRes.json())[0].id;
 
 for (const s of SPOTS) {
+  if (!s.sell) continue;
   await post("game_spots", {
     id: s.id, game_id: GAME, spot_number: s.spot_number,
     status: s.sell ? "sold" : "open",
@@ -84,13 +87,6 @@ await page.getByRole("button", { name: /draw without ceremony/i }).click();
 await page.waitForTimeout(400);
 await page.locator('[role="dialog"] button').first().click();
 await page.waitForTimeout(1200);
-// This fixture is short on purpose — spot 2 is unsold so the selector's
-// index and the spot number cannot coincide — which means it is an early
-// draw and the second confirmation applies.
-const early = page.getByRole("button", { name: /draw anyway/i });
-if (await early.count()) {
-  await early.click();
-}
 await page.waitForTimeout(2500);
 
 const screen = await page.locator("body").innerText();

@@ -50,7 +50,10 @@ async function fillCheckout(page) {
   ]) if (await page.locator(k).count()) await page.fill(k, v);
   const boxes = page.getByRole("checkbox");
   await boxes.first().check();
-  if (BUY === "spots") await boxes.nth(1).check();
+  if (BUY === "spots") {
+    await boxes.nth(1).check();
+    await boxes.nth(2).check();
+  }
 }
 
 async function newPage() {

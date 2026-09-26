@@ -53,7 +53,7 @@ export default function GameCard({
             than no demo at all. */}
         {demo && (
           <p className="absolute left-0 top-0 z-10 bg-amber px-3 py-1 text-xs font-bold uppercase tracking-[0.28em] text-ink">
-            Demo — not a real drop
+            Demo, not a real drop
           </p>
         )}
         {image ? (
@@ -83,7 +83,7 @@ export default function GameCard({
           {finished
             ? `Drawn${drawnOn ? ` ${drawnOn}` : ""}`
             : awaiting
-              ? "Sold out — awaiting the draw"
+              ? "Sold out, awaiting the draw"
               : "Open now"}
         </p>
         <h3 className="display mt-3 text-xl">

@@ -16,8 +16,8 @@ const archivo = Archivo({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Molon Labe Firearms x SunCity Outdoors — El Paso, TX",
-    template: "%s — Molon Labe Firearms x SunCity Outdoors",
+    default: "Molon Labe Firearms x SunCity Outdoors | El Paso, TX",
+    template: "%s | Molon Labe Firearms x SunCity Outdoors",
   },
   description:
     `Digital showroom for Molon Labe Firearms x SunCity Outdoors. See what is on hand, what is currently featured, and visit us at ${SHOP_ADDRESS.street}, ${SHOP_ADDRESS.city}, ${SHOP_ADDRESS.region}.`,

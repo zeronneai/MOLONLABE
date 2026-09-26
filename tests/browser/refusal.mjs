@@ -49,9 +49,11 @@ async function signedIn(){
   for(let n=1;n<=3;n++) await hold(n);
   const p=await signedIn();
   await p.goto(`${APP}/admin/games/${GAME}`,{waitUntil:"networkidle"});
-  const btn=p.getByRole("button",{name:/no guides sold yet/i});
+  // No draw control at all until every guide is sold (there is no early
+  // draw), so nothing sold certainly offers none.
   check("with nothing sold the draw button is not offered",
-    await btn.isDisabled().catch(()=>false));
+    (await p.getByRole("button",{name:/draw/i}).count())===0,
+    `${await p.getByRole("button",{name:/draw/i}).count()} draw buttons`);
   const body=await p.locator("body").innerText();
   // The disabled button alone says "no", not "why". The ledger has to
   // account for the three spots he knows people are buying.

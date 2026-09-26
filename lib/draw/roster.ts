@@ -7,7 +7,12 @@
 // same rows the draw uses, shows every buyer, and has to add up to the
 // number of guides sold. Nothing here samples, caps or truncates.
 //
-// Privacy: names leave this module as first name plus last initial. The
+// Privacy: names leave this module as first name plus last initial, and
+// only for a buyer who agreed at checkout that their name would appear on
+// the broadcast (BROADCAST_NOTICE in lib/games/terms.ts). A buyer who has
+// not, which includes everyone who paid before that notice existed, is
+// still on the roster and still on the wheel, because the rule says every
+// entry is shown; they appear by guide number instead of by name. The
 // email address is used only to group one buyer's guides together and is
 // never part of what is returned.
 
@@ -17,8 +22,13 @@ import { redactName } from "./select";
 export type RosterEntry = {
   /** Opaque. Never derived from an email or a name. */
   key: string;
-  /** First name and last initial. Nothing else. */
+  /**
+   * First name and last initial, or "Holder of guide #N" for a buyer who
+   * has not agreed to be named on the broadcast. Nothing else.
+   */
   name: string;
+  /** False when the buyer has not agreed to be named on the broadcast. */
+  named: boolean;
   /** Guides held, which is entries held. */
   count: number;
   /** The guide numbers they hold, ascending. Matches the winning number. */
@@ -30,7 +40,12 @@ type SoldSpot = {
   first_name: string | null;
   last_name: string | null;
   email: string | null;
+  /** Whether this guide's order carries the broadcast acknowledgement. */
+  broadcast_consent: boolean;
 };
+
+/** How a buyer who has not agreed to be named appears. */
+export const unnamedLabel = (firstGuide: number) => `Holder of guide #${firstGuide}`;
 
 /**
  * Every buyer, once, with their guides counted.
@@ -41,23 +56,40 @@ type SoldSpot = {
  * themselves.
  */
 export function buildRoster(spots: SoldSpot[]): RosterEntry[] {
-  const groups = new Map<string, { first: string; last: string; numbers: number[] }>();
+  const groups = new Map<
+    string,
+    { first: string; last: string; numbers: number[]; consent: boolean }
+  >();
   for (const s of spots) {
     const email = (s.email ?? "").trim().toLowerCase();
     const first = (s.first_name ?? "").trim();
     const last = (s.last_name ?? "").trim();
     const id = email || (first || last ? `name:${first.toLowerCase()} ${last.toLowerCase()}` : `guide:${s.spot_number}`);
-    const g = groups.get(id) ?? { first, last, numbers: [] };
+    const g = groups.get(id) ?? { first, last, numbers: [], consent: false };
     g.numbers.push(s.spot_number);
+    // One line per person, so one name or none. A buyer who agreed on any
+    // of their orders has agreed to their name being shown; it is the
+    // same name either way.
+    g.consent = g.consent || s.broadcast_consent === true;
     groups.set(id, g);
   }
-  const entries = [...groups.values()].map((g) => ({
-    name: redactName(g.first || "Buyer", g.last),
-    count: g.numbers.length,
-    numbers: [...g.numbers].sort((a, b) => a - b),
-  }));
+  const entries = [...groups.values()].map((g) => {
+    const numbers = [...g.numbers].sort((a, b) => a - b);
+    return {
+      name: g.consent ? redactName(g.first || "Buyer", g.last) : unnamedLabel(numbers[0]),
+      named: g.consent,
+      count: numbers.length,
+      numbers,
+    };
+  });
+  // Named buyers alphabetically, so a viewer can find themselves; then
+  // the unnamed ones by guide number, which is how they know themselves.
   entries.sort((a, b) =>
-    a.name.localeCompare(b.name, "en", { sensitivity: "base" }) || a.numbers[0] - b.numbers[0],
+    a.named !== b.named
+      ? a.named ? -1 : 1
+      : a.named
+        ? a.name.localeCompare(b.name, "en", { sensitivity: "base" }) || a.numbers[0] - b.numbers[0]
+        : a.numbers[0] - b.numbers[0],
   );
   return entries.map((e, i) => ({ key: `p${i + 1}`, ...e }));
 }
@@ -77,7 +109,19 @@ export function paginate<T>(items: T[], perPage: number): T[][] {
 // ------------------------------------------------------------ the wheel
 
 /** A wedge, in degrees clockwise from the top of the wheel. */
-export type WheelSegment = { key: string; name: string; start: number; end: number };
+export type WheelSegment = {
+  key: string;
+  /** What the readout says: the roster's name for this buyer. */
+  name: string;
+  /**
+   * What is printed on the wedge, which has room for a first name and an
+   * initial and not much more. A buyer shown by guide number is "#12"
+   * there, because "Holder of guide #12" cut to fit says nothing.
+   */
+  label: string;
+  start: number;
+  end: number;
+};
 
 /**
  * One wedge per buyer, its angle proportional to the guides they hold.
@@ -91,7 +135,13 @@ export function wheelSegments(roster: RosterEntry[]): WheelSegment[] {
   return roster.map((r) => {
     const start = at;
     at += (r.count / total) * 360;
-    return { key: r.key, name: r.name, start, end: at };
+    return {
+      key: r.key,
+      name: r.name,
+      label: r.named === false ? `#${r.numbers[0]}` : r.name,
+      start,
+      end: at,
+    };
   });
 }
 

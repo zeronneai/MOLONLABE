@@ -67,22 +67,25 @@ check("does not describe itself as unreviewed",
   !/has not been reviewed|needs? an? (lawyer|attorney)/i.test(text));
 
 // ------------------------------------------------- the operative clauses
-// The client's edits of 2026-09-25, as published. Clause numbers are the
-// page's own continuous numbering.
+// The client's edits of 2026-09-25 and decisions of 2026-09-26, as
+// published. Clause numbers are the page's own continuous numbering;
+// clause 02 was cut on 2026-09-26, so everything after it moved up one.
 const clauses = (await page.locator("main ol li").allInnerTexts())
   .map((t) => t.replace(/\s+/g, " ").trim());
 const clause = (n) => clauses.find((c) => c.startsWith(String(n).padStart(2, "0"))) ?? "";
+check("there are 23 clauses", clauses.length === 23, `${clauses.length}`);
 const exact = [
   [1, "You must be 21 years or older to buy a guide and to win."],
-  [3, CLIENT_ELIGIBILITY],
-  [5, "All purchases are subject to Texas sales tax at 8.25%."],
-  [6, "No refunds or exchanges."],
-  [7, "A person may buy as many guides as they want, up to the total offered in that drop."],
-  [11, "Entry requires purchasing a guide. There are no free entries."],
-  [12, "A drop runs until every guide is purchased."],
-  [17, "By purchasing a guide, the buyer agrees to provide their full name, email and phone number so the shop can contact them if they win."],
-  [18, "The winner has one week from being contacted to confirm and claim the prize. If they do not, the prize returns to the shop."],
-  [19, "Unclaimed prizes are sold in store only and are not listed on the website again."],
+  [2, CLIENT_ELIGIBILITY],
+  [4, "All purchases are subject to Texas sales tax at 8.25%."],
+  [5, "No refunds or exchanges."],
+  [6, "A person may buy as many guides as they want, up to the total offered in that drop."],
+  [10, "Entry requires purchasing a guide. There are no free entries."],
+  [11, "A drop runs until every guide is purchased."],
+  [15, "A drop is drawn once. A drop that already has a winner cannot be drawn again."],
+  [16, "By purchasing a guide, the buyer agrees to provide their full name, email and phone number so the shop can contact them if they win."],
+  [17, "The winner has one week from being contacted to confirm and claim the prize. If they do not, the prize returns to the shop."],
+  [18, "Unclaimed prizes are sold in store only and are not listed on the website again."],
 ];
 for (const [n, want] of exact) {
   check(`clause ${String(n).padStart(2, "0")} reads as the client wrote it`,
@@ -90,32 +93,42 @@ for (const [n, want] of exact) {
 }
 check("the client's eligibility paragraph appears exactly once, verbatim",
   text.split(CLIENT_ELIGIBILITY).length === 2);
-check("the early-draw clause is gone", !/sole discretion|before every guide is sold/i.test(text));
+check("clause 02, which repeated it, is gone",
+  !/You must be able to receive a firearm lawfully/i.test(text));
+check("the early-draw clause is gone", !/sole discretion|before every guide is sold|draw earlier/i.test(text));
 check("the state-limit question is gone", !/state or residency/i.test(text));
+check("the rules say drop, not game, in the headings and clause 15",
+  /^When a drop closes$/im.test(text) && !/\bgames?\b/i.test(clauses.join(" ")),
+  (clauses.join(" ").match(/.{0,30}\bgames?\b.{0,30}/i) ?? ["clean"])[0]);
 
-const pendingWording = await page.locator("[data-pending-wording]").allInnerTexts();
-const stillOpen = [
-  "How many guides a drop offers",
-  "How guide numbers are assigned",
-  "Adding more guides to a cart",
-  "held during checkout",
-  "Which guides are in the drawing",
-  "chance of winning",
-  "names appear anywhere public",
+// The seven drafts of 2026-09-26, held here as literals so an edit to the
+// source cannot also edit the check. Each is published with the marker
+// until the client confirms the set.
+const DRAFTS = [
+  [3, "Each drop offers a set number of guides at a set price per guide. Both are fixed when the drop is created and do not change while it runs."],
+  [7, "Each guide in a drop has a number, from 1 up to the number of guides offered. Numbers are assigned automatically at checkout from those still available, lowest first. A buyer cannot choose them, and a buyer who gets several may not get consecutive numbers."],
+  [8, "Adding more guides from the same drop to a cart adds them to the guides already there, and the cart shows the running total before payment. A cart holds guides from one drop at a time. If fewer guides are left than the cart holds, the cart is reduced to the number left before payment."],
+  [9, "Guide numbers are set aside when the buyer submits payment and are held while the payment is processed. If the payment does not go through, they are released at once. If the payment is interrupted, they are released after 15 minutes. A guide belongs to the buyer only once payment succeeds."],
+  [12, "A drop is drawn only after every guide has been sold, and every guide sold is in the drawing."],
+  [13, "Each guide is one entry, and every entry has the same chance of winning. A person holding five guides has five times the chance of a person holding one, and five times the share of the wheel."],
+  [22, "This website shows how many guides a drop has left, never who bought them. During the drawing, each buyer's first name and last initial appear on screen, as stated at checkout. A buyer who bought before checkout stated this appears by guide number instead. Email addresses, phone numbers and full surnames are never shown."],
 ];
-check("seven clauses are still marked as wording to be confirmed",
-  pendingWording.length === 7, `${pendingWording.length}`);
-for (const topic of stillOpen) {
-  check(`still open: ${topic}`,
-    pendingWording.some((p) => p.toLowerCase().includes(topic.toLowerCase())),
-    pendingWording.find((p) => p.toLowerCase().includes(topic.toLowerCase()))?.slice(0, 80) ?? "MISSING");
+const marked = await page.locator("main ol li").evaluateAll((lis) =>
+  lis.map((li, i) => (li.querySelector("[data-pending-wording]") ? i + 1 : null)).filter(Boolean));
+check("exactly the seven drafts are marked wording to be confirmed",
+  JSON.stringify(marked) === JSON.stringify(DRAFTS.map(([n]) => n)), marked.join(", "));
+for (const [n, want] of DRAFTS) {
+  check(`draft ${String(n).padStart(2, "0")} is published with its marker`,
+    /wording to be confirmed/i.test(clause(n)) && clause(n).includes(want),
+    clause(n).slice(0, 90) || "MISSING");
 }
-// Clause 15 as the client decided it (2026-09-25), held as a literal
+// Clause 14 as the client decided it (2026-09-25), held as a literal
 // here so an edit to the source cannot also edit the check.
 const DRAW_METHOD =
   "The winner is selected by an electronic name wheel, weighted by the number of guides each person holds. The drawing is run at the shop, broadcast live on our Instagram, @molonlabe.fa, and saved as a reel. Before the wheel is spun, every entry is shown on screen so viewers can confirm all buyers were included. The result is recorded.";
-check("clause 15 is the client's wording, verbatim", clause(15).includes(DRAW_METHOD),
-  clause(15).slice(0, 90));
+check("clause 14 is the client's wording, verbatim", clause(14).includes(DRAW_METHOD),
+  clause(14).slice(0, 90));
+check("clause 14 is not marked as a draft", !/wording to be confirmed/i.test(clause(14)));
 
 // ---------------------------------------------- how the page presents it
 check("the title is the client's", /^Official Sweepstakes Rules$/m.test(text),
@@ -174,19 +187,15 @@ check("the page is still noindex", /noindex/i.test(robots ?? ""), String(robots)
 await page.goto(`${APP}/featured`, { waitUntil: "networkidle" });
 const buy = await page.locator("body").innerText();
 
-// KNOWN DISAGREEMENT, reported rather than hidden: the client deleted the
-// early-draw clause from the rules, but the checkout terms still say the
-// shop may draw earlier, and the admin still allows it. Which one changes
-// is the client's decision. This records the state so it cannot drift
-// further without somebody noticing.
-note(/earlier at its discretion/i.test(buy) && !/sole discretion/i.test(text)
-  ? "OPEN: the checkout terms allow an early draw; the rules no longer mention one"
-  : "early-draw wording now agrees between the checkout terms and the rules");
-check("the buy control does NOT promise a draw only when the last guide sells",
-  /drawn once the last guide sells/i.test(buy) &&
-    !/drawn once the last guide sells\.(?!\s*The shop may)/i.test(buy));
-// The rules page's own no-end-date clause is awaiting the attorney, so
-// the buyer-facing statement is checked where it still lives.
+// The early draw is gone everywhere (2026-09-26), so the checkout terms
+// and the rules now say the same thing: drawn when the last guide sells.
+check("the buy control says the winner is drawn once the last guide sells",
+  /drawn once the last guide sells\./i.test(buy));
+check("and no longer says the shop may draw earlier",
+  !/draw earlier|at its discretion/i.test(buy));
+check("the buy control shows the broadcast notice the rules refer to",
+  /broadcast live on Instagram and saved as a reel\. Your first name and last initial will appear on screen\./.test(buy));
+// The no-end-date statement lives at the buy control and checkout.
 check("the buy control still says there is no end date",
   /no end date/i.test(buy));
 

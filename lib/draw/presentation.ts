@@ -20,14 +20,6 @@ export type DrawRecord =
   | {
       ok: false;
       error: string;
-      /**
-       * Set when the refusal is "there are unsold spots, are you sure".
-       * That is not a failure — it is a question, and the caller has to
-       * tell the two apart to know whether to offer a way through.
-       */
-      needsEarlyConfirmation?: boolean;
-      unsold?: number;
-      totalSpots?: number;
     }
   | {
       ok: true;
@@ -149,7 +141,7 @@ export function rehearsalRoster(count = 64): RosterEntry[] {
   return rehearsalPool(count)
     .map((m) => {
       const numbers = Array.from({ length: Math.max(1, m.weight) }, () => next++);
-      return { key: m.id, name: m.name, count: numbers.length, numbers };
+      return { key: m.id, name: m.name, named: true, count: numbers.length, numbers };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 }

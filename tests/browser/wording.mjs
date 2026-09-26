@@ -15,6 +15,11 @@
 //
 // A source check can be satisfied by a string assembled at run time from
 // data. This cannot.
+//
+// The same artifacts a customer receives are also read for em dashes,
+// which the client does not want anywhere on the public site: every
+// public page, the checkout and receipt, the email, the guide PDF, the
+// stored order line and the draw presentation. Staff pages are not.
 
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -63,10 +68,24 @@ async function readable(p) {
 }
 
 const hits = [];
+const dashes = [];
+/** Every em dash, as "surface: …context…". Empty is the pass. */
+const dashFound = (surface, text) =>
+  [...String(text).matchAll(/\u2014/g)].map((m) => {
+    const at = m.index ?? 0;
+    return `${surface}: …${String(text).slice(Math.max(0, at - 40), at + 40).replace(/\s+/g, " ")}…`;
+  });
+/** A surface a customer reads: both checks. */
+const customer = (surface, text) => {
+  hits.push(...found(surface, text));
+  dashes.push(...dashFound(surface, text));
+};
 async function sweep(p, surface, path) {
   const res = await p.goto(`${APP}${path}`, { waitUntil: "networkidle" });
   await p.waitForTimeout(250);
-  hits.push(...found(`${surface} ${path}`, await readable(p)));
+  const text = await readable(p);
+  if (surface.startsWith("PUBLIC")) customer(`${surface} ${path}`, text);
+  else hits.push(...found(`${surface} ${path}`, text));
   return res?.status();
 }
 
@@ -100,7 +119,7 @@ await phone.goto(`${APP}/`, { waitUntil: "networkidle" });
 const menu = phone.getByRole("button", { name: /menu/i }).first();
 if (await menu.count()) await menu.click().catch(() => {});
 await phone.waitForTimeout(300);
-hits.push(...found("PUBLIC mobile menu", await readable(phone)));
+customer("PUBLIC mobile menu", await readable(phone));
 
 // Buy two guides, all the way through.
 await c.goto(`${APP}/featured`, { waitUntil: "networkidle" });
@@ -110,7 +129,7 @@ check("the buy control reads as buying a guide",
   await c.getByRole("button", { name: /^Get/ }).first().innerText().catch(() => "none"));
 await c.getByRole("button", { name: /^Get/ }).click();
 await c.waitForTimeout(600);
-hits.push(...found("PUBLIC /featured after adding", await readable(c)));
+customer("PUBLIC /featured after adding", await readable(c));
 await sweep(c, "PUBLIC", "/cart");
 await sweep(c, "PUBLIC", "/checkout");
 for (const [k, v] of [
@@ -124,7 +143,7 @@ await c.getByRole("button", { name: /Pay \$/ }).click();
 await c.waitForURL(/confirmation/, { timeout: 25000 }).catch(() => {});
 await c.waitForTimeout(1500);
 const receipt = await readable(c);
-hits.push(...found("PUBLIC confirmation page", receipt));
+customer("PUBLIC confirmation page", receipt);
 check("the confirmation page names the guide numbers",
   /guide numbers\s*1, 2/i.test(receipt.replace(/\s+/g, " ")),
   (receipt.match(/[^\n]*guide number[^\n]*/i) ?? ["NOT SHOWN"])[0].slice(0, 80));
@@ -136,9 +155,9 @@ check("the order went through", Boolean(order), d.orders.length ? "" : "no order
 // The email, exactly as it was handed to the transport.
 const email = d.emails.find((e) => e.kind === "order_confirmation");
 check("a confirmation email was sent", Boolean(email));
-hits.push(...found("EMAIL subject", email?.subject ?? ""));
-hits.push(...found("EMAIL html", String(email?.html ?? "").replace(/<[^>]+>/g, " ")));
-hits.push(...found("EMAIL text", email?.text ?? ""));
+customer("EMAIL subject", email?.subject ?? "");
+customer("EMAIL html", String(email?.html ?? "").replace(/<[^>]+>/g, " "));
+customer("EMAIL text", email?.text ?? "");
 
 // The owner's alerts.
 for (const n of d.notifications) {
@@ -154,14 +173,14 @@ if (guideHref) {
   const text = pdfText(buf);
   check("the guide PDF was produced and read", res.status() === 200 && text.length > 200,
     `${res.status()}, ${text.length} characters`);
-  hits.push(...found("GUIDE PDF", text));
+  customer("GUIDE PDF", text);
 } else {
   check("the confirmation page links the guide", false, "no /guide/ link found");
 }
 
 // The stored order line. Not rewritten after the fact, so it must be
 // right when it is written.
-hits.push(...found("ORDER line as stored", d.order_items.map((l) => l.name).join("\n")));
+customer("ORDER line as stored", d.order_items.map((l) => l.name).join("\n"));
 
 // Sell the rest so the drop fills and the sold-out alert goes out.
 await c.goto(`${APP}/featured`, { waitUntil: "networkidle" });
@@ -184,8 +203,8 @@ check("the sold-out alert went out", Boolean(full));
 hits.push(...found("ALERT game_full", `${full?.subject}\n${full?.summary}`));
 for (const path of ["/", "/games", "/featured"]) await sweep(c, "PUBLIC sold out", path);
 
-// The rules: what is not settled is marked, not guessed at. Eight left
-// after the client's edits of 2026-09-25 (tests/browser/rules.mjs names them).
+// The rules: the seven drafts of 2026-09-26 are marked as awaiting the
+// client (tests/browser/rules.mjs names them).
 await c.goto(`${APP}/sweepstakes-rules`, { waitUntil: "networkidle" });
 const pendingCount = await c.locator("[data-pending-wording]").count();
 check("the rules page marks the clauses still to be confirmed", pendingCount === 7, `${pendingCount}`);
@@ -236,7 +255,7 @@ for (const o of ORIENTATIONS) {
 
   await p.getByRole("button", { name: /start the draw|replay the draw/i }).click();
   await p.locator("[data-roster-page]").waitFor();
-  hits.push(...found(`DRAW ${o.label} roster`, await readable(p)));
+  customer(`DRAW ${o.label} roster`, await readable(p));
   await p.screenshot({ path: join(SHOTS, `draw-${o.label}-2-roster.png`) });
   const { rows } = await throughRoster(p);
   check(`DRAW ${o.label}: the roster was read before the spin`, rows.length > 0, `${rows.length} rows`);
@@ -253,10 +272,10 @@ for (const o of ORIENTATIONS) {
     }
     await p.waitForTimeout(150);
   }
-  for (const text of seen) hits.push(...found(`DRAW ${o.label} during`, text));
+  for (const text of seen) customer(`DRAW ${o.label} during`, text);
   await p.waitForTimeout(500);
   const locked = await readable(p);
-  hits.push(...found(`DRAW ${o.label} result`, locked));
+  customer(`DRAW ${o.label} result`, locked);
   await p.screenshot({ path: join(SHOTS, `draw-${o.label}-4-result.png`) });
   check(`DRAW ${o.label}: the result names the winning guide`,
     /winning guide\s*#\d+/i.test(locked), (locked.match(/[^\n]*winning guide[^\n]*/i) ?? ["NOT SHOWN"])[0]);
@@ -271,7 +290,8 @@ for (const o of ORIENTATIONS) {
     await p.waitForTimeout(300);
     const clip = await p.evaluate(() => navigator.clipboard.readText()).catch(() => "");
     check(`DRAW ${o.label}: the copied summary was read`, clip.length > 20, clip.slice(0, 60));
-    hits.push(...found(`DRAW ${o.label} copied summary`, clip));
+    // Posted with the video, so a customer reads it.
+    customer(`DRAW ${o.label} copied summary`, clip);
     check(`DRAW ${o.label}: the summary says what each guide was`,
       /every guide was one entry/i.test(clip), clip.split("\n").find((l) => /entry/i.test(l)) ?? "");
   }
@@ -303,6 +323,10 @@ const unique = [...new Set(hits)];
 check("no customer or staff surface says spot, ticket, raffle or lottery",
   unique.length === 0, unique.slice(0, 12).join("\n      "));
 if (unique.length > 12) note(`${unique.length - 12} more`);
+const uniqueDashes = [...new Set(dashes)];
+check("no em dash anywhere a customer reads",
+  uniqueDashes.length === 0, uniqueDashes.slice(0, 12).join("\n      "));
+if (uniqueDashes.length > 12) note(`${uniqueDashes.length - 12} more em dashes`);
 
 await b.close();
 report();

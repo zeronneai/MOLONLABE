@@ -157,7 +157,7 @@ export function GuideDocument(data: GuideData): ReactElement<DocumentProps> {
 
   return (
     <Document
-      title={`${item.name} — a guide`}
+      title={`${item.name}: a guide`}
       author={SHOP_NAME}
       subject={data.gameTitle}
       creator={SHOP_SHORT_NAME}

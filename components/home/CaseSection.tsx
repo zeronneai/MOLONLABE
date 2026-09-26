@@ -27,8 +27,8 @@ export default async function CaseSection() {
             ASK ABOUT ANY OF IT
           </h2>
           <p className="mt-6 max-w-[52ch] text-muted">
-            Firearms on hand at the shop. Nothing here goes in a basket —
-            every transfer happens at the counter, with the paperwork and
+            Firearms on hand at the shop. Nothing here goes in a basket.
+            Every transfer happens at the counter, with the paperwork and
             the background check. Tell us what you are after.
           </p>
         </Reveal>

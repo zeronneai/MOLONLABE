@@ -50,61 +50,83 @@ on them when they were placed (order lines such as "September Rifle
 Game — 3 spots", and the terms text the buyer accepted). That is a
 record of what the buyer saw, and it is not rewritten.
 
-## The rules, after the client's edits (25 September)
+## The rules, after the client's edits (25 and 26 September)
 
 The client returned wording for most of the clauses that had been
-frozen since the terminology ruling. Applied as sent, with his notes
-turned into sentences where he wrote notes:
+frozen since the terminology ruling (25 September), then decided the rest
+of the open questions (26 September). Numbers below are the page's
+current numbering: clause 02 was cut, so everything after it moved up
+one from the numbering used on 25 September.
 
 | # | Now reads |
 | --- | --- |
 | 01 | You must be 21 years or older to buy a guide and to win. |
-| 03 | His eligibility paragraph, verbatim (`CLIENT_ELIGIBILITY`). Replaces the state-limit question. |
-| 05 | All purchases are subject to Texas sales tax at 8.25%. |
-| 06 | No refunds or exchanges. Also shown at display size under the page intro. |
-| 07 | A person may buy as many guides as they want, up to the total offered in that drop. |
-| 11 | Entry requires purchasing a guide. There are no free entries. |
-| 12 | A drop runs until every guide is purchased. |
-| 17 | By purchasing a guide, the buyer agrees to provide their full name, email and phone number so the shop can contact them if they win. |
-| 18 | The winner has one week from being contacted to confirm and claim the prize. If they do not, the prize returns to the shop. |
-| 19 | Unclaimed prizes are sold in store only and are not listed on the website again. |
+| 02 | His eligibility paragraph, verbatim (`CLIENT_ELIGIBILITY`). The lawful-possession clause that stood before it was cut because it repeated this. |
+| 04 | All purchases are subject to Texas sales tax at 8.25%. |
+| 05 | No refunds or exchanges. Also shown at display size under the page intro. |
+| 06 | A person may buy as many guides as they want, up to the total offered in that drop. |
+| 10 | Entry requires purchasing a guide. There are no free entries. |
+| 11 | A drop runs until every guide is purchased. (Heading: "When a drop closes".) |
+| 14 | How the winner is picked: his wording, verbatim (`CLIENT_DRAW_METHOD`). |
+| 15 | A drop is drawn once. A drop that already has a winner cannot be drawn again. |
+| 16 | By purchasing a guide, the buyer agrees to provide their full name, email and phone number so the shop can contact them if they win. |
+| 17 | The winner has one week from being contacted to confirm and claim the prize. If they do not, the prize returns to the shop. |
+| 18 | Unclaimed prizes are sold in store only and are not listed on the website again. |
 
-The early-draw clause was deleted at his instruction. Numbers from 13
-onward moved up by one.
+The early-draw clause was deleted at his instruction, and on 26 September
+the early draw was removed everywhere else too: the checkout terms, the
+admin, the presentation, the server action and the database.
 
-**Still to be confirmed (seven)**, shown as "Wording to be confirmed" with the
-subject only (`RULES_PENDING_WORDING` in `lib/games/rules.ts`):
+**Drafted by the agency on 26 September, for the client to confirm as a
+set (seven).** Written from what the system does, and published with a
+"Wording to be confirmed" marker (`RULES_DRAFTS` in `lib/games/rules.ts`;
+approving one means removing `pending` from its clause):
 
-| # (now) | Subject | Previous text |
+| # | Draft | Was (25 Sept) |
 | --- | --- | --- |
-| 04 | How many guides a drop offers and at what price | Each game offers a fixed number of spots at a fixed price. Both are set when the game opens and neither changes while it runs. |
-| 08 | How guide numbers are assigned | Spot numbers are assigned when you buy — you do not choose them. You get the lowest numbers still free, so if spots 2 and 4 have gone and you take three, you get 1, 3 and 5. |
-| 09 | Adding more guides to a cart | Adding more spots to your cart for the same game adds to what is already there. Your cart shows the running total before you pay. |
-| 10 | Guide numbers held during checkout | Your spots are held while you check out and are released back to the game if the payment does not complete. A spot is only yours once payment succeeds. |
-| 13 | Which guides are in the drawing | One spot is drawn at random from the spots that have sold. Unsold spots are not in the drawing. |
-| 14 | Each guide's chance of winning | Every sold spot has the same chance. Someone holding five spots therefore has five times the chance of someone holding one. |
-| 23 | Whether buyers' names appear anywhere public | Spots are anonymous on the public board by default. A first name and last initial appear only if you ticked the box at checkout asking for that. Your email address and phone number are never shown. |
+| 03 | Each drop offers a set number of guides at a set price per guide. Both are fixed when the drop is created and do not change while it runs. | 04 |
+| 07 | Each guide in a drop has a number, from 1 up to the number of guides offered. Numbers are assigned automatically at checkout from those still available, lowest first. A buyer cannot choose them, and a buyer who gets several may not get consecutive numbers. | 08 |
+| 08 | Adding more guides from the same drop to a cart adds them to the guides already there, and the cart shows the running total before payment. A cart holds guides from one drop at a time. If fewer guides are left than the cart holds, the cart is reduced to the number left before payment. | 09 |
+| 09 | Guide numbers are set aside when the buyer submits payment and are held while the payment is processed. If the payment does not go through, they are released at once. If the payment is interrupted, they are released after 15 minutes. A guide belongs to the buyer only once payment succeeds. | 10 |
+| 12 | A drop is drawn only after every guide has been sold, and every guide sold is in the drawing. | 13 |
+| 13 | Each guide is one entry, and every entry has the same chance of winning. A person holding five guides has five times the chance of a person holding one, and five times the share of the wheel. | 14 |
+| 22 | This website shows how many guides a drop has left, never who bought them. During the drawing, each buyer's first name and last initial appear on screen, as stated at checkout. A buyer who bought before checkout stated this appears by guide number instead. Email addresses, phone numbers and full surnames are never shown. | 23 |
 
-**15 was decided by the client on 25 September** and is published
-verbatim: an electronic name wheel weighted by guides held, run at the
-shop, broadcast on Instagram and saved as a reel, with every entry shown
-before the wheel is spun. The draw presentation now does each of those
-things; see "The draw" in `docs/handover.md`.
+What each draft rests on, so it stays true:
 
-**Unedited and worth a look:** the heading "When a game closes" and
-clause 16, "A game is drawn once. A game that already has a winner cannot
-be drawn again", still say "game". Clause 24, "A winner is published the
-same way", follows clause 23, which is still to be confirmed. Its em dash
-became a colon.
-
-**Checkout terms still allow an early draw.** The rules no longer
-mention one, but `lib/games/terms.ts` says "The shop may draw earlier at
-its discretion" and the admin still allows it. One of them has to change.
+- 03: the admin never offers to edit count or price after creation, and
+  since 26 September the database refuses it (`refuse_pool_change`).
+- 07: `claim_game_spots`, lowest open number first.
+- 08: `addSpots` in `lib/cart/store.tsx` and the drop rules in
+  `lib/cart/pricing.ts`.
+- 09: `claim_game_spots` runs when Pay is pressed, before the charge;
+  `release_game_spots` on a decline; holds older than 15 minutes are
+  released by the next claim and, since 26 September, counted as
+  available (`game_spots_remaining`), so they cannot strand a drop.
+- 12: `commitDraw` and `refuse_early_draw`.
+- 13: `lib/draw/select.ts`, one entry per guide; the wheel's wedges in
+  `lib/draw/roster.ts`.
+- 22: `BROADCAST_NOTICE` at checkout, stored on the order;
+  `lib/draw/soldGuides.ts` and `buildRoster` for who is named.
 
 The checkout terms (`lib/games/terms.ts`) are the agency's wording and
-are stored on each order as what the buyer agreed to, so they were
-changed by word substitution only; `GAME_TERMS_VERSION` is
-`2026-09-agency-3`.
+are stored on each order as what the buyer agreed to.
+`GAME_TERMS_VERSION` is `2026-09-agency-4`: the early-draw sentence is
+gone, and the client's broadcast acknowledgement is a separate required
+box, stored in the same text. Orders placed before keep what they were
+shown.
+
+## Em dashes
+
+The client does not want them anywhere a customer reads. They were
+removed from every public page, page title, the cart, checkout and its
+messages, the confirmation email, the guide PDF and the draw
+presentation on 26 September. `scripts/check-copy.mjs` fails the build
+on a new one in any file outside the admin, and `tests/browser/wording.mjs`
+reads the rendered pages, email, PDF and every draw frame for them.
+Text the owner types (a drop description, an item's notes) is shown as
+written and is not checked by the build; the rendered-page test would
+catch one in the test data only.
 
 ## Where "guide" reads worse
 

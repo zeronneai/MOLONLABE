@@ -173,7 +173,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       persist(
         read().map((l) =>
           lineKey(l) === key
-            ? { ...l, quantity: Math.min(qty, MAX_QUANTITY.ship) }
+            ? {
+                ...l,
+                // Guides are bounded by what is left in the drop, which
+                // pricing applies; the shipped-goods cap of ten would
+                // contradict the rule that a person may buy as many as
+                // they want.
+                quantity: Math.min(qty, l.gameId ? MAX_QUANTITY.none : MAX_QUANTITY.ship),
+              }
             : l,
         ),
       );

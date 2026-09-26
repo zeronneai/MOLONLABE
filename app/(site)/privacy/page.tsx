@@ -6,6 +6,7 @@ import {
   SHOP_PHONE_DISPLAY,
   SHOP_PHONE_HREF,
 } from "@/lib/brand";
+import { BROADCAST_NOTICE } from "@/lib/games/terms";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/privacy" },
@@ -17,7 +18,7 @@ export const metadata: Metadata = {
 };
 
 // ---------------------------------------------------------------------------
-// DRAFT — NOT REVIEWED BY A LAWYER.
+// DRAFT, NOT REVIEWED BY A LAWYER.
 //
 // Written as real operative copy, because it describes things the site
 // actually does and those facts are ours to state accurately. The
@@ -41,7 +42,7 @@ export const metadata: Metadata = {
 //     reads.
 // ---------------------------------------------------------------------------
 
-const UPDATED = "August 2026";
+const UPDATED = "September 2026";
 
 export default function PrivacyPage() {
   return (
@@ -52,7 +53,7 @@ export default function PrivacyPage() {
       </h1>
 
       <div className="mt-10 max-w-[68ch] border border-amber p-6">
-        <p className="label text-amber">Draft — for the client&apos;s attorney</p>
+        <p className="label text-amber">Draft for the client&apos;s attorney</p>
         <p className="mt-4 text-sm leading-relaxed">
           This describes what the site actually does, accurately, but it has
           not been reviewed by a lawyer. Retention periods and anything the
@@ -86,14 +87,19 @@ export default function PrivacyPage() {
               item, we record which one.
             </Bullet>
             <Bullet>
-              <strong className="text-bone">Sweepstakes entries:</strong> your
-              first and last name, email address, and phone number if you give
-              one.
+              <strong className="text-bone">Orders, including guides:</strong>{" "}
+              your first and last name, email address, phone number, and a
+              shipping address if something is being shipped to you.
+            </Bullet>
+            <Bullet>
+              <strong className="text-bone">Card payments:</strong> your card
+              details are typed into our payment processor&apos;s secure form
+              and go straight to them. They never reach our server. We keep
+              the card type and last four digits for the receipt.
             </Bullet>
             <Bullet>
               <strong className="text-bone">Nothing else.</strong> We do not
-              ask for an address, a date of birth, or any payment details, and
-              there is no account to create.
+              ask for a date of birth, and there is no account to create.
             </Bullet>
           </ul>
         </Section>
@@ -107,20 +113,36 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
+        <Section title="Your name in the drawing">
+          <p data-broadcast-notice>{BROADCAST_NOTICE}</p>
+          <p className="mt-4">
+            You are asked to acknowledge this at checkout before you buy a
+            guide, and the acknowledgement is kept with your order. Nothing
+            else about you is shown: not your full surname, email address,
+            phone number or address. If you bought a guide before checkout
+            asked, you appear in the drawing by your guide number, not by
+            name.
+          </p>
+          <p className="mt-4">
+            The winner of each drop is also listed on this site by first name
+            and last initial.
+          </p>
+        </Section>
+
         <Section title="Where it is stored">
           <p>
             Form submissions are stored in a Supabase database (Postgres,
             hosted in the United States) and are also sent to a Google
             Workspace account belonging to the shop, where they appear as a
-            spreadsheet row and an email to the owner. Only the shop owner has
-            access to either.
+            spreadsheet row and an email to the shop. Only the shop&apos;s
+            staff have access to either.
           </p>
         </Section>
 
         <Section title="Analytics and cookies">
           <p>
             We use Google Analytics 4 to understand which pages people visit
-            and which actions they take — viewing an item, tapping the phone
+            and which actions they take: viewing an item, tapping the phone
             number, submitting a form. Google sets cookies to do this. We send
             Google no names, emails or phone numbers: analytics events carry
             only page paths, item identifiers and counts.

@@ -25,6 +25,8 @@ import {
 } from "@/lib/legal";
 import { lineKey, type PricedCart } from "@/lib/cart/types";
 import {
+  BROADCAST_CONSENT,
+  BROADCAST_NOTICE,
   GAME_TERMS,
   GAME_TERMS_CONSENT,
 } from "@/lib/games/terms";
@@ -77,6 +79,7 @@ export default function CheckoutForm({
   // payment; the board opt-in changes nothing about the sale and only
   // decides whether a first name appears in public.
   const [gameTerms, setGameTerms] = useState(false);
+  const [broadcast, setBroadcast] = useState(false);
   const buyingSpots = Boolean(cart?.spotGame && cart.spotCount > 0);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -181,6 +184,10 @@ export default function CheckoutForm({
       setError("Accept the terms of this drop before we can take payment.");
       return;
     }
+    if (buyingSpots && !broadcast) {
+      setError("Tick the box about the broadcast drawing before we can take payment.");
+      return;
+    }
     if (!accepted) {
       setError("You have to accept the terms before we can take payment.");
       return;
@@ -250,6 +257,7 @@ export default function CheckoutForm({
               shipping,
               disclaimerAccepted: true,
               gameTermsAccepted: buyingSpots ? gameTerms : undefined,
+              broadcastAccepted: buyingSpots ? broadcast : undefined,
               idempotencyKey,
               opaqueData: response.opaqueData!,
             });
@@ -453,6 +461,26 @@ export default function CheckoutForm({
             </label>
             {err("gameTermsAccepted")}
 
+            {/* The broadcast acknowledgement. Its own box: agreeing to how
+                a drop works is not agreeing to be named on a public video. */}
+            <p className="mt-8 max-w-[62ch] text-sm leading-relaxed text-amber" data-broadcast-notice>
+              {BROADCAST_NOTICE}
+            </p>
+            <label className="mt-4 flex max-w-[62ch] cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={broadcast}
+                onChange={(e) => setBroadcast(e.target.checked)}
+                required
+                data-broadcast-consent
+                className="mt-1 h-5 w-5 shrink-0 accent-[var(--color-acid)]"
+              />
+              <span className="text-sm leading-relaxed">
+                {BROADCAST_CONSENT}
+              </span>
+            </label>
+            {err("broadcastAccepted")}
+
           </section>
         )}
       </div>
@@ -465,7 +493,7 @@ export default function CheckoutForm({
               <li key={lineKey(l)} className="flex justify-between gap-4">
                 <span className="min-w-0">
                   {l.name}
-                  {l.size ? ` — ${l.size}` : ""}
+                  {l.size ? `, ${l.size}` : ""}
                   {l.quantity > 1 ? ` × ${l.quantity}` : ""}
                   <span
                     className={`label ml-2 ${
@@ -522,7 +550,7 @@ export default function CheckoutForm({
 
           <button
             type="submit"
-            disabled={working || !accepted || (buyingSpots && !gameTerms) || !acceptReady}
+            disabled={working || !accepted || (buyingSpots && (!gameTerms || !broadcast)) || !acceptReady}
             className="cta-primary control-go mt-7 w-full"
           >
             {working
@@ -531,7 +559,7 @@ export default function CheckoutForm({
                 ? "Loading secure form…"
                 : `Pay ${formatUsd(cart.totalCents)}`}
           </button>
-          {(!accepted || (buyingSpots && !gameTerms)) && (
+          {(!accepted || (buyingSpots && (!gameTerms || !broadcast))) && (
             <p className="label mt-3 text-center text-muted">
               Accept the terms to continue
             </p>

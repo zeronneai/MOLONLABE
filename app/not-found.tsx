@@ -17,7 +17,7 @@ export default function NotFound() {
           THE CASE.
         </>
       }
-      body="Whatever was here is gone, sold, or never existed. Inventory moves fast around here — the case is the best place to start again."
+      body="Whatever was here is gone, sold, or never existed. Inventory moves fast around here. The case is the best place to start again."
       primary={{ href: "/shop", text: "Go to the shop" }}
     />
   );

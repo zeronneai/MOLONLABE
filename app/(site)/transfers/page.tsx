@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 const steps: { title: string; body: string }[] = [
   {
     title: "BUY IT ANYWHERE",
-    body: "Online retailer, auction site, private seller with an FFL — doesn't matter. You buy it, we receive it.",
+    body: "Online retailer, auction site, private seller with an FFL: it doesn't matter. You buy it, we receive it.",
   },
   {
     title: "SEND US THE DETAILS",
@@ -35,7 +35,7 @@ export default function TransfersPage() {
           PICK UP HERE.
         </h1>
         <p className="mt-6 max-w-md text-muted">
-          We take FFL transfers daily. Standard transfer fee applies — call for
+          We take FFL transfers daily. Standard transfer fee applies. Call for
           current pricing.
         </p>
       </div>

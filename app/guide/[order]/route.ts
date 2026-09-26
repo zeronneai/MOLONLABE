@@ -71,7 +71,7 @@ export async function GET(
     // them the file is missing would send them looking for a mistake
     // they did not make. They get a person to call instead.
     return new Response(
-      `We can't produce your guide right now. Nothing is wrong with your order — call the shop on ${SHOP_PHONE_DISPLAY} and quote ${orderNumber}.`,
+      `We can't produce your guide right now. Nothing is wrong with your order. Call the shop on ${SHOP_PHONE_DISPLAY} and quote ${orderNumber}.`,
       { status: 503, headers: { "content-type": "text/plain; charset=utf-8" } },
     );
   }

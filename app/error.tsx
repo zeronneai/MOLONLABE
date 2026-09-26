@@ -29,7 +29,7 @@ export default function Error({
           JAMMED.
         </>
       }
-      body="That's on us, not you. Try it again — if it keeps happening, the shop can sort you out directly."
+      body="That's on us, not you. Try it again. If it keeps happening, the shop can sort you out directly."
       onRetry={reset}
       primary={{ href: "/shop", text: "Go to the shop" }}
     />

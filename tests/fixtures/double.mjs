@@ -622,6 +622,12 @@ http.createServer(async (req, res) => {
       // NOTE: this double is single-threaded, so it cannot exercise the
       // race the real function guards against. race.mjs does that against
       // real PostgreSQL. What this proves is the app's use of it.
+      // Self-healing, as the real function: stale holds go back first.
+      const staleBefore = Date.now() - 15 * 60 * 1000;
+      for (const sp of db.game_spots) {
+        if (sp.game_id === a.p_game && sp.status === "held" && sp.held_at &&
+            Date.parse(sp.held_at) < staleBefore) { sp.status = "open"; sp.held_at = null; }
+      }
       const open = db.game_spots
         .filter((sp) => sp.game_id === a.p_game && sp.status === "open")
         .sort((x, y) => x.spot_number - y.spot_number);
@@ -656,8 +662,12 @@ http.createServer(async (req, res) => {
       return send(res, 200, null);
     }
     if (fn === "game_spots_remaining") {
+      // As the real function: a hold older than fifteen minutes is an
+      // abandoned checkout and counts as available.
+      const stale = Date.now() - 15 * 60 * 1000;
       return send(res, 200, db.game_spots.filter(
-        (sp) => sp.game_id === a.p_game && sp.status === "open").length);
+        (sp) => sp.game_id === a.p_game && (sp.status === "open" ||
+          (sp.status === "held" && sp.held_at && Date.parse(sp.held_at) < stale))).length);
     }
     if (fn === "claim_variant_stock") {
       const v = db.item_variants.find((x) => x.id === a.p_variant);
