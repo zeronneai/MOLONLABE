@@ -6,6 +6,7 @@ import { getSupabase } from "@/lib/supabase/server";
 import { notifyOwner } from "@/lib/notify";
 import { logDbError } from "@/lib/db/log";
 import type { InquiryInsert } from "@/lib/database.types";
+import { SHOP_PHONE_DISPLAY, TRANSFERS_ENABLED } from "@/lib/brand";
 
 export async function submitInquiry(
   _prev: FormState,
@@ -38,6 +39,16 @@ export async function submitInquiry(
   }
 
   const data = parsed.data;
+
+  // Transfers are switched off (TRANSFERS_ENABLED), and the page with
+  // the form is gone. A request posted anyway is refused rather than
+  // filed, because the shop cannot act on it yet.
+  if (data.type === "transfer" && !TRANSFERS_ENABLED) {
+    return {
+      status: "error",
+      message: `We're not taking transfer requests online yet. Call the shop on ${SHOP_PHONE_DISPLAY}.`,
+    };
+  }
 
   // Prefer the server-only service-role client; fall back to the anon
   // client, which the RLS insert policy still permits.

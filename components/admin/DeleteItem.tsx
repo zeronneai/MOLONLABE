@@ -89,7 +89,8 @@ export default function DeleteItem({
               Delete {name.toUpperCase()} permanently?
             </p>
             <p className="mt-3 text-sm text-muted">
-              This cannot be undone. Its uploaded images are deleted too.
+              This cannot be undone. Its uploaded images are deleted too,
+              unless another item uses them.
             </p>
             <form action={action} className="mt-8 flex flex-wrap gap-3">
               <input type="hidden" name="id" value={id} />

@@ -61,17 +61,22 @@ given to anyone who buys a guide. Linked from the confirmation page and the
 confirmation email. Contains the piece's name, brand, specifications and
 description, its photographs, and three sections the owner writes.
 
-**Services.** What the shop does beyond selling: currently FFL transfers
-only. Needs the real list of services from the client.
+**Services.** What the shop does beyond selling. It lists nothing at the
+moment and says to call the shop, because the only service was FFL
+transfers, which are switched off. Needs the real list from the client.
 
-**FFL transfers.** How a transfer works, in steps, with a form to start
-one.
+**FFL transfers. Switched off (27 September)** until the client decides
+the service and its price. `/transfers` returns a 404, and it is out of
+the navigation, the footer, the sitemap and the Services page. The
+server refuses a transfer request even if one is posted by hand. The
+page and its form are intact: set `TRANSFERS_ENABLED` to `true` in
+`lib/brand.ts` to bring all of it back.
 
 **Visit.** Address, hours, phone, directions.
 
-**Sweepstakes rules.** The full written rules. Three clauses are marked
-as outstanding on the page itself and need answers from the shop. The
-page is hidden from search engines until launch.
+**Sweepstakes rules.** The full written rules, final: the client approved
+the last seven clauses on 26 September and nothing on the page is marked
+as outstanding. The page is hidden from search engines until launch.
 
 **Privacy policy.** Drafted, live, linked in the footer, hidden from
 search engines, and not yet reviewed by the attorney. One gap left
@@ -178,6 +183,9 @@ reached. Owner only.
 
 ## 2. What has to happen before launch
 
+The payment switch and the removal of test orders are step by step in
+`docs/go-live.md`.
+
 ### Purple Roots
 
 1. Apply migration `20260927100000_guide_image_count.sql` to the live
@@ -241,21 +249,19 @@ reached. Owner only.
 1. Confirm the two shipping prices. They are currently $10 standard and
    $20 oversize, both invented.
 2. Confirm the sales tax rate of 8.25%.
-3. Confirm the seven rules clauses drafted on 26 September (03, 07, 08,
-   09, 12, 13 and 22). They are published marked "Wording to be
-   confirmed"; `docs/wording.md` has the text. Clause 14, how the winner
-   is picked, was decided on 25 September.
+3. Done 26 September: the rules are final.
 4. Supply the final wording for the refund line. It currently reads "All
    sales are final. No refunds or exchanges." and that is our wording,
    not theirs.
-5. Supply the real list of services. The page currently claims FFL
-   transfers and nothing else.
+5. Supply the real list of services, and decide the transfer service and
+   its price. The Services page lists nothing until then, and transfers
+   are switched off.
 6. Read the shop story, the hero lines and the empty states, and correct
    anything that does not sound like the shop.
 7. Supply a photograph of the actual storefront to replace the
    atmospheric stand-in, and confirm or correct its alt text.
-8. Confirm whether the shop's phone line has WhatsApp. Every WhatsApp
-   button is switched off until it does.
+8. Done: WhatsApp stays off permanently. All contact is by email or
+   (915) 497-0541.
 9. Decide whether the arcade discount code is on at launch, and what the
    code and the reward are.
 10. Replace the four seeded catalogue items with real stock.
@@ -283,9 +289,8 @@ review the acknowledgement and the privacy policy section.
 3. Approve or rewrite the refund line.
 4. Approve or rewrite the pickup notice, which says that paying online
    does not complete a firearm sale. That wording is ours.
-5. Review the rules as the client edited them on 25 and 26 September,
-   and the seven drafts marked "Wording to be confirmed".
-   `docs/wording.md` lists what changed and what is open.
+5. Review the rules as the client finalised them on 26 September.
+   `docs/wording.md` lists what changed.
 6. Confirm the checkout terms (`2026-09-agency-4`): the early-draw
    sentence is gone and the broadcast acknowledgement is new. They are
    stored on every order.

@@ -5,6 +5,7 @@ import {
   SHOP_HOURS,
   SHOP_PHONE_DISPLAY,
   SHOP_PHONE_HREF,
+  TRANSFERS_ENABLED,
 } from "@/lib/brand";
 
 const navLinks = [
@@ -14,7 +15,7 @@ const navLinks = [
   { href: "/transfers", label: "Transfers" },
   { href: "/services", label: "Services" },
   { href: "/visit", label: "Visit" },
-];
+].filter((l) => TRANSFERS_ENABLED || l.href !== "/transfers");
 
 export default function Footer() {
   return (

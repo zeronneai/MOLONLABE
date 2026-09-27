@@ -77,12 +77,13 @@ The early-draw clause was deleted at his instruction, and on 26 September
 the early draw was removed everywhere else too: the checkout terms, the
 admin, the presentation, the server action and the database.
 
-**Drafted by the agency on 26 September, for the client to confirm as a
-set (seven).** Written from what the system does, and published with a
-"Wording to be confirmed" marker (`RULES_DRAFTS` in `lib/games/rules.ts`;
-approving one means removing `pending` from its clause):
+**Drafted by the agency and approved by the client, 26 September
+(seven).** Written from what the system does (`RULES_APPROVED` in
+`lib/games/rules.ts`). The rules are final: nothing on the page is marked
+as awaiting confirmation, and `tests/browser/rules.mjs` fails if a marker
+comes back.
 
-| # | Draft | Was (25 Sept) |
+| # | Wording | Was (25 Sept) |
 | --- | --- | --- |
 | 03 | Each drop offers a set number of guides at a set price per guide. Both are fixed when the drop is created and do not change while it runs. | 04 |
 | 07 | Each guide in a drop has a number, from 1 up to the number of guides offered. Numbers are assigned automatically at checkout from those still available, lowest first. A buyer cannot choose them, and a buyer who gets several may not get consecutive numbers. | 08 |
@@ -92,7 +93,7 @@ approving one means removing `pending` from its clause):
 | 13 | Each guide is one entry, and every entry has the same chance of winning. A person holding five guides has five times the chance of a person holding one, and five times the share of the wheel. | 14 |
 | 22 | This website shows how many guides a drop has left, never who bought them. During the drawing, each buyer's first name and last initial appear on screen, as stated at checkout. A buyer who bought before checkout stated this appears by guide number instead. Email addresses, phone numbers and full surnames are never shown. | 23 |
 
-What each draft rests on, so it stays true:
+What each clause rests on, so it stays true:
 
 - 03: the admin never offers to edit count or price after creation, and
   since 26 September the database refuses it (`refuse_pool_change`).

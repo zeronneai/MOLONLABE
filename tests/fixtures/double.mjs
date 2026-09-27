@@ -176,6 +176,8 @@ let mailRefuses = false;
 // name would make that untestable.
 const BUCKETS = new Set(["product-images", "game-guides"]);
 let storage = new Map();
+/** Every object key deleted since the last reset, in order. */
+let storageDeletes = [];
 
 const readRaw = (req) =>
   new Promise((resolve) => {
@@ -367,6 +369,7 @@ http.createServer(async (req, res) => {
   if (path === "/__reset") {
     db = seed();
     storage = new Map();
+    storageDeletes = [];
     mailRefuses = false;
     return send(res, 200, { ok: true });
   }
@@ -554,7 +557,19 @@ http.createServer(async (req, res) => {
     }
 
     if (req.method === "DELETE") {
+      // storage-js remove([...]) is one DELETE on the bucket with the
+      // paths in the body; a DELETE on a full path removes that object.
+      if (key === bucket) {
+        const body = (await readBody(req)) ?? {};
+        const removed = [];
+        for (const prefix of body.prefixes ?? []) {
+          if (storage.delete(`${bucket}/${prefix}`)) removed.push({ name: prefix });
+        }
+        storageDeletes.push(...removed.map((r) => `${bucket}/${r.name}`));
+        return send(res, 200, removed);
+      }
       storage.delete(key);
+      storageDeletes.push(key);
       return send(res, 200, { message: "Successfully deleted" });
     }
   }

@@ -101,10 +101,10 @@ check("the rules say drop, not game, in the headings and clause 15",
   /^When a drop closes$/im.test(text) && !/\bgames?\b/i.test(clauses.join(" ")),
   (clauses.join(" ").match(/.{0,30}\bgames?\b.{0,30}/i) ?? ["clean"])[0]);
 
-// The seven drafts of 2026-09-26, held here as literals so an edit to the
-// source cannot also edit the check. Each is published with the marker
-// until the client confirms the set.
-const DRAFTS = [
+// The seven clauses drafted on 2026-09-26 and approved by the client the
+// same day, held here as literals so an edit to the source cannot also
+// edit the check. Final: no clause on the page carries a marker.
+const APPROVED = [
   [3, "Each drop offers a set number of guides at a set price per guide. Both are fixed when the drop is created and do not change while it runs."],
   [7, "Each guide in a drop has a number, from 1 up to the number of guides offered. Numbers are assigned automatically at checkout from those still available, lowest first. A buyer cannot choose them, and a buyer who gets several may not get consecutive numbers."],
   [8, "Adding more guides from the same drop to a cart adds them to the guides already there, and the cart shows the running total before payment. A cart holds guides from one drop at a time. If fewer guides are left than the cart holds, the cart is reduced to the number left before payment."],
@@ -113,13 +113,12 @@ const DRAFTS = [
   [13, "Each guide is one entry, and every entry has the same chance of winning. A person holding five guides has five times the chance of a person holding one, and five times the share of the wheel."],
   [22, "This website shows how many guides a drop has left, never who bought them. During the drawing, each buyer's first name and last initial appear on screen, as stated at checkout. A buyer who bought before checkout stated this appears by guide number instead. Email addresses, phone numbers and full surnames are never shown."],
 ];
-const marked = await page.locator("main ol li").evaluateAll((lis) =>
-  lis.map((li, i) => (li.querySelector("[data-pending-wording]") ? i + 1 : null)).filter(Boolean));
-check("exactly the seven drafts are marked wording to be confirmed",
-  JSON.stringify(marked) === JSON.stringify(DRAFTS.map(([n]) => n)), marked.join(", "));
-for (const [n, want] of DRAFTS) {
-  check(`draft ${String(n).padStart(2, "0")} is published with its marker`,
-    /wording to be confirmed/i.test(clause(n)) && clause(n).includes(want),
+check("no clause is marked as wording to be confirmed",
+  !/to be confirmed/i.test(text) && (await page.locator("[data-pending-wording]").count()) === 0,
+  (text.match(/[^\n]*to be confirmed[^\n]*/i) ?? ["none"])[0].slice(0, 80));
+for (const [n, want] of APPROVED) {
+  check(`clause ${String(n).padStart(2, "0")} is the approved wording, unmarked`,
+    clause(n).includes(want) && !/confirm/i.test(clause(n)),
     clause(n).slice(0, 90) || "MISSING");
 }
 // Clause 14 as the client decided it (2026-09-25), held as a literal
@@ -128,7 +127,6 @@ const DRAW_METHOD =
   "The winner is selected by an electronic name wheel, weighted by the number of guides each person holds. The drawing is run at the shop, broadcast live on our Instagram, @molonlabe.fa, and saved as a reel. Before the wheel is spun, every entry is shown on screen so viewers can confirm all buyers were included. The result is recorded.";
 check("clause 14 is the client's wording, verbatim", clause(14).includes(DRAW_METHOD),
   clause(14).slice(0, 90));
-check("clause 14 is not marked as a draft", !/wording to be confirmed/i.test(clause(14)));
 
 // ---------------------------------------------- how the page presents it
 check("the title is the client's", /^Official Sweepstakes Rules$/m.test(text),

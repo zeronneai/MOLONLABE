@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { TRANSFERS_ENABLED } from "@/lib/brand";
 import InquiryForm from "@/components/forms/InquiryForm";
 import Reveal from "@/components/motion/Reveal";
 
@@ -25,6 +27,9 @@ const steps: { title: string; body: string }[] = [
 ];
 
 export default function TransfersPage() {
+  // Off until the client decides the service and its price. A 404 rather
+  // than "coming soon", so there is no page to index and no form to send.
+  if (!TRANSFERS_ENABLED) notFound();
   return (
     <div className="pb-24 pt-[calc(72px+4rem)]">
       <div className="px-page">

@@ -48,7 +48,12 @@ const page = await ctx.newPage();
 page.on("pageerror", (e) => bad.push(`PAGE ERROR ${e.message}`));
 
 // ------------------------------------------------------- an inquiry
-await page.goto(`${APP}/transfers`, { waitUntil: "networkidle" });
+// Through an item's Inquire drawer. (Transfers are switched off, and with
+// them the form this used to use.)
+await page.setViewportSize({ width: 1280, height: 1000 });
+await page.goto(`${APP}/inventory/sig-mpx-carbon`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: /inquire about this/i }).first().click();
+await page.waitForTimeout(600);
 // The inquiry form namespaces its ids per instance, so go by label.
 await page.getByLabel("Name", { exact: true }).fill("Alma Cortez");
 await page.getByLabel("Email", { exact: true }).fill("alma.cortez@example.com");
@@ -56,7 +61,7 @@ const phone = page.getByLabel(/phone/i);
 if (await phone.count()) await phone.first().fill("915-555-0142");
 const msg = page.getByLabel(/message|details|tell us/i);
 if (await msg.count())
-  await msg.first().fill("Incoming transfer from an out of state dealer.");
+  await msg.first().fill("Is this still in the case this weekend?");
 await page.locator('form button[type="submit"]').first().click();
 await page.waitForTimeout(1800);
 

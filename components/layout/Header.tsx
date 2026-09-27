@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LOGO_URL } from "@/lib/brand";
-import { SHOP_PHONE_HREF } from "@/lib/brand";
+import { SHOP_PHONE_HREF, TRANSFERS_ENABLED } from "@/lib/brand";
 import CartLink from "@/components/cart/CartLink";
 
 const nav = [
@@ -16,7 +16,7 @@ const nav = [
   { href: "/in-the-case", label: "In the case" },
   { href: "/transfers", label: "Transfers" },
   { href: "/services", label: "Services" },
-];
+].filter((l) => TRANSFERS_ENABLED || l.href !== "/transfers");
 
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);

@@ -1,26 +1,32 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Reveal from "@/components/motion/Reveal";
-import { SHOP_PHONE_HREF } from "@/lib/brand";
+import { SHOP_PHONE_DISPLAY, SHOP_PHONE_HREF, TRANSFERS_ENABLED } from "@/lib/brand";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/services" },
   title: "Services",
-  description:
-    "FFL transfers, special orders, and in-store services at Molon Labe Firearms x SunCity Outdoors, El Paso, TX.",
+  description: TRANSFERS_ENABLED
+    ? "FFL transfers and in-store services at Molon Labe Firearms x SunCity Outdoors, El Paso, TX."
+    : "In-store services at Molon Labe Firearms x SunCity Outdoors, El Paso, TX.",
 };
 
-// Only what the build actually evidences. FFL transfers are real — the
+// Only what the build actually evidences. FFL transfers are real: the
 // brief specifies a /transfers route with an intake form, and it exists.
 // Special orders, consignment and "advice" were my inventions and are
 // gone; the client is supplying the real lineup, which likely includes
 // range and classes that I had no basis to claim either way.
-const services: { title: string; body: string }[] = [
-  {
-    title: "FFL TRANSFERS",
-    body: "Buy anywhere, ship it to us, pick it up at the counter. Start it online and we'll take it from there.",
-  },
-];
+//
+// Transfers are listed only while TRANSFERS_ENABLED is on; the client has
+// not yet decided the service or its price.
+const services: { title: string; body: string }[] = TRANSFERS_ENABLED
+  ? [
+      {
+        title: "FFL TRANSFERS",
+        body: "Buy anywhere, ship it to us, pick it up at the counter. Start it online and we'll take it from there.",
+      },
+    ]
+  : [];
 
 export default function ServicesPage() {
   return (
@@ -33,29 +39,42 @@ export default function ServicesPage() {
       </h1>
 
       <Reveal className="mt-14">
-        <ol className="border-t hairline">
-          {services.map((s, i) => (
-            <li
-              key={s.title}
-              className="grid gap-2 border-b hairline py-8 md:grid-cols-[48px_280px_1fr] md:items-baseline md:gap-4"
-            >
-              <span className="label text-muted">{String(i + 1).padStart(2, "0")}</span>
-              <span className="display text-2xl">{s.title}</span>
-              <p className="max-w-[52ch] text-sm text-muted">{s.body}</p>
-            </li>
-          ))}
-        </ol>
+        {services.length > 0 && (
+          <ol className="border-t hairline">
+            {services.map((s, i) => (
+              <li
+                key={s.title}
+                className="grid gap-2 border-b hairline py-8 md:grid-cols-[48px_280px_1fr] md:items-baseline md:gap-4"
+              >
+                <span className="label text-muted">{String(i + 1).padStart(2, "0")}</span>
+                <span className="display text-2xl">{s.title}</span>
+                <p className="max-w-[52ch] text-sm text-muted">{s.body}</p>
+              </li>
+            ))}
+          </ol>
+        )}
         <p className="mt-8 max-w-[52ch] text-sm leading-relaxed text-muted">
-          More than this happens at the counter. If you need something and
-          you don&apos;t see it here, call and ask. It&apos;s a short
-          conversation.
+          {services.length > 0 ? (
+            <>
+              More than this happens at the counter. If you need something and
+              you don&apos;t see it here, call and ask. It&apos;s a short
+              conversation.
+            </>
+          ) : (
+            <>
+              Services are handled at the counter. Call the shop on{" "}
+              {SHOP_PHONE_DISPLAY} and ask. It&apos;s a short conversation.
+            </>
+          )}
         </p>
       </Reveal>
 
       <div className="mt-12 flex flex-wrap items-center gap-x-10 gap-y-4">
-        <Link href="/transfers" className="cta-primary control-go">
-          Start a transfer
-        </Link>
+        {TRANSFERS_ENABLED && (
+          <Link href="/transfers" className="cta-primary control-go">
+            Start a transfer
+          </Link>
+        )}
         <a href={SHOP_PHONE_HREF} className="cta-primary">
           Call the shop
         </a>

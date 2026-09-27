@@ -68,13 +68,7 @@ export default function SweepstakesRulesPage() {
                       {String(n).padStart(2, "0")}
                     </span>
 
-                    <div className="max-w-[62ch]" data-pending-wording={clause.pending ? "" : undefined}>
-                      {clause.pending && (
-                        /* A draft awaiting the client. Marked in place, so a
-                           reader meets it in the clause it belongs to
-                           rather than as a warning about the whole page. */
-                        <p className="label mb-2 text-amber">Wording to be confirmed</p>
-                      )}
+                    <div className="max-w-[62ch]">
                       <p
                         className={
                           clause.prominent
@@ -85,9 +79,7 @@ export default function SweepstakesRulesPage() {
                                 // paragraph). Given its own rule so it
                                 // reads as quoted, and never reflowed.
                                 "border-l-2 border-acid pl-5 leading-relaxed"
-                              : clause.pending
-                                ? "border-l-2 border-amber pl-5 leading-relaxed"
-                                : "leading-relaxed"
+                              : "leading-relaxed"
                         }
                       >
                         {clause.text}

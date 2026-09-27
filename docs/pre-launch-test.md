@@ -91,8 +91,9 @@ number and what happened instead.
    `item_id` populated and `type = 'item'`.
 4. **If `GOOGLE_SCRIPT_URL` is set:** check the owner's inbox and sheet.
    If it is not set, submissions still save — that is expected.
-5. Go to `/transfers`, submit that form.
-6. **Expect** a row with `type = 'transfer'` and `item_id` null.
+5. Go to `/transfers`. **Expect** a 404: transfers are switched off
+   until the client decides the service and its price. There is no
+   Transfers link in the header or footer.
 
 > This is the step that proves the revoke-anon-inserts migration and the
 > service-role key are both correct. If it fails with a permission error,

@@ -52,10 +52,10 @@ existing entrant insert. `FORTIS_*` are commented out in `.env.example`.
 Note: the brief asks for `lib/payments/provider.ts`; ours is
 `lib/payments/index.ts`. Rename if the exact path matters.
 
-### 2.2 WhatsApp — OFF BEHIND A FLAG
-`WHATSAPP_ENABLED = false` in `lib/brand.ts`. Confirm with the shop
-whether (915) 497-0541 actually has WhatsApp; if it does, flip the flag
-and the CTAs return.
+### 2.2 WhatsApp: OFF, PERMANENTLY
+The client decided (26 September) that WhatsApp stays off for good. All
+contact is by email or (915) 497-0541. `WHATSAPP_ENABLED` in
+`lib/brand.ts` stays `false`.
 
 ### 2.3 ~~Hero clip durations~~ — MEASURED, NOT ASSUMED
 `lib/hero/duration.ts` reads the real duration from Cloudinary's

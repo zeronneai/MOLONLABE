@@ -106,7 +106,7 @@ await c.context().addInitScript(() => {
 });
 
 for (const path of [
-  "/", "/games", "/featured", "/shop", "/in-the-case", "/transfers", "/services",
+  "/", "/games", "/featured", "/shop", "/in-the-case", "/services",
   "/visit", "/privacy", "/sweepstakes-rules", "/inventory/sig-mpx-carbon",
   "/inventory/molon-labe-tee", "/cart", "/no-such-page",
 ]) {
@@ -203,11 +203,12 @@ check("the sold-out alert went out", Boolean(full));
 hits.push(...found("ALERT game_full", `${full?.subject}\n${full?.summary}`));
 for (const path of ["/", "/games", "/featured"]) await sweep(c, "PUBLIC sold out", path);
 
-// The rules: the seven drafts of 2026-09-26 are marked as awaiting the
-// client (tests/browser/rules.mjs names them).
+// The rules are final (approved 2026-09-26): nothing is marked as
+// awaiting confirmation (tests/browser/rules.mjs checks each clause).
 await c.goto(`${APP}/sweepstakes-rules`, { waitUntil: "networkidle" });
-const pendingCount = await c.locator("[data-pending-wording]").count();
-check("the rules page marks the clauses still to be confirmed", pendingCount === 7, `${pendingCount}`);
+const rulesText = await c.locator("body").innerText();
+check("the rules page marks nothing as still to be confirmed",
+  !/to be confirmed/i.test(rulesText), (rulesText.match(/[^\n]*to be confirmed[^\n]*/i) ?? ["none"])[0]);
 
 // ====================================================================
 // STAFF

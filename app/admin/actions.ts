@@ -197,28 +197,15 @@ export async function deleteItem(
     };
   }
 
-  // Uploaded images live in the bucket; legacy Cloudinary URLs are not ours
-  // to remove and are skipped.
-  const marker = `/storage/v1/object/public/${PRODUCT_BUCKET}/`;
-  const paths = (Array.isArray(item.images) ? item.images : [])
-    .filter((u): u is string => typeof u === "string")
-    .map((url) => {
-      const at = url.indexOf(marker);
-      return at === -1 ? null : url.slice(at + marker.length);
-    })
-    .filter((p): p is string => p !== null);
-  if (paths.length > 0) {
-    const { error } = await sb.storage.from(PRODUCT_BUCKET).remove(paths);
-    // An unremovable file is a cleanup problem, not a reason to keep a
-    // record the owner has decided is a mistake.
-    if (error) console.error("deleteItem storage:", error.message);
-  }
-
+  // The row first, then its files. The other way round, a failed delete
+  // left an item pointing at photographs that no longer existed.
   const { error } = await sb.from("items").delete().eq("id", id);
   if (error) {
     console.error("deleteItem:", error.message);
     return { status: "error", message: "Could not delete that item." };
   }
+  await removeUnusedPhotos(sb, Array.isArray(item.images) ? item.images : [], "deleteItem");
+
   // Logged after the fact but with the label captured before, so the line
   // still names the thing that no longer exists.
   await logActivity(sb, session, {
@@ -345,6 +332,47 @@ export async function duplicateItem(id: string): Promise<void> {
   }
   revalidatePath("/admin/inventory");
   if (copy?.id) redirect(`/admin/inventory/${copy.id}`);
+}
+
+/**
+ * Deletes product photographs from storage that no item uses any more.
+ *
+ * Called only after the database write that stopped using them has
+ * succeeded: removing a photo in the form, or deleting an item, used to
+ * delete the file first, so a form abandoned or a save that failed left
+ * the item pointing at a file that was gone.
+ *
+ * A file is kept if ANY item still lists it. Duplicating an item copies
+ * its photo addresses, so an original and its copy share files, and
+ * deleting one's photo must not break the other's.
+ *
+ * Only files in our bucket; legacy Cloudinary URLs are not ours to
+ * remove. A failure here leaves an unused file behind, which costs a few
+ * hundred kilobytes and is logged, never a broken item.
+ */
+async function removeUnusedPhotos(
+  sb: NonNullable<Awaited<ReturnType<typeof getSessionSupabase>>>,
+  urls: unknown[],
+  where: string,
+): Promise<void> {
+  const marker = `/storage/v1/object/public/${PRODUCT_BUCKET}/`;
+  const candidates = [...new Set(urls.filter((u): u is string => typeof u === "string" && u.includes(marker)))];
+  if (candidates.length === 0) return;
+  const { data: items, error: readError } = await sb.from("items").select("images");
+  // Unsure whether another item uses them: keep them.
+  if (readError) {
+    logDbError(`${where} photo references`, readError);
+    return;
+  }
+  const inUse = new Set(
+    (items ?? []).flatMap((it) => (Array.isArray(it.images) ? it.images : [])),
+  );
+  const paths = candidates
+    .filter((url) => !inUse.has(url))
+    .map((url) => url.slice(url.indexOf(marker) + marker.length));
+  if (paths.length === 0) return;
+  const { error } = await sb.storage.from(PRODUCT_BUCKET).remove(paths);
+  if (error) console.error(`${where} storage:`, error.message);
 }
 
 /**
@@ -531,6 +559,18 @@ export async function saveItem(
       };
     }
     return { status: "error", message: "Save failed — try again." };
+  }
+
+  // Photos taken off the item are deleted now that the item no longer
+  // lists them, and not before. Owner only: deleting a file is
+  // permanent, and storage refuses it for the manager anyway, so his
+  // removals leave the file in the bucket, unused.
+  if (id && session.role === "owner") {
+    const kept = new Set(Array.isArray(images) ? images : []);
+    const dropped = (Array.isArray(previous?.images) ? previous.images : []).filter(
+      (u) => !kept.has(u),
+    );
+    await removeUnusedPhotos(sb, dropped, "saveItem");
   }
 
   // Sizes are only synced while the toggle is on. Turning it off leaves

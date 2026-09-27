@@ -105,8 +105,12 @@ await p.evaluate(() => localStorage.setItem("mlf_cart", JSON.stringify([
 await pay("Ana");
 await fetch(`${DOUBLE}/__fail`);
 
-// A transfer request through the real form.
-await p.goto(`${APP}/transfers`, { waitUntil: "networkidle" });
+// An inquiry through the real form, on an item page. (Transfers are
+// switched off, and with them the form this used to use.)
+await p.setViewportSize({ width: 1280, height: 1000 });
+await p.goto(`${APP}/inventory/sig-mpx-carbon`, { waitUntil: "networkidle" });
+await p.getByRole("button", { name: /inquire about this/i }).first().click();
+await p.waitForTimeout(600);
 await p.fill('[name="name"]', "Alma Cortez");
 await p.fill('[name="email"]', "alma@example.com");
 if (await p.locator('[name="phone"]').count()) await p.fill('[name="phone"]', "9155550142");

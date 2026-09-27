@@ -43,19 +43,16 @@ import { FIREARM_DISCLAIMER, PICKUP_NOTICE } from "@/lib/legal";
 
 /**
  * Clauses drafted by the agency on 2026-09-26 from how the system
- * actually behaves, for the client to confirm as one set.
+ * actually behaves, and approved by the client as a set the same day.
+ * Final. Each describes a mechanic and can be pointed at the code listed
+ * at the top of this file; if the code changes, the clause changes with
+ * it.
  *
- * Each was a placeholder since the terminology ruling. They describe
- * mechanics, not legal judgments, and each can be pointed at the code
- * listed at the top of this file. They are published with a "Wording to
- * be confirmed" marker until the client approves them; approving one
- * means removing `pending` from its clause below, nothing else.
- *
- * 12 and 13 are written to agree with the client's clause 14 (the wheel):
- * every sold guide is one entry, and a person's share of the wheel is the
- * number of guides they hold.
+ * 12 and 13 agree with the client's clause 14 (the wheel): every sold
+ * guide is one entry, and a person's share of the wheel is the number of
+ * guides they hold.
  */
-export const RULES_DRAFTS = {
+export const RULES_APPROVED = {
   fixedPool:
     "Each drop offers a set number of guides at a set price per guide. Both are fixed when the drop is created and do not change while it runs.",
   numbering:
@@ -104,8 +101,6 @@ export const NO_REFUNDS = "No refunds or exchanges.";
 
 export type RuleClause = {
   text: string;
-  /** A draft, published with a "Wording to be confirmed" marker. */
-  pending?: boolean;
   /** Set for wording that is quoted exactly and never reflowed or edited. */
   verbatim?: boolean;
   /** Set it apart at display size rather than as body copy. */
@@ -149,7 +144,7 @@ export const RULES: RuleSection[] = [
   {
     heading: "How guides work",
     clauses: [
-      { text: RULES_DRAFTS.fixedPool, pending: true },
+      { text: RULES_APPROVED.fixedPool },
       { text: `All purchases are subject to Texas sales tax at ${SALES_TAX_DISPLAY}.` },
       { text: NO_REFUNDS, prominent: true },
       {
@@ -157,9 +152,9 @@ export const RULES: RuleSection[] = [
         // never more than the drop's total.
         text: "A person may buy as many guides as they want, up to the total offered in that drop.",
       },
-      { text: RULES_DRAFTS.numbering, pending: true },
-      { text: RULES_DRAFTS.cartMerge, pending: true },
-      { text: RULES_DRAFTS.holds, pending: true },
+      { text: RULES_APPROVED.numbering },
+      { text: RULES_APPROVED.cartMerge },
+      { text: RULES_APPROVED.holds },
       { text: "Entry requires purchasing a guide. There are no free entries." },
     ],
   },
@@ -172,8 +167,8 @@ export const RULES: RuleSection[] = [
   {
     heading: "How the winner is chosen",
     clauses: [
-      { text: RULES_DRAFTS.pool, pending: true },
-      { text: RULES_DRAFTS.odds, pending: true },
+      { text: RULES_APPROVED.pool },
+      { text: RULES_APPROVED.odds },
       { text: CLIENT_DRAW_METHOD, verbatim: true },
       {
         text: "A drop is drawn once. A drop that already has a winner cannot be drawn again.",
@@ -214,7 +209,7 @@ export const RULES: RuleSection[] = [
   {
     heading: "Your name and details",
     clauses: [
-      { text: RULES_DRAFTS.publicNames, pending: true },
+      { text: RULES_APPROVED.publicNames },
       {
         text: "A winner is published the same way: first name and last initial, nothing more.",
       },

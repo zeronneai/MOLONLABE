@@ -26,10 +26,22 @@ const PRODUCTION = {
   script: "https://js.authorize.net/v1/Accept.js",
 };
 
+/**
+ * Which Authorize.net this build talks to. Exactly the word
+ * "production" (any case, surrounding spaces ignored) means production;
+ * anything else, including unset or a typo, means sandbox, where no real
+ * card can be charged. Trimmed because a value pasted into a hosting
+ * dashboard with a trailing space or newline would otherwise read as
+ * sandbox with nothing to say so. /api/health reports the result.
+ */
+export function paymentMode(): "production" | "sandbox" {
+  return (process.env.NEXT_PUBLIC_AUTHORIZENET_ENV ?? "").trim().toLowerCase() === "production"
+    ? "production"
+    : "sandbox";
+}
+
 function endpoints() {
-  const production =
-    (process.env.NEXT_PUBLIC_AUTHORIZENET_ENV ?? "sandbox").toLowerCase() ===
-    "production";
+  const production = paymentMode() === "production";
   const base = production ? PRODUCTION : SANDBOX;
   // Escape hatch for tests, which point this at a local double. Ignored
   // in production so a stray variable cannot redirect live charges.

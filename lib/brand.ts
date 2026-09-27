@@ -11,12 +11,20 @@ export const SHOP_PHONE_E164 = "+19154970541";
 export const SHOP_PHONE_HREF = `tel:${SHOP_PHONE_E164}`;
 
 /**
- * WhatsApp is off until the shop confirms the line actually has it — a
- * wa.me link to a number without WhatsApp opens an error page, which is
- * worse than no button at all. Flip this to true to bring every WhatsApp
- * CTA back; the code paths are intact behind it.
+ * WhatsApp is off, permanently, by the client's decision (26 September):
+ * all contact is by email or the shop's phone. Leave this false.
  */
 export const WHATSAPP_ENABLED = false;
+
+/**
+ * FFL transfers are off until the client decides the service and its
+ * price (26 September). While false: /transfers returns a 404, it is not
+ * in the navigation, the footer or the sitemap, the Services page does
+ * not offer it, and the inquiry action refuses a transfer request even
+ * if one is posted directly. The page and its form are intact; set this
+ * to true to bring all of it back.
+ */
+export const TRANSFERS_ENABLED = false;
 
 export function whatsappUrl(message: string): string {
   return `https://wa.me/${SHOP_PHONE_E164.replace("+", "")}?text=${encodeURIComponent(message)}`;

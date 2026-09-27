@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { SITE_URL } from "@/lib/brand";
+import { SITE_URL, TRANSFERS_ENABLED } from "@/lib/brand";
 import { getSupabase } from "@/lib/supabase/server";
 import { getLockedPrizeItemIds } from "@/lib/games/queries";
 import { logDbError } from "@/lib/db/log";
@@ -21,12 +21,14 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: Metadata
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
-  const entries: MetadataRoute.Sitemap = STATIC_ROUTES.map((r) => ({
-    url: `${SITE_URL}${r.path}`,
-    lastModified: now,
-    changeFrequency: r.changeFrequency,
-    priority: r.priority,
-  }));
+  const entries: MetadataRoute.Sitemap = STATIC_ROUTES
+    .filter((r) => TRANSFERS_ENABLED || r.path !== "/transfers")
+    .map((r) => ({
+      url: `${SITE_URL}${r.path}`,
+      lastModified: now,
+      changeFrequency: r.changeFrequency,
+      priority: r.priority,
+    }));
 
   const sb = getSupabase();
   if (!sb) return entries;

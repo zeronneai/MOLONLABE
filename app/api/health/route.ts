@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { paymentMode } from "@/lib/payments/authorizenet";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { emailProvider } from "@/lib/email/send";
@@ -150,6 +151,10 @@ export async function GET() {
     },
 
     payments: {
+      // What the gateway code will actually use, decided exactly as the
+      // checkout decides it. "production" here is the only proof that
+      // real cards are being charged.
+      mode: paymentMode(),
       NEXT_PUBLIC_AUTHORIZENET_ENV:
         process.env.NEXT_PUBLIC_AUTHORIZENET_ENV?.trim() || null,
       AUTHORIZENET_API_LOGIN_ID: {
