@@ -81,6 +81,19 @@ export default function CheckoutForm({
   const [gameTerms, setGameTerms] = useState(false);
   const [broadcast, setBroadcast] = useState(false);
   const buyingSpots = Boolean(cart?.spotGame && cart.spotCount > 0);
+
+  // The ticks are agreement for the drop named above them. If the cart
+  // switches to another drop (from another tab), they are cleared, so
+  // nobody pays for a drop they did not agree to by name.
+  const agreedFor = useRef<string | null>(null);
+  const dropId = cart?.spotGame?.id ?? null;
+  useEffect(() => {
+    if (agreedFor.current !== null && agreedFor.current !== dropId) {
+      setGameTerms(false);
+      setBroadcast(false);
+    }
+    agreedFor.current = dropId;
+  }, [dropId]);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -258,6 +271,9 @@ export default function CheckoutForm({
               disclaimerAccepted: true,
               gameTermsAccepted: buyingSpots ? gameTerms : undefined,
               broadcastAccepted: buyingSpots ? broadcast : undefined,
+              // The drop named on this page. The server refuses to charge
+              // if the cart now holds a different one.
+              spotGameId: cart.spotGame?.id ?? null,
               idempotencyKey,
               opaqueData: response.opaqueData!,
             });
@@ -437,6 +453,26 @@ export default function CheckoutForm({
             timestamp on the order. */}
         {buyingSpots && (
           <section className="mt-12 border-t hairline pt-8">
+            {/* Which drawing these guides are for, named before the terms
+                and before the money: with more than one drop open, the
+                buyer has to be able to see which one they are paying for. */}
+            <div className="mb-8 border-l-2 border-acid pl-5" data-checkout-drop={cart.spotGame!.id}>
+              <p className="label text-acid">You are buying guides for</p>
+              <p className="display mt-2 text-2xl" data-checkout-drop-title>
+                {cart.spotGame!.title.toUpperCase()}
+              </p>
+              {cart.spotGame!.pieceName && cart.spotGame!.pieceName !== cart.spotGame!.title && (
+                <p className="mt-1 text-sm">
+                  <span className="text-muted">Featured piece: </span>
+                  {cart.spotGame!.pieceName}
+                </p>
+              )}
+              <p className="mt-2 text-sm text-muted">
+                {cart.spotCount} {cart.spotCount === 1 ? "guide" : "guides"} at{" "}
+                {formatUsd(cart.spotGame!.spotPriceCents)}. They enter this drop&apos;s
+                drawing and no other.
+              </p>
+            </div>
             <h2 className="label text-amber">
               Terms of this drop
             </h2>
@@ -534,8 +570,12 @@ export default function CheckoutForm({
 
           {buyingSpots && (
             <p className="mt-5 border-t hairline pt-5 text-sm text-acid">
-              {cart.spotCount} {cart.spotCount === 1 ? "guide" : "guides"} from{" "}
-              {cart.spotGame!.title}.{" "}
+              {cart.spotCount} {cart.spotCount === 1 ? "guide" : "guides"} for the drop{" "}
+              <strong>{cart.spotGame!.title}</strong>
+              {cart.spotGame!.pieceName && cart.spotGame!.pieceName !== cart.spotGame!.title
+                ? `, featuring the ${cart.spotGame!.pieceName}`
+                : ""}
+              .{" "}
               <span className="text-muted">
                 Guide numbers are assigned when you pay.
               </span>

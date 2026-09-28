@@ -11,6 +11,7 @@
 // tax, shipping and the total are dimmed until the server's re-quote
 // arrives a moment later. The server's figures are always what is paid.
 
+import { dropPath } from "@/lib/games/paths";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import CartThumb from "@/components/cart/CartThumb";
@@ -175,8 +176,14 @@ export default function CartView() {
           {cart.spotGame && guideCount > 0 && (
             <div className="mt-5 border-t hairline pt-5">
               <p className="text-sm text-acid">
-                {guideCount} {guideCount === 1 ? "guide" : "guides"} from{" "}
-                {cart.spotGame.title}.{" "}
+                {guideCount} {guideCount === 1 ? "guide" : "guides"} for the drop{" "}
+                <Link href={dropPath(cart.spotGame.id)} className="font-extrabold underline" data-cart-drop-name>
+                  {cart.spotGame.title}
+                </Link>
+                {cart.spotGame.pieceName && cart.spotGame.pieceName !== cart.spotGame.title
+                  ? `, featuring the ${cart.spotGame.pieceName}`
+                  : ""}
+                .{" "}
                 <span className="text-muted">
                   {cart.spotGame.remaining}{" "}
                   {cart.spotGame.remaining === 1 ? "guide" : "guides"} left of{" "}
@@ -268,7 +275,8 @@ function CartLineRow({
       ? `Guide to the ${line.pieceName}`
       : "Guide"
     : line.name;
-  const href = guide ? "/games" : `/inventory/${line.slug}`;
+  // A guide line goes to its own drop's page, never to a page that picks.
+  const href = guide && line.gameId ? dropPath(line.gameId) : `/inventory/${line.slug}`;
   // A single unit (a firearm to collect) is always exactly one.
   const fixed = line.maxQuantity <= 1 && line.fulfillment === "pickup";
 

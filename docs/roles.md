@@ -19,6 +19,7 @@ screen, nothing more.
 | Tax rate, shipping prices | yes | no (sees them, cannot change) |
 | Discount code, offer on or off, arcade difficulty | yes | no (sees them, cannot change) |
 | Create or remove the demo game | yes | no |
+| Choose the drop on the home page | yes | no (sees which one it is) |
 | Activity log | yes, filterable by person | no |
 | Team & alerts: who gets which alert, send a test | yes | no (sees the lists, cannot change) |
 | Create accounts or change anyone's role | Supabase dashboard only | no |

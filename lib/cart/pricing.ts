@@ -227,6 +227,7 @@ export async function priceCart(
         spotGame = {
           id: game.id,
           title: game.title,
+          pieceName: piece?.name ?? null,
           spotPriceCents: game.spot_price_cents,
           totalSpots: game.total_spots,
           remaining,

@@ -114,7 +114,7 @@ export async function recordInStoreSale(
   const sale = data as unknown as { order_id: string; numbers: number[] };
   const { data: game } = await sb
     .from("games")
-    .select("title, total_spots, spot_price_cents, status")
+    .select("title, total_spots, spot_price_cents, status, item:items(name)")
     .eq("id", gameId)
     .maybeSingle();
 
@@ -149,7 +149,9 @@ export async function recordInStoreSale(
       totalCents: qty * game.spot_price_cents,
       shipTo: null,
       spots: {
+        gameId,
         game: game.title,
+        piece: (game.item as { name?: string } | null)?.name ?? null,
         numbers: sale.numbers,
         totalSpots: game.total_spots,
         unitPriceCents: game.spot_price_cents,
@@ -205,7 +207,7 @@ export async function recordInStoreSale(
 
   revalidatePath(`/admin/games/${gameId}`);
   revalidatePath("/admin/orders");
-  revalidatePath("/featured");
+  revalidatePath(`/games/${gameId}`);
   revalidatePath("/games");
   revalidatePath("/");
 
@@ -284,7 +286,7 @@ export async function voidInStoreSale(
 
   if (order.game_id) revalidatePath(`/admin/games/${order.game_id}`);
   revalidatePath("/admin/orders");
-  revalidatePath("/featured");
+  if (order.game_id) revalidatePath(`/games/${order.game_id}`);
   revalidatePath("/games");
   revalidatePath("/");
   return {

@@ -351,7 +351,8 @@ create table if not exists public.games (
   guide_fingerprint text,
   guide_generated_at timestamp with time zone,
   guide_images_wanted integer,
-  guide_images_used integer
+  guide_images_used integer,
+  featured_on_home boolean default false not null
 );
 alter table public.games add column if not exists id uuid default gen_random_uuid();
 do $$ begin
@@ -439,6 +440,20 @@ alter table public.games add column if not exists guide_fingerprint text;
 alter table public.games add column if not exists guide_generated_at timestamp with time zone;
 alter table public.games add column if not exists guide_images_wanted integer;
 alter table public.games add column if not exists guide_images_used integer;
+alter table public.games add column if not exists featured_on_home boolean default false;
+do $$ begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'games'
+      and column_name = 'featured_on_home' and is_nullable = 'YES'
+  ) then
+    if exists (select 1 from public.games where featured_on_home is null) then
+      raise notice 'public.games.featured_on_home holds nulls; left nullable. Fill them, then: alter table public.games alter column featured_on_home set not null;';
+    else
+      alter table public.games alter column featured_on_home set not null;
+    end if;
+  end if;
+end $$;
 do $$ declare c text; begin
   foreach c in array array['item_id', 'description', 'winner_note', 'created_at', 'created_by', 'created_by_name', 'updated_by', 'updated_by_name', 'guide_why', 'guide_care', 'guide_pairs', 'guide_path', 'guide_fingerprint', 'guide_generated_at', 'guide_images_wanted', 'guide_images_used'] loop
     if exists (
@@ -2412,6 +2427,7 @@ create index if not exists game_events_kind_idx ON public.game_events USING btre
 create index if not exists game_spots_email_idx ON public.game_spots USING btree (game_id, lower(email));
 create index if not exists game_spots_game_status_idx ON public.game_spots USING btree (game_id, status);
 create index if not exists game_spots_order_idx ON public.game_spots USING btree (order_id);
+create UNIQUE index if not exists games_one_on_home ON public.games USING btree (featured_on_home) WHERE featured_on_home;
 create index if not exists games_status_idx ON public.games USING btree (status);
 create index if not exists inquiries_status_idx ON public.inquiries USING btree (status);
 create index if not exists item_variants_item_idx ON public.item_variants USING btree (item_id, sort_order);
@@ -2858,6 +2874,23 @@ begin
 end;
 $function$;
 
+create or replace function public.refuse_home_choice()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+begin
+  -- No signed-in user is the SQL editor or the server's own key; a
+  -- signed-in user must be the owner.
+  if new.featured_on_home is distinct from old.featured_on_home
+     and auth.uid() is not null and not public.is_owner() then
+    raise exception 'Only the owner chooses the drop on the home page.'
+      using errcode = '42501';
+  end if;
+  return new;
+end;
+$function$;
+
 create or replace function public.refuse_pool_change()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -2939,6 +2972,38 @@ begin
       select 1 from public.game_spots
       where game_id = p_game and status <> 'sold'
     );
+end;
+$function$;
+
+create or replace function public.set_home_drop(p_game uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_status text;
+begin
+  if not public.is_owner() then
+    raise exception 'Only the owner chooses the drop on the home page.'
+      using errcode = '42501';
+  end if;
+  if p_game is not null then
+    select status into v_status from public.games where id = p_game;
+    if v_status is null then
+      raise exception 'That drop does not exist.' using errcode = 'P0002';
+    end if;
+    if v_status = 'drawn' then
+      raise exception 'That drop has been drawn. Choose a drop that is still running.'
+        using errcode = 'P0001';
+    end if;
+  end if;
+  update public.games set featured_on_home = false
+    where featured_on_home and id is distinct from p_game;
+  if p_game is not null then
+    update public.games set featured_on_home = true
+      where id = p_game and not featured_on_home;
+  end if;
 end;
 $function$;
 
@@ -3093,6 +3158,8 @@ drop trigger if exists admin_activity_stamp_actor on public.admin_activity;
 CREATE TRIGGER admin_activity_stamp_actor BEFORE INSERT ON public.admin_activity FOR EACH ROW EXECUTE FUNCTION stamp_activity_actor();
 drop trigger if exists campaigns_stamp_authorship on public.games;
 CREATE TRIGGER campaigns_stamp_authorship BEFORE INSERT OR UPDATE ON public.games FOR EACH ROW EXECUTE FUNCTION stamp_authorship();
+drop trigger if exists games_refuse_home_choice on public.games;
+CREATE TRIGGER games_refuse_home_choice BEFORE UPDATE OF featured_on_home ON public.games FOR EACH ROW EXECUTE FUNCTION refuse_home_choice();
 drop trigger if exists games_refuse_pool_change on public.games;
 CREATE TRIGGER games_refuse_pool_change BEFORE UPDATE OF total_spots, spot_price_cents ON public.games FOR EACH ROW EXECUTE FUNCTION refuse_pool_change();
 drop trigger if exists items_set_updated_at on public.items;
@@ -3392,11 +3459,13 @@ revoke execute on function public.password_fingerprint(p_user uuid) from public;
 revoke execute on function public.record_in_store_sale(p_game uuid, p_qty integer, p_first_name text, p_last_name text, p_email text, p_phone text, p_ack text, p_order_number text, p_token text) from public;
 revoke execute on function public.record_password_change() from public;
 revoke execute on function public.refuse_early_draw() from public;
+revoke execute on function public.refuse_home_choice() from public;
 revoke execute on function public.refuse_pool_change() from public;
 revoke execute on function public.release_checkout(p_key text) from public;
 revoke execute on function public.release_game_spots(p_game uuid, p_spots integer[]) from public;
 revoke execute on function public.release_variant_stock(p_variant uuid, p_qty integer) from public;
 revoke execute on function public.sell_game_spots(p_game uuid, p_spots integer[], p_order uuid, p_first_name text, p_last_name text, p_email text, p_phone text) from public;
+revoke execute on function public.set_home_drop(p_game uuid) from public;
 revoke execute on function public.set_updated_at() from public;
 revoke execute on function public.staff_name() from public;
 revoke execute on function public.staff_role() from public;
@@ -3432,6 +3501,8 @@ revoke execute on function public.record_password_change() from anon;
 grant execute on function public.record_password_change() to authenticated;
 revoke execute on function public.refuse_early_draw() from anon;
 revoke execute on function public.refuse_early_draw() from authenticated;
+revoke execute on function public.refuse_home_choice() from anon;
+revoke execute on function public.refuse_home_choice() from authenticated;
 revoke execute on function public.refuse_pool_change() from anon;
 revoke execute on function public.refuse_pool_change() from authenticated;
 revoke execute on function public.release_checkout(p_key text) from anon;
@@ -3442,6 +3513,8 @@ revoke execute on function public.release_variant_stock(p_variant uuid, p_qty in
 revoke execute on function public.release_variant_stock(p_variant uuid, p_qty integer) from authenticated;
 revoke execute on function public.sell_game_spots(p_game uuid, p_spots integer[], p_order uuid, p_first_name text, p_last_name text, p_email text, p_phone text) from anon;
 revoke execute on function public.sell_game_spots(p_game uuid, p_spots integer[], p_order uuid, p_first_name text, p_last_name text, p_email text, p_phone text) from authenticated;
+revoke execute on function public.set_home_drop(p_game uuid) from anon;
+grant execute on function public.set_home_drop(p_game uuid) to authenticated;
 revoke execute on function public.set_updated_at() from anon;
 revoke execute on function public.set_updated_at() from authenticated;
 revoke execute on function public.staff_name() from anon;

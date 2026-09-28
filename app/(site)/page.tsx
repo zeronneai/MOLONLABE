@@ -2,6 +2,9 @@ export const dynamic = "force-dynamic";
 
 import HeroScrub from "@/components/home/HeroScrub";
 import { getClipDurations } from "@/lib/hero/duration";
+import { getHomeDrop } from "@/lib/games/queries";
+import { dropPath } from "@/lib/games/paths";
+import { heroCopy } from "@/content/en";
 import Featured from "@/components/home/Featured";
 import FreshArrivals from "@/components/home/FreshArrivals";
 import CaseSection from "@/components/home/CaseSection";
@@ -24,10 +27,15 @@ import VisitSection from "@/components/home/VisitSection";
  */
 export default async function Home() {
   // Measured once per hour on the server, so the client never pays for it.
-  const durations = await getClipDurations();
+  const [durations, { featured }] = await Promise.all([getClipDurations(), getHomeDrop()]);
+  // The hero's second button goes to the featured drop's own page, or to
+  // the list of drops when none is featured. Never to a page that picks.
+  const feature = featured
+    ? { href: dropPath(featured.id), label: heroCopy.secondaryCta }
+    : { href: "/games", label: "See the drops" };
   return (
     <>
-      <HeroScrub durations={durations} />
+      <HeroScrub durations={durations} feature={feature} />
       <FreshArrivals />
       <CaseSection />
       <Featured />

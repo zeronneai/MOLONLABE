@@ -17,7 +17,8 @@ import { ProductJsonLd } from "@/components/seo/StructuredData";
 import TrackView from "@/components/analytics/TrackView";
 import PurchasePanel from "@/components/inventory/PurchasePanel";
 import { getItemVariants } from "@/lib/db/items";
-import { getPrizeItemStates } from "@/lib/games/queries";
+import { getPrizeItemStates, getRunningGameForItem } from "@/lib/games/queries";
+import { dropPath } from "@/lib/games/paths";
 import { needsFirearmDisclaimer } from "@/lib/admin/constants";
 
 
@@ -84,6 +85,8 @@ export default async function ItemPage({ params }: Params) {
   // winner's; unclaimed, it is sold in the shop only.
   if (prizeState === "drawn") notFound();
   const isPrize = prizeState === "running";
+  // The drop this piece is in, so the link goes to that drop and no other.
+  const prizeDrop = isPrize ? await getRunningGameForItem(item.id) : null;
 
   return (
     <div className="lg:flex">
@@ -127,8 +130,8 @@ export default async function ItemPage({ params }: Params) {
               now. It goes back on sale if the drop is drawn without it
               being won outright.
             </p>
-            <Link href="/featured" className="cta-secondary mt-5 inline-block">
-              See the drop →
+            <Link href={prizeDrop ? dropPath(prizeDrop.id) : "/games"} className="cta-secondary mt-5 inline-block">
+              {prizeDrop ? `See the drop: ${prizeDrop.title} →` : "See the drops →"}
             </Link>
           </div>
         ) : (

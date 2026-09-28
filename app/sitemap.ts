@@ -3,6 +3,8 @@ import { SITE_URL, TRANSFERS_ENABLED } from "@/lib/brand";
 import { getSupabase } from "@/lib/supabase/server";
 import { getLockedPrizeItemIds } from "@/lib/games/queries";
 import { logDbError } from "@/lib/db/log";
+import { dropPath } from "@/lib/games/paths";
+import { isDemoGame } from "@/lib/surfaces";
 
 // Rebuilt per request: inventory turns over, and a stale sitemap pointing
 // at sold-and-archived items is worse than none.
@@ -13,7 +15,6 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: Metadata
   { path: "/shop", priority: 0.9, changeFrequency: "weekly" },
   { path: "/games", priority: 0.9, changeFrequency: "daily" },
   { path: "/in-the-case", priority: 0.9, changeFrequency: "daily" },
-  { path: "/featured", priority: 0.8, changeFrequency: "daily" },
   { path: "/transfers", priority: 0.6, changeFrequency: "monthly" },
   { path: "/services", priority: 0.6, changeFrequency: "monthly" },
   { path: "/visit", priority: 0.6, changeFrequency: "monthly" },
@@ -32,6 +33,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const sb = getSupabase();
   if (!sb) return entries;
+
+  // Every drop at its own address. /featured only redirects, so it is
+  // not listed; a demo drop is for the client, not for search.
+  const { data: drops, error: dropsError } = await sb
+    .from("games")
+    .select("id, title, status, created_at")
+    .order("created_at", { ascending: false });
+  if (dropsError) logDbError("sitemap drops", dropsError);
+  for (const d of drops ?? []) {
+    if (isDemoGame(d.title)) continue;
+    entries.push({
+      url: `${SITE_URL}${dropPath(d.id)}`,
+      lastModified: now,
+      changeFrequency: d.status === "drawn" ? "monthly" : "daily",
+      priority: d.status === "drawn" ? 0.5 : 0.8,
+    });
+  }
 
   // Archived items are excluded by RLS already; the filter is belt and
   // braces so a policy change can't quietly publish them.

@@ -8,6 +8,8 @@ import { useIsOwner } from "@/components/admin/Role";
 import { OWNER_ONLY } from "@/lib/admin/constants";
 import InStoreSaleDialog from "@/components/admin/InStoreSaleDialog";
 import type { DropAfterSale } from "@/components/admin/InStoreSaleForm";
+import HomeDropControl from "@/components/admin/HomeDropControl";
+import { dropPath } from "@/lib/games/paths";
 
 // No status buttons. A game's state is derived — open at creation, full
 // the instant the last spot sells, drawn once a winner is recorded — so
@@ -107,6 +109,16 @@ export default function GameCard({
               CSV · owner only
             </span>
           )}
+          {/* The drop's own public page, exactly as a customer reaches it. */}
+          <a
+            href={dropPath(game.id)}
+            target="_blank"
+            rel="noopener"
+            className="label flex h-11 items-center px-3 text-muted hover:text-bone"
+            data-view-on-site
+          >
+            View on site
+          </a>
           <Link href={`/admin/games/${game.id}`} className="control control-sm">
             Open
           </Link>
@@ -124,6 +136,14 @@ export default function GameCard({
             </button>
           )}
         </div>
+      </div>
+
+      <div className="mt-3">
+        <HomeDropControl
+          gameId={game.id}
+          featured={game.featured_on_home === true}
+          running={status === "open" || status === "full"}
+        />
       </div>
 
       {selling && (

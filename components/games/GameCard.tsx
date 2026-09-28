@@ -5,6 +5,7 @@ import { itemImages } from "@/lib/db/items";
 import type { GameSummary } from "@/lib/games/queries";
 import type { GameState } from "@/lib/games/types";
 import { demoStrippedTitle, isDemoGame } from "@/lib/surfaces";
+import { dropPath } from "@/lib/games/paths";
 
 const stamp = (iso: string | null) => {
   if (!iso) return null;
@@ -45,6 +46,7 @@ export default function GameCard({
   const demo = isDemoGame(game.title);
   const finished = state === "finished";
   const awaiting = state === "awaiting";
+  const href = dropPath(game.id);
 
   return (
     <article className="border hairline bg-surface">
@@ -86,8 +88,12 @@ export default function GameCard({
               ? "Sold out, awaiting the draw"
               : "Open now"}
         </p>
+        {/* The title is the drop's own link. Every link on this card goes
+            to this drop's page, never to a page that picks one. */}
         <h3 className="display mt-3 text-xl">
-          {demoStrippedTitle(game.title).toUpperCase()}
+          <Link href={href} className="hover:text-acid" data-drop-link={game.id}>
+            {demoStrippedTitle(game.title).toUpperCase()}
+          </Link>
         </h3>
         {game.item && (
           <p className="mt-2 text-sm text-muted">{game.item.name}</p>
@@ -145,10 +151,10 @@ export default function GameCard({
               posted here.
             </p>
             <Link
-              href="/featured"
+              href={href}
               className="cta-secondary mt-5 inline-block"
             >
-              See the board →
+              See this drop →
             </Link>
           </>
         ) : (
@@ -156,7 +162,7 @@ export default function GameCard({
             <p className="mt-5 text-sm text-muted">
               {formatUsd(game.spotPriceCents)} a guide
             </p>
-            <Link href="/featured" className="control mt-5 w-full justify-center">
+            <Link href={href} className="control mt-5 w-full justify-center">
               Get your guide
             </Link>
           </>

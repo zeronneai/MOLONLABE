@@ -33,9 +33,15 @@ const PRIORITY_FRAMES = 8;
 
 export default function HeroScrub({
   durations,
+  feature = { href: "/games", label: "See the drops" },
 }: {
   /** Measured clip durations; falls back to the configured constants. */
   durations?: { desktop: number; mobile: number };
+  /**
+   * Where the second button goes: the home page's drop, by its own
+   * address, or the list of drops when none is featured.
+   */
+  feature?: { href: string; label: string };
 } = {}) {
   const [status, setStatus] = useState<Status>("boot");
   const [portrait, setPortrait] = useState(false);
@@ -462,8 +468,8 @@ export default function HeroScrub({
             <Link href="/in-the-case" className="cta-primary control-go">
               {heroCopy.primaryCta}
             </Link>
-            <Link href="/featured" className="cta-secondary">
-              {heroCopy.secondaryCta}
+            <Link href={feature.href} className="cta-secondary">
+              {feature.label}
             </Link>
           </div>
         </div>

@@ -4,6 +4,7 @@ import Reveal from "@/components/motion/Reveal";
 import { getAllGames } from "@/lib/games/queries";
 import { itemImages } from "@/lib/db/items";
 import { demoStrippedTitle, isDemoGame } from "@/lib/surfaces";
+import { dropPath } from "@/lib/games/paths";
 
 const stamp = (iso: string | null) => {
   if (!iso) return null;
@@ -84,8 +85,13 @@ export default async function PastGames() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="display truncate text-lg">
-                          {(g.item?.name ?? demoStrippedTitle(g.title)).toUpperCase()}
+                          <Link href={dropPath(g.id)} className="hover:text-acid" data-drop-link={g.id}>
+                            {demoStrippedTitle(g.title).toUpperCase()}
+                          </Link>
                         </p>
+                        {g.item?.name && g.item.name !== g.title && (
+                          <p className="mt-1 truncate text-sm text-muted">{g.item.name}</p>
+                        )}
                         <p className="label mt-1">
                           {isDemoGame(g.title) && (
                             <span className="text-amber">DEMO · </span>

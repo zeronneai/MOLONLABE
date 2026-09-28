@@ -115,6 +115,9 @@ export interface Database {
           // What the last build managed. Unequal is shown to the owner.
           guide_images_wanted: number | null;
           guide_images_used: number | null;
+          // The owner's choice for the home page; at most one is true.
+          // Missing (undefined) until 20261002100000_home_drop.sql runs.
+          featured_on_home: boolean;
           created_by: string | null;
           created_by_name: string | null;
           updated_by: string | null;
@@ -138,6 +141,7 @@ export interface Database {
           guide_generated_at?: string | null;
           guide_images_wanted?: number | null;
           guide_images_used?: number | null;
+          featured_on_home?: boolean;
           created_by_name?: string | null;
           updated_by_name?: string | null;
           created_at?: string | null;
@@ -159,6 +163,7 @@ export interface Database {
           guide_generated_at?: string | null;
           guide_images_wanted?: number | null;
           guide_images_used?: number | null;
+          featured_on_home?: boolean;
           created_by_name?: string | null;
           updated_by_name?: string | null;
           created_at?: string | null;
@@ -660,6 +665,11 @@ export interface Database {
       record_password_change: {
         Args: Record<string, never>;
         Returns: boolean;
+      };
+      /** Owner only. Null clears the home page's drop. */
+      set_home_drop: {
+        Args: { p_game: string | null };
+        Returns: undefined;
       };
       /** 'claimed' | 'in_flight' | 'done:<order number>' */
       claim_checkout: {

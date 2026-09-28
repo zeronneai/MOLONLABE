@@ -86,6 +86,15 @@ const checkoutSchema = z.object({
   gameTermsAccepted: z.boolean().optional(),
   broadcastAccepted: z.boolean().optional(),
   /**
+   * The drop the checkout page named when the buyer pressed Pay. With
+   * more than one drop open, a cart changed in another tab could hold a
+   * different drop's guides by the time this arrives; the buyer agreed
+   * to buy guides for the one they were shown, so anything else is
+   * refused before a claim or a charge. Optional so a page loaded before
+   * this existed can still pay.
+   */
+  spotGameId: z.string().uuid().nullable().optional(),
+  /**
    * Opt-in, and it stays false unless the buyer ticked the box. Never
    * inferred from anything else.
    */
@@ -194,6 +203,15 @@ export async function submitCheckout(
   }
   if (cart.totalCents <= 0) {
     return { ok: false, message: "That order totals nothing. Check your cart." };
+  }
+  // The drop the page named is the drop being bought. See spotGameId.
+  if (data.spotGameId !== undefined && (cart.spotGame?.id ?? null) !== data.spotGameId) {
+    return {
+      ok: false,
+      message: cart.spotGame
+        ? `Your cart changed: it now holds guides for ${cart.spotGame.title}, not the drop this page showed. Nothing has been charged. Check your cart and pay again.`
+        : "Your cart changed: the guides this page showed are no longer in it. Nothing has been charged. Check your cart and pay again.",
+    };
   }
 
   // 2. Claim the stock before charging, so a simultaneous checkout of the
@@ -528,7 +546,7 @@ export async function submitCheckout(
         game: cart.spotGame.title,
       });
     }
-    revalidatePath("/featured");
+    revalidatePath(`/games/${cart.spotGame.id}`);
   }
 
   // Whether there is a guide to promise. This ASKS THE ROW, and renders
@@ -583,7 +601,9 @@ export async function submitCheckout(
       : null,
     spots: cart.spotGame
       ? {
+          gameId: cart.spotGame.id,
           game: cart.spotGame.title,
+          piece: cart.spotGame.pieceName,
           numbers: claimedSpots,
           totalSpots: cart.spotGame.totalSpots,
           unitPriceCents: cart.spotGame.spotPriceCents,
@@ -682,7 +702,7 @@ export async function submitCheckout(
   revalidatePath("/shop");
   revalidatePath("/games");
   revalidatePath("/in-the-case");
-  revalidatePath("/featured");
+  if (cart.spotGame) revalidatePath(`/games/${cart.spotGame.id}`);
 
   // The guide, warmed AFTER the response.
   //

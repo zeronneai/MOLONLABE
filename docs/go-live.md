@@ -21,6 +21,12 @@ not have yet, in this order:
    sign-in, the owner and the manager each choose their own password
    before the admin opens (`docs/passwords.md`). Tell them before it
    runs, so the screen is not a surprise.
+6. `supabase/migrations/20261002100000_home_drop.sql`: the owner's
+   choice of drop for the home page. It adds one column, false on every
+   drop, and changes no existing value. Until the owner chooses, the
+   home page lists every running drop. Without it, "Feature on the home
+   page" says the database update is missing and changes nothing; the
+   drop pages work either way.
 
 The third is what stops a winner being recorded before a drop sells out.
 The fourth adds in-store sales, and must be in place before the go-live

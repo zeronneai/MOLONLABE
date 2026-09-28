@@ -78,7 +78,7 @@ function revalidatePublic(slug?: string) {
   revalidatePath("/shop");
   revalidatePath("/games");
   revalidatePath("/in-the-case");
-  revalidatePath("/featured");
+  revalidatePath("/games/[id]", "page");
   // The product page lives at one path whichever surface links to it.
   if (slug) revalidatePath(`/inventory/${slug}`);
 }
@@ -1638,4 +1638,53 @@ export async function markPrizeClaimed(gameId: string): Promise<ActionState> {
   revalidatePath(`/admin/games/${gameId}`);
   revalidatePath("/admin/inventory");
   return { status: "success", message: "Marked as claimed. The piece is recorded as sold." };
+}
+
+/**
+ * The drop the home page features. Owner only, and only a drop that is
+ * still running; null takes the home page back to listing every running
+ * drop. One drop at a time: the database moves the choice in one step.
+ */
+export async function setHomeDrop(gameId: string | null): Promise<ActionState> {
+  const session = await requireSession();
+  if (!session) return { status: "error", message: "Not signed in." };
+  if (session.role !== "owner") return refuseManager(session, "choose the drop on the home page");
+  const { sb } = session;
+
+  const { data: before } = await sb
+    .from("games").select("id, title").eq("featured_on_home", true).maybeSingle();
+  const { data: next } = gameId
+    ? await sb.from("games").select("id, title, status").eq("id", gameId).maybeSingle()
+    : { data: null };
+  if (gameId && !next) return { status: "error", message: "That drop no longer exists." };
+  if (next?.status === "drawn") {
+    return { status: "error", message: "That drop has been drawn. Choose a drop that is still running." };
+  }
+
+  const { error } = await sb.rpc("set_home_drop", { p_game: gameId });
+  if (error) {
+    logDbError("setHomeDrop", error);
+    return {
+      status: "error",
+      message: /set_home_drop|featured_on_home/.test(error.message)
+        ? "The home page choice needs the latest database update (20261002100000_home_drop.sql). Nothing changed."
+        : "The home page did not change. Try again.",
+    };
+  }
+  if ((before?.id ?? null) !== (next?.id ?? null)) {
+    await logActivity(sb, session, {
+      action: "home drop", entity: "game", entityId: next?.id ?? before?.id ?? null,
+      entityLabel: next?.title ?? before?.title ?? null,
+      field: "home page", before: before?.title ?? null, after: next?.title ?? null,
+    });
+  }
+  revalidatePath("/");
+  revalidatePath("/featured");
+  revalidatePath("/admin/games");
+  if (gameId) revalidatePath(`/admin/games/${gameId}`);
+  if (before?.id) revalidatePath(`/admin/games/${before.id}`);
+  return {
+    status: "success",
+    message: next ? `${next.title} is now the drop on the home page.` : "No drop is featured. The home page lists every running drop.",
+  };
 }

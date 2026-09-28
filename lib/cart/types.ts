@@ -107,6 +107,8 @@ export type PricedCart = {
   spotGame: {
     id: string;
     title: string;
+    /** The featured piece, so the buyer sees which drawing this is. */
+    pieceName: string | null;
     spotPriceCents: number;
     totalSpots: number;
     remaining: number;

@@ -20,29 +20,85 @@ export function toGame(row: GameRow): Game {
 }
 
 /**
- * The game on the front of the site.
- *
- * An open game wins over a full one, and the newest wins within that, so
- * a game awaiting its draw keeps the slot until something is actually on
- * sale again — a blank page between two games would be worse than showing
- * the one everyone is waiting on.
+ * Every drop still running: open, or sold out and waiting for its draw.
+ * Newest first, the order the drops list uses.
  */
-export async function getCurrentGame(): Promise<GameWithItem | null> {
+export async function getRunningGames(): Promise<GameWithItem[]> {
   const sb = getSupabase();
-  if (!sb) return null;
+  if (!sb) return [];
   const { data, error } = await sb
     .from("games")
     .select("*, item:items(*)")
     .in("status", ["open", "full"])
-    .order("status", { ascending: true }) // 'full' < 'open' alphabetically
-    .order("created_at", { ascending: false })
-    .limit(10);
+    .order("created_at", { ascending: false });
   if (error) {
-    logDbError("getCurrentGame", error);
+    logDbError("getRunningGames", error);
+    return [];
+  }
+  return (data ?? []) as GameWithItem[];
+}
+
+/**
+ * The drop the home page features, and every drop that is running.
+ *
+ * The owner chooses the featured one in the admin (games.featured_on_home).
+ * It used to be whichever was created last, which with two drops open
+ * made the older one unreachable: every button led to the newer one.
+ *
+ * Nothing chosen, or the chosen one drawn: when exactly one drop is
+ * running there is nothing to choose between and it is featured; when
+ * several are, none is, and the home page lists them all rather than
+ * guessing.
+ */
+export async function getHomeDrop(): Promise<{
+  featured: GameWithItem | null;
+  running: GameWithItem[];
+}> {
+  const running = await getRunningGames();
+  const chosen = running.find((g) => g.featured_on_home === true) ?? null;
+  return {
+    featured: chosen ?? (running.length === 1 ? running[0] : null),
+    running,
+  };
+}
+
+/**
+ * The running drop whose featured piece this item is, for the item's
+ * own page to point at. Null when the piece is not in a running drop.
+ */
+export async function getRunningGameForItem(itemId: string): Promise<{ id: string; title: string } | null> {
+  const sb = getSupabase();
+  if (!sb) return null;
+  const { data, error } = await sb
+    .from("games")
+    .select("id, title")
+    .eq("item_id", itemId)
+    .in("status", ["open", "full"])
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (error) {
+    logDbError("getRunningGameForItem", error);
     return null;
   }
-  const rows = (data ?? []) as GameWithItem[];
-  return rows.find((g) => g.status === "open") ?? rows[0] ?? null;
+  return data?.[0] ?? null;
+}
+
+/** The winner of one drop, if it has been drawn. */
+export async function getGameWinner(
+  gameId: string,
+): Promise<{ display_name: string; drawn_at: string } | null> {
+  const sb = getSupabase();
+  if (!sb) return null;
+  const { data, error } = await sb
+    .from("winners")
+    .select("display_name, drawn_at")
+    .eq("game_id", gameId)
+    .maybeSingle();
+  if (error) {
+    logDbError("getGameWinner", error);
+    return null;
+  }
+  return data ?? null;
 }
 
 export async function getGameById(id: string): Promise<GameWithItem | null> {

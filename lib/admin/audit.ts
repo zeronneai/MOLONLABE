@@ -23,6 +23,7 @@ export type ActivityAction =
   | "status"
   | "price"
   | "featured"
+  | "home drop"
   | "offer"
   | "difficulty"
   | "commerce"

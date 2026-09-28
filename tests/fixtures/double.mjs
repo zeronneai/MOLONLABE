@@ -122,6 +122,7 @@ const seed = () => ({
     guide_pairs:
       "A Holosun 507C sits straight on it with no adapter, and a padded case if it lives in a truck.",
     guide_path: null, guide_fingerprint: null, guide_generated_at: null,
+    featured_on_home: false,
     created_by: null, created_by_name: null, updated_by: null, updated_by_name: null,
     created_at: "2026-08-01T00:00:00Z",
   }],
@@ -638,7 +639,7 @@ http.createServer(async (req, res) => {
         id, title: a.p_title, description: a.p_description, winner_note: a.p_winner_note,
         item_id: a.p_item_id, guide_why: a.p_guide_why, guide_care: a.p_guide_care,
         guide_pairs: a.p_guide_pairs, total_spots: a.p_total_spots,
-        spot_price_cents: a.p_spot_price_cents, status: "open",
+        spot_price_cents: a.p_spot_price_cents, status: "open", featured_on_home: false,
         created_at: now, updated_at: now,
         created_by: caller.id, created_by_name: member.display_name,
         updated_by: caller.id, updated_by_name: member.display_name,
@@ -814,6 +815,22 @@ http.createServer(async (req, res) => {
       const g = db.games.find((x) => x.id === o.game_id);
       if (g && g.status === "full" && db.game_spots.some((sp) => sp.game_id === g.id && sp.status !== "sold")) g.status = "open";
       return send(res, 200, n);
+    }
+    // 20261002100000_home_drop.sql: owner only, one drop at a time, never
+    // a drawn one; null clears.
+    if (fn === "set_home_drop") {
+      const caller = userFromAuth(req.headers.authorization);
+      const member = caller && db.staff.find((m) => m.user_id === caller.id);
+      const refuse = (code, message) => send(res, 400, { code, message });
+      if (!member || member.role !== "owner" || member.must_change_password)
+        return refuse("42501", "Only the owner chooses the drop on the home page.");
+      if (a.p_game) {
+        const g = db.games.find((x) => x.id === a.p_game);
+        if (!g) return refuse("P0002", "That drop does not exist.");
+        if (g.status === "drawn") return refuse("P0001", "That drop has been drawn. Choose a drop that is still running.");
+      }
+      for (const g of db.games) g.featured_on_home = g.id === a.p_game;
+      return send(res, 200, null);
     }
     if (fn === "record_password_change") {
       const caller = userFromAuth(req.headers.authorization);

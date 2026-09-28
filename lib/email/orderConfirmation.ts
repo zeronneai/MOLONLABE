@@ -77,7 +77,11 @@ export type OrderEmailData = {
    * sale — ordinary purchases earn nothing at all now.
    */
   spots: {
+    /** The drop's id, for the link to its own page. */
+    gameId: string;
     game: string;
+    /** The featured piece, when it is named differently from the drop. */
+    piece?: string | null;
     /** The actual numbers held, which is what makes them checkable. */
     numbers: number[];
     totalSpots: number;
@@ -251,11 +255,18 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
     ? panel(
         C.acid,
         C.bone,
-        `<strong style="color:${C.acid}">${
+        `<span style="${SMALL};color:${C.muted}">Your guides are for</span><br>
+         <strong style="font-size:18px;color:${C.bone}">${escapeHtml(order.spots.game)}</strong>${
+           order.spots.piece && order.spots.piece !== order.spots.game
+             ? `<br><span style="${SMALL};color:${C.muted}">Featured piece: ${escapeHtml(order.spots.piece)}</span>`
+             : ""
+         }
+         <div style="height:10px;line-height:10px">&nbsp;</div>
+         <strong style="color:${C.acid}">${
           order.spots.numbers.length === 1
             ? "Your guide"
             : `${order.spots.numbers.length} guides`
-        }</strong> from ${escapeHtml(order.spots.game)}:
+        }</strong> in this drop:
          ${
            order.spots.numbers.length === 1
              ? `guide number <strong style="color:${C.acid}">${order.spots.numbers[0]}</strong>`
@@ -263,8 +274,8 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
          } of ${order.spots.totalSpots}.
          <div style="height:10px;line-height:10px">&nbsp;</div>
          <span style="${SMALL};color:${C.muted}">The draw happens once the last
-         guide sells, or earlier if the shop decides. There is no end date.
-         <a href="${SITE_URL}/featured" style="color:${C.acid};text-decoration:underline">Watch the board</a>.</span>`,
+         guide sells. There is no end date.
+         <a href="${SITE_URL}/games/${order.spots.gameId}" style="color:${C.acid};text-decoration:underline">Watch this drop</a>.</span>`,
       )
     : "";
 
@@ -512,12 +523,14 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
           ``,
           `YOUR GUIDE NUMBERS`,
           RULE,
-          `${order.spots.numbers.length === 1 ? "Guide number" : "Guide numbers"} ${order.spots.numbers.join(", ")} of ${order.spots.totalSpots}`,
-          `in ${order.spots.game}.`,
+          `Your guides are for the drop: ${order.spots.game}`,
+          ...(order.spots.piece && order.spots.piece !== order.spots.game
+            ? [`Featured piece: ${order.spots.piece}`]
+            : []),
+          `${order.spots.numbers.length === 1 ? "Guide number" : "Guide numbers"} ${order.spots.numbers.join(", ")} of ${order.spots.totalSpots} in this drop.`,
           ``,
-          `The draw happens once the last guide sells, or earlier if the`,
-          `shop decides. There is no end date.`,
-          `${SITE_URL}/featured`,
+          `The draw happens once the last guide sells. There is no end date.`,
+          `Watch this drop: ${SITE_URL}/games/${order.spots.gameId}`,
         ]
       : []),
     ...(order.guideFor

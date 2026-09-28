@@ -9,7 +9,7 @@ Molon Labe Firearms x SunCity Outdoors. Current as of the
 
 ### Public pages
 
-**Home.** Scrolling hero video, the current game, newly arrived stock, a
+**Home.** Scrolling hero video, the drop the owner features, newly arrived stock, a
 look into the case, past winners, the shop story, brands, and where to
 find the shop. Everything on it links somewhere else.
 
@@ -30,26 +30,45 @@ leaves the website for good: no listing, no page, not in the sitemap,
 refused by the cart. The draw sets it to hidden; "Prize claimed" on the
 drop's admin page marks it sold. An unclaimed piece is sold in the shop.
 
-**The featured drop.** The drop currently running: the featured piece,
-what a guide costs, how many guides are left, and a control to get one
-or more. Each guide comes with entry into the drawing. A sold-out drop
-says so and says the draw is next. Past winners are listed underneath by
-first name and last initial.
+**A drop's page (`/games/<id>`, 2 October).** Every drop has its own
+page at its own address: its name, the featured piece, what a guide
+costs, how many guides are left, and a control to get one or more. Each
+guide comes with entry into that drop's drawing. A sold-out drop says so
+and says the draw is next; a drawn one shows the winner. Other running
+drops are linked by name underneath, then past winners by first name and
+last initial. Every card, button, cart line, receipt and email that
+means a drop links to that drop's page. Before this there was one
+"current drop" page that showed the newest, so with two drops open the
+older one could not be reached and a click on it opened the other.
+
+**The home page's drop.** The owner chooses it in the admin ("Feature on
+the home page" on the drops list or the drop's page; owner only, logged).
+Nothing chosen and one drop running: that one. Nothing chosen and several
+running: all of them, each to its own page, never a guess. The old
+`/featured` address only forwards: to the chosen drop, the only running
+drop, or the drops list.
 
 **Drops.** Every drop in three groups: open now, sold out and awaiting
-the draw, and finished with the winner shown.
+the draw, and finished with the winner shown. Any number can be open at
+once.
 
 **Cart.** What the visitor has picked, split into things that ship and
 things collected at the shop, with quantities adjustable and a running
-total. Collection lines carry a notice that paying online does not
+total. Guides for one drop at a time (they are claimed and paid for
+together): adding guides for a second drop replaces the first drop's,
+and the drop's page says so, by name, before the button. Collection lines carry a notice that paying online does not
 complete a firearm sale.
 
 **Checkout.** Name, email, phone, a shipping address when anything ships,
 and card details. The card goes straight from the browser to
 Authorize.net and never touches the shop's server. Tax and shipping are
 calculated by the site, not typed in. The visitor must tick the firearms
-disclaimer, and a second box for the drop's terms when the cart holds
-guides.
+disclaimer, and boxes for the drop's terms and the broadcast when the
+cart holds guides. With guides, the page names the drop being bought
+above the terms ("You are buying guides for..."). If the cart switches
+to another drop in another tab, the page shows the new drop and clears
+those two boxes; the server also refuses to charge if the drop in the
+cart is not the one the page named.
 
 **Order confirmation.** What was bought, what was paid, the guide
 numbers if any, the link to the guide, and the exact terms

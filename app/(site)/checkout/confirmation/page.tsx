@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { dropPath } from "@/lib/games/paths";
 import { notFound } from "next/navigation";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { formatUsd } from "@/lib/money";
@@ -68,7 +69,7 @@ export default async function ConfirmationPage({
   // The spots this order bought, read from the order's own line rather
   // than from the pool — the receipt has to keep saying what was bought
   // even after the game is drawn and the spots have served their purpose.
-  let spots: { game: string; numbers: number[]; totalSpots: number } | null = null;
+  let spots: { gameId: string; game: string; piece: string | null; numbers: number[]; totalSpots: number } | null = null;
   // The piece the guide is about, and the only thing that decides whether
   // the guide is offered below. Read from the game rather than from the
   // order lines because the guide belongs to the game, not to the sale.
@@ -89,8 +90,11 @@ export default async function ConfirmationPage({
     ]);
     const numbers = spotLine?.spot_numbers ?? [];
     if (game && numbers.length > 0) {
+      const piece = (game.item as { name?: string } | null)?.name ?? null;
       spots = {
+        gameId: order.game_id,
         game: game.title,
+        piece: piece && piece !== game.title ? piece : null,
         numbers,
         totalSpots: game.total_spots,
       };
@@ -225,19 +229,32 @@ export default async function ConfirmationPage({
             board. Nothing about how a winner is picked or anyone's
             chances — the rules are the attorney's to write. */}
         {spots && (
-          <div className="mt-8 border-l-2 border-acid pl-5">
-            <p className="text-sm text-acid">
+          <div className="mt-8 border-l-2 border-acid pl-5" data-confirmation-drop={spots.gameId}>
+            {/* The drop, by name, first: which drawing these guides are in. */}
+            <p className="label text-acid">Your guides are for</p>
+            <p className="display mt-2 text-2xl" data-confirmation-drop-title>
+              <Link href={dropPath(spots.gameId)} className="hover:text-acid">
+                {spots.game.toUpperCase()}
+              </Link>
+            </p>
+            {spots.piece && (
+              <p className="mt-1 text-sm">
+                <span className="text-muted">Featured piece: </span>
+                {spots.piece}
+              </p>
+            )}
+            <p className="mt-4 text-sm text-acid">
               {spots.numbers.length === 1 ? "Guide number" : "Guide numbers"}{" "}
               <span className="font-extrabold tracking-[-0.02em]">
                 {spots.numbers.join(", ")}
               </span>{" "}
-              of {spots.totalSpots} in {spots.game}.
+              of {spots.totalSpots} in this drop.
             </p>
             <p className="mt-2 max-w-[56ch] text-sm text-muted">
               The draw happens once the last guide sells. There is no end
               date. The drop runs until it sells out.{" "}
-              <Link href="/featured" className="underline hover:text-bone">
-                Watch the board
+              <Link href={dropPath(spots.gameId)} className="underline hover:text-bone">
+                Watch this drop
               </Link>
               .
             </p>

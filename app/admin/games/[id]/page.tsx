@@ -4,6 +4,8 @@ import GameForm from "@/components/admin/GameForm";
 import DrawPanel from "@/components/admin/DrawPanel";
 import SpotLedger from "@/components/admin/SpotLedger";
 import BackLink from "@/components/admin/BackLink";
+import HomeDropControl from "@/components/admin/HomeDropControl";
+import { dropPath } from "@/lib/games/paths";
 import PrizeClaim from "@/components/admin/PrizeClaim";
 import { loadSoldGuides } from "@/lib/draw/soldGuides";
 import { buildRoster } from "@/lib/draw/roster";
@@ -98,6 +100,22 @@ export default async function EditGamePage({
     <div className="mx-auto max-w-2xl">
       <BackLink href="/admin/inventory" label="All drops" />
       <h1 className="display text-2xl">{game.title.toUpperCase()}</h1>
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <a
+          href={dropPath(game.id)}
+          target="_blank"
+          rel="noopener"
+          className="label text-muted underline hover:text-bone"
+          data-view-on-site
+        >
+          View on site →
+        </a>
+        <HomeDropControl
+          gameId={game.id}
+          featured={game.featured_on_home === true}
+          running={game.status === "open" || game.status === "full"}
+        />
+      </div>
       <div className="mt-8">
         <GameForm game={game} items={items ?? []} />
       </div>

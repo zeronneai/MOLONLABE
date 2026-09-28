@@ -1,6 +1,6 @@
 import { SkeletonBar } from "@/components/ui/Skeleton";
 
-export default function FeaturedLoading() {
+export default function DropLoading() {
   return (
     <div className="pb-24">
       <div className="skeleton min-h-[70vh] w-full" aria-hidden="true" />
@@ -17,7 +17,7 @@ export default function FeaturedLoading() {
         </div>
       </div>
       <span className="sr-only" role="status">
-        Loading the current feature
+        Loading the drop
       </span>
     </div>
   );

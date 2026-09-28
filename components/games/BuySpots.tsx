@@ -24,14 +24,20 @@ const LOW_SPOTS = 5;
 
 export default function BuySpots({
   gameId,
+  dropTitle,
   spotPriceCents,
   remaining,
+  dropTitles = {},
 }: {
   gameId: string;
+  /** Said on the button's result and in the switch warning. */
+  dropTitle: string;
   spotPriceCents: number;
   remaining: number;
+  /** Every running drop's title by id, to name the one already in the cart. */
+  dropTitles?: Record<string, string>;
 }) {
-  const { addSpots } = useCart();
+  const { addSpots, lines, ready } = useCart();
   const router = useRouter();
   const [count, setCount] = useState(1);
   /** The cart total after the last add, so the button can say it. */
@@ -42,6 +48,13 @@ export default function BuySpots({
   // will ever have — the person who wants twenty spots — away at the
   // control.
   const cap = Math.max(1, remaining);
+
+  // A cart holds one drop's guides (one drop per order: the guides are
+  // claimed and paid for together). Adding guides for this drop replaces
+  // another drop's, so that is said before the button, by name, rather
+  // than discovered in the cart, or not at all.
+  const otherInCart = ready ? lines.find((l) => l.gameId && l.gameId !== gameId) : undefined;
+  const otherTitle = otherInCart?.gameId ? dropTitles[otherInCart.gameId] ?? "another drop" : null;
   const clamped = Math.max(1, Math.min(count, cap));
 
   if (remaining === 0) {
@@ -117,8 +130,19 @@ export default function BuySpots({
         <p className="label mt-4 text-amber">That is every guide left.</p>
       )}
 
+      {otherInCart && otherTitle && (
+        <p className="mt-6 max-w-[56ch] border-l-2 border-amber pl-4 text-sm" data-cart-other-drop>
+          Your cart has{" "}
+          {otherInCart.quantity === 1 ? "1 guide" : `${otherInCart.quantity} guides`} for{" "}
+          <strong>{otherTitle}</strong>. A cart holds guides for one drop at a
+          time, so adding these replaces them with guides for{" "}
+          <strong>{dropTitle}</strong>.
+        </p>
+      )}
+
       <button
         type="button"
+        data-buy-drop={gameId}
         onClick={() => {
           setInCart(addSpots(gameId, clamped));
           router.refresh();
@@ -135,8 +159,8 @@ export default function BuySpots({
           a silent success. */}
       {inCart !== null && (
         <p role="status" className="mt-4 text-sm">
-          <span className="text-acid">
-            {inCart === 1 ? "1 guide" : `${inCart} guides`} in your cart.
+          <span className="text-acid" data-in-cart>
+            {inCart === 1 ? "1 guide" : `${inCart} guides`} for {dropTitle} in your cart.
           </span>{" "}
           <a href="/cart" className="underline">
             Go to cart
