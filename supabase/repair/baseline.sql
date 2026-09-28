@@ -132,6 +132,17 @@ alter table public.admin_activity add column if not exists entity_label text;
 alter table public.admin_activity add column if not exists field text;
 alter table public.admin_activity add column if not exists before_value jsonb;
 alter table public.admin_activity add column if not exists after_value jsonb;
+do $$ declare c text; begin
+  foreach c in array array['actor_id', 'entity_id', 'entity_label', 'field', 'before_value', 'after_value'] loop
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'admin_activity'
+        and column_name = c and is_nullable = 'NO'
+    ) then
+      execute format('alter table public.%I alter column %I drop not null', 'admin_activity', c);
+    end if;
+  end loop;
+end $$;
 
 create table if not exists public.checkout_attempts (
   key text not null,
@@ -171,6 +182,17 @@ end $$;
 alter table public.checkout_attempts add column if not exists order_number text;
 alter table public.checkout_attempts add column if not exists finished_at timestamp with time zone;
 alter table public.checkout_attempts add column if not exists outcome text;
+do $$ declare c text; begin
+  foreach c in array array['order_number', 'finished_at', 'outcome'] loop
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'checkout_attempts'
+        and column_name = c and is_nullable = 'NO'
+    ) then
+      execute format('alter table public.%I alter column %I drop not null', 'checkout_attempts', c);
+    end if;
+  end loop;
+end $$;
 
 create table if not exists public.game_events (
   id uuid default gen_random_uuid() not null,
@@ -208,6 +230,17 @@ do $$ begin
 end $$;
 alter table public.game_events add column if not exists mode text;
 alter table public.game_events add column if not exists created_at timestamp with time zone default now();
+do $$ declare c text; begin
+  foreach c in array array['mode', 'created_at'] loop
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'game_events'
+        and column_name = c and is_nullable = 'NO'
+    ) then
+      execute format('alter table public.%I alter column %I drop not null', 'game_events', c);
+    end if;
+  end loop;
+end $$;
 
 create table if not exists public.game_spots (
   id uuid default gen_random_uuid() not null,
@@ -285,6 +318,17 @@ alter table public.game_spots add column if not exists email text;
 alter table public.game_spots add column if not exists phone text;
 alter table public.game_spots add column if not exists held_at timestamp with time zone;
 alter table public.game_spots add column if not exists sold_at timestamp with time zone;
+do $$ declare c text; begin
+  foreach c in array array['order_id', 'first_name', 'last_name', 'email', 'phone', 'held_at', 'sold_at'] loop
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'game_spots'
+        and column_name = c and is_nullable = 'NO'
+    ) then
+      execute format('alter table public.%I alter column %I drop not null', 'game_spots', c);
+    end if;
+  end loop;
+end $$;
 
 create table if not exists public.games (
   id uuid default gen_random_uuid() not null,
@@ -395,6 +439,17 @@ alter table public.games add column if not exists guide_fingerprint text;
 alter table public.games add column if not exists guide_generated_at timestamp with time zone;
 alter table public.games add column if not exists guide_images_wanted integer;
 alter table public.games add column if not exists guide_images_used integer;
+do $$ declare c text; begin
+  foreach c in array array['item_id', 'description', 'winner_note', 'created_at', 'created_by', 'created_by_name', 'updated_by', 'updated_by_name', 'guide_why', 'guide_care', 'guide_pairs', 'guide_path', 'guide_fingerprint', 'guide_generated_at', 'guide_images_wanted', 'guide_images_used'] loop
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'games'
+        and column_name = c and is_nullable = 'NO'
+    ) then
+      execute format('alter table public.%I alter column %I drop not null', 'games', c);
+    end if;
+  end loop;
+end $$;
 
 create table if not exists public.inquiries (
   id uuid default gen_random_uuid() not null,
@@ -481,6 +536,17 @@ do $$ begin
   end if;
 end $$;
 alter table public.inquiries add column if not exists created_at timestamp with time zone default now();
+do $$ declare c text; begin
+  foreach c in array array['item_id', 'phone', 'message', 'created_at'] loop
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'inquiries'
+        and column_name = c and is_nullable = 'NO'
+    ) then
+      execute format('alter table public.%I alter column %I drop not null', 'inquiries', c);
+    end if;
+  end loop;
+end $$;
 
 create table if not exists public.item_variants (
   id uuid default gen_random_uuid() not null,
@@ -731,6 +797,17 @@ do $$ begin
   end if;
 end $$;
 alter table public.items add column if not exists shipping_override_cents integer;
+do $$ declare c text; begin
+  foreach c in array array['brand', 'short_desc', 'long_desc', 'specs', 'price_display', 'is_featured', 'sort_order', 'images', 'video_url', 'created_at', 'updated_at', 'price_cents', 'created_by', 'created_by_name', 'updated_by', 'updated_by_name', 'shipping_override_cents'] loop
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'items'
+        and column_name = c and is_nullable = 'NO'
+    ) then
+      execute format('alter table public.%I alter column %I drop not null', 'items', c);
+    end if;
+  end loop;
+end $$;
 
 create table if not exists public.order_items (
   id uuid default gen_random_uuid() not null,
@@ -866,12 +943,23 @@ alter table public.order_items add column if not exists variant_id uuid;
 alter table public.order_items add column if not exists size text;
 alter table public.order_items add column if not exists game_id uuid;
 alter table public.order_items add column if not exists spot_numbers integer[];
+do $$ declare c text; begin
+  foreach c in array array['item_id', 'pack_id', 'variant_id', 'size', 'game_id', 'spot_numbers'] loop
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'order_items'
+        and column_name = c and is_nullable = 'NO'
+    ) then
+      execute format('alter table public.%I alter column %I drop not null', 'order_items', c);
+    end if;
+  end loop;
+end $$;
 
 create table if not exists public.orders (
   id uuid default gen_random_uuid() not null,
   order_number text not null,
   status text default 'paid'::text not null,
-  email text not null,
+  email text,
   first_name text not null,
   last_name text not null,
   phone text,
@@ -887,10 +975,10 @@ create table if not exists public.orders (
   ship_city text,
   ship_region text,
   ship_postal_code text,
-  disclaimer_accepted_at timestamp with time zone not null,
-  disclaimer_text text not null,
+  disclaimer_accepted_at timestamp with time zone,
+  disclaimer_text text,
   disclaimer_version text,
-  refund_policy_text text not null,
+  refund_policy_text text,
   game_id uuid,
   gateway text default 'authorize.net'::text not null,
   gateway_transaction_id text,
@@ -904,7 +992,12 @@ create table if not exists public.orders (
   confirmation_expires_at timestamp with time zone default (now() + '1 year'::interval) not null,
   game_terms_accepted_at timestamp with time zone,
   game_terms_text text,
-  idempotency_key text
+  idempotency_key text,
+  source text default 'online'::text not null,
+  recorded_by uuid,
+  recorded_by_name text,
+  voided_at timestamp with time zone,
+  voided_by_name text
 );
 alter table public.orders add column if not exists id uuid default gen_random_uuid();
 do $$ begin
@@ -949,19 +1042,6 @@ do $$ begin
   end if;
 end $$;
 alter table public.orders add column if not exists email text;
-do $$ begin
-  if exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public' and table_name = 'orders'
-      and column_name = 'email' and is_nullable = 'YES'
-  ) then
-    if exists (select 1 from public.orders where email is null) then
-      raise notice 'public.orders.email holds nulls; left nullable. Fill them, then: alter table public.orders alter column email set not null;';
-    else
-      alter table public.orders alter column email set not null;
-    end if;
-  end if;
-end $$;
 alter table public.orders add column if not exists first_name text;
 do $$ begin
   if exists (
@@ -1082,48 +1162,9 @@ alter table public.orders add column if not exists ship_city text;
 alter table public.orders add column if not exists ship_region text;
 alter table public.orders add column if not exists ship_postal_code text;
 alter table public.orders add column if not exists disclaimer_accepted_at timestamp with time zone;
-do $$ begin
-  if exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public' and table_name = 'orders'
-      and column_name = 'disclaimer_accepted_at' and is_nullable = 'YES'
-  ) then
-    if exists (select 1 from public.orders where disclaimer_accepted_at is null) then
-      raise notice 'public.orders.disclaimer_accepted_at holds nulls; left nullable. Fill them, then: alter table public.orders alter column disclaimer_accepted_at set not null;';
-    else
-      alter table public.orders alter column disclaimer_accepted_at set not null;
-    end if;
-  end if;
-end $$;
 alter table public.orders add column if not exists disclaimer_text text;
-do $$ begin
-  if exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public' and table_name = 'orders'
-      and column_name = 'disclaimer_text' and is_nullable = 'YES'
-  ) then
-    if exists (select 1 from public.orders where disclaimer_text is null) then
-      raise notice 'public.orders.disclaimer_text holds nulls; left nullable. Fill them, then: alter table public.orders alter column disclaimer_text set not null;';
-    else
-      alter table public.orders alter column disclaimer_text set not null;
-    end if;
-  end if;
-end $$;
 alter table public.orders add column if not exists disclaimer_version text;
 alter table public.orders add column if not exists refund_policy_text text;
-do $$ begin
-  if exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public' and table_name = 'orders'
-      and column_name = 'refund_policy_text' and is_nullable = 'YES'
-  ) then
-    if exists (select 1 from public.orders where refund_policy_text is null) then
-      raise notice 'public.orders.refund_policy_text holds nulls; left nullable. Fill them, then: alter table public.orders alter column refund_policy_text set not null;';
-    else
-      alter table public.orders alter column refund_policy_text set not null;
-    end if;
-  end if;
-end $$;
 alter table public.orders add column if not exists game_id uuid;
 alter table public.orders add column if not exists gateway text default 'authorize.net'::text;
 do $$ begin
@@ -1190,6 +1231,35 @@ end $$;
 alter table public.orders add column if not exists game_terms_accepted_at timestamp with time zone;
 alter table public.orders add column if not exists game_terms_text text;
 alter table public.orders add column if not exists idempotency_key text;
+alter table public.orders add column if not exists source text default 'online'::text;
+do $$ begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'orders'
+      and column_name = 'source' and is_nullable = 'YES'
+  ) then
+    if exists (select 1 from public.orders where source is null) then
+      raise notice 'public.orders.source holds nulls; left nullable. Fill them, then: alter table public.orders alter column source set not null;';
+    else
+      alter table public.orders alter column source set not null;
+    end if;
+  end if;
+end $$;
+alter table public.orders add column if not exists recorded_by uuid;
+alter table public.orders add column if not exists recorded_by_name text;
+alter table public.orders add column if not exists voided_at timestamp with time zone;
+alter table public.orders add column if not exists voided_by_name text;
+do $$ declare c text; begin
+  foreach c in array array['email', 'phone', 'ship_name', 'ship_line1', 'ship_line2', 'ship_city', 'ship_region', 'ship_postal_code', 'disclaimer_accepted_at', 'disclaimer_text', 'disclaimer_version', 'refund_policy_text', 'game_id', 'gateway_transaction_id', 'gateway_auth_code', 'gateway_response_code', 'card_brand', 'card_last4', 'confirmation_sent_at', 'game_terms_accepted_at', 'game_terms_text', 'idempotency_key', 'recorded_by', 'recorded_by_name', 'voided_at', 'voided_by_name'] loop
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'orders'
+        and column_name = c and is_nullable = 'NO'
+    ) then
+      execute format('alter table public.%I alter column %I drop not null', 'orders', c);
+    end if;
+  end loop;
+end $$;
 
 create table if not exists public.settings (
   key text not null,
@@ -1229,6 +1299,17 @@ end $$;
 alter table public.settings add column if not exists updated_at timestamp with time zone default now();
 alter table public.settings add column if not exists updated_by uuid;
 alter table public.settings add column if not exists updated_by_name text;
+do $$ declare c text; begin
+  foreach c in array array['updated_at', 'updated_by', 'updated_by_name'] loop
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'settings'
+        and column_name = c and is_nullable = 'NO'
+    ) then
+      execute format('alter table public.%I alter column %I drop not null', 'settings', c);
+    end if;
+  end loop;
+end $$;
 
 create table if not exists public.staff (
   user_id uuid not null,
@@ -1388,6 +1469,17 @@ do $$ begin
   end if;
 end $$;
 alter table public.winners add column if not exists unsold_spots integer;
+do $$ declare c text; begin
+  foreach c in array array['spot_id', 'photo_url', 'note', 'seed', 'ticket', 'entry_total', 'pool', 'ticket_index', 'unsold_spots'] loop
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'winners'
+        and column_name = c and is_nullable = 'NO'
+    ) then
+      execute format('alter table public.%I alter column %I drop not null', 'winners', c);
+    end if;
+  end loop;
+end $$;
 
 -- ---------------------------------------------------------------------
 -- Views
@@ -1857,6 +1949,48 @@ declare current_def text;
 begin
   select pg_get_constraintdef(c.oid) into current_def
   from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'orders_in_store_recorded'
+    and c.conrelid = 'orders'::regclass;
+  if current_def is null then
+    alter table orders add constraint orders_in_store_recorded CHECK (((source <> 'in_store'::text) OR ((game_terms_text IS NOT NULL) AND (game_terms_accepted_at IS NOT NULL) AND (recorded_by_name IS NOT NULL) AND (game_id IS NOT NULL))));
+  elsif current_def is distinct from 'CHECK (((source <> ''in_store''::text) OR ((game_terms_text IS NOT NULL) AND (game_terms_accepted_at IS NOT NULL) AND (recorded_by_name IS NOT NULL) AND (game_id IS NOT NULL))))' then
+    alter table orders drop constraint orders_in_store_recorded;
+    alter table orders add constraint orders_in_store_recorded CHECK (((source <> 'in_store'::text) OR ((game_terms_text IS NOT NULL) AND (game_terms_accepted_at IS NOT NULL) AND (recorded_by_name IS NOT NULL) AND (game_id IS NOT NULL))));
+  end if;
+end $$;
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'orders_online_complete'
+    and c.conrelid = 'orders'::regclass;
+  if current_def is null then
+    alter table orders add constraint orders_online_complete CHECK (((source <> 'online'::text) OR ((email IS NOT NULL) AND (disclaimer_accepted_at IS NOT NULL) AND (disclaimer_text IS NOT NULL) AND (refund_policy_text IS NOT NULL))));
+  elsif current_def is distinct from 'CHECK (((source <> ''online''::text) OR ((email IS NOT NULL) AND (disclaimer_accepted_at IS NOT NULL) AND (disclaimer_text IS NOT NULL) AND (refund_policy_text IS NOT NULL))))' then
+    alter table orders drop constraint orders_online_complete;
+    alter table orders add constraint orders_online_complete CHECK (((source <> 'online'::text) OR ((email IS NOT NULL) AND (disclaimer_accepted_at IS NOT NULL) AND (disclaimer_text IS NOT NULL) AND (refund_policy_text IS NOT NULL))));
+  end if;
+end $$;
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'orders_source_valid'
+    and c.conrelid = 'orders'::regclass;
+  if current_def is null then
+    alter table orders add constraint orders_source_valid CHECK ((source = ANY (ARRAY['online'::text, 'in_store'::text])));
+  elsif current_def is distinct from 'CHECK ((source = ANY (ARRAY[''online''::text, ''in_store''::text])))' then
+    alter table orders drop constraint orders_source_valid;
+    alter table orders add constraint orders_source_valid CHECK ((source = ANY (ARRAY['online'::text, 'in_store'::text])));
+  end if;
+end $$;
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
   where n.nspname = 'public' and c.conname = 'orders_status_valid'
     and c.conrelid = 'orders'::regclass;
   if current_def is null then
@@ -2102,6 +2236,20 @@ begin
   elsif current_def is distinct from 'FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE SET NULL' then
     alter table orders drop constraint orders_game_id_fkey;
     alter table orders add constraint orders_game_id_fkey FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE SET NULL;
+  end if;
+end $$;
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'orders_recorded_by_fkey'
+    and c.conrelid = 'orders'::regclass;
+  if current_def is null then
+    alter table orders add constraint orders_recorded_by_fkey FOREIGN KEY (recorded_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+  elsif current_def is distinct from 'FOREIGN KEY (recorded_by) REFERENCES auth.users(id) ON DELETE SET NULL' then
+    alter table orders drop constraint orders_recorded_by_fkey;
+    alter table orders add constraint orders_recorded_by_fkey FOREIGN KEY (recorded_by) REFERENCES auth.users(id) ON DELETE SET NULL;
   end if;
 end $$;
 do $$
@@ -2396,6 +2544,120 @@ AS $function$
   select exists (select 1 from public.staff s where s.user_id = auth.uid())
 $function$;
 
+create or replace function public.record_in_store_sale(p_game uuid, p_qty integer, p_first_name text, p_last_name text, p_email text, p_phone text, p_ack text, p_order_number text, p_token text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_game     public.games%rowtype;
+  v_name     text := public.staff_name();
+  v_open     integer;
+  v_held     integer;
+  v_numbers  integer[];
+  v_ids      uuid[];
+  v_order    uuid;
+  v_email    text := nullif(btrim(coalesce(p_email, '')), '');
+  v_phone    text := nullif(btrim(coalesce(p_phone, '')), '');
+begin
+  if not public.is_staff() then
+    raise exception 'Only staff can record an in-store sale.' using errcode = '42501';
+  end if;
+  if p_qty is null or p_qty < 1 then
+    raise exception 'Enter how many guides were sold.' using errcode = '22023';
+  end if;
+  if btrim(coalesce(p_first_name, '')) = '' or btrim(coalesce(p_last_name, '')) = '' then
+    raise exception 'Enter the buyer''s first and last name.' using errcode = '22023';
+  end if;
+  if v_phone is null then
+    raise exception 'Enter the buyer''s phone number, so the shop can reach them if they win.' using errcode = '22023';
+  end if;
+  if btrim(coalesce(p_ack, '')) = '' then
+    raise exception 'The buyer has to have been shown the rules and agreed.' using errcode = '22023';
+  end if;
+
+  select * into v_game from public.games where id = p_game;
+  if not found then
+    raise exception 'There is no such drop.' using errcode = 'P0002';
+  end if;
+  if v_game.status <> 'open' then
+    raise exception 'This drop is %, so no more guides can be sold.',
+      case v_game.status when 'full' then 'sold out' when 'drawn' then 'already drawn' else v_game.status end
+      using errcode = 'P0001';
+  end if;
+
+  -- Abandoned checkouts go back first, exactly as claim_game_spots does.
+  update public.game_spots
+     set status = 'open', held_at = null
+   where game_id = p_game and status = 'held'
+     and held_at < now() - interval '15 minutes';
+
+  -- The lowest available numbers, locked. SKIP LOCKED is the same
+  -- protection online checkout has: a row another transaction is taking
+  -- right now is passed over, never shared.
+  with picked as (
+    select id, spot_number
+      from public.game_spots
+     where game_id = p_game and status = 'open'
+     order by spot_number
+     limit p_qty
+       for update skip locked
+  )
+  select array_agg(spot_number order by spot_number), array_agg(id)
+    into v_numbers, v_ids
+    from picked;
+
+  if coalesce(array_length(v_numbers, 1), 0) < p_qty then
+    select count(*) filter (where status = 'open'),
+           count(*) filter (where status = 'held')
+      into v_open, v_held
+      from public.game_spots where game_id = p_game;
+    raise exception '% guide% requested, but only % % available%. Nothing was recorded.',
+      p_qty, case when p_qty = 1 then ' was' else 's were' end,
+      v_open, case when v_open = 1 then 'is' else 'are' end,
+      case when v_held > 0 then format(' (%s more in an online checkout right now)', v_held) else '' end
+      using errcode = 'P0001';
+  end if;
+
+  insert into public.orders (
+    order_number, status, source, email, first_name, last_name, phone,
+    subtotal_cents, tax_cents, shipping_cents, total_cents,
+    has_shipment, has_pickup, game_id, gateway, confirmation_token,
+    game_terms_accepted_at, game_terms_text, recorded_by, recorded_by_name
+  ) values (
+    p_order_number, 'paid', 'in_store', v_email, btrim(p_first_name), btrim(p_last_name), v_phone,
+    p_qty * v_game.spot_price_cents, 0, 0, p_qty * v_game.spot_price_cents,
+    false, false, p_game, 'in_store', p_token,
+    now(), btrim(p_ack), auth.uid(), coalesce(v_name, 'Staff')
+  )
+  returning id into v_order;
+
+  insert into public.order_items (
+    order_id, line_type, game_id, spot_numbers, name,
+    unit_price_cents, quantity, fulfillment_type, line_total_cents
+  ) values (
+    v_order, 'game_spot', p_game, v_numbers,
+    v_game.title || ': ' || case when p_qty = 1 then 'guide number ' else 'guide numbers ' end
+      || array_to_string(v_numbers, ', '),
+    v_game.spot_price_cents, p_qty, 'none', p_qty * v_game.spot_price_cents
+  );
+
+  update public.game_spots
+     set status = 'sold', sold_at = now(), held_at = null, order_id = v_order,
+         first_name = btrim(p_first_name), last_name = btrim(p_last_name),
+         email = v_email, phone = v_phone
+   where id = any(v_ids);
+
+  update public.games g
+     set status = 'full'
+   where g.id = p_game and g.status = 'open'
+     and not exists (select 1 from public.game_spots where game_id = p_game and status <> 'sold');
+
+  return jsonb_build_object('order_id', v_order, 'numbers', to_jsonb(v_numbers));
+end;
+$function$;
+
 create or replace function public.refuse_early_draw()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -2597,6 +2859,56 @@ begin
 end;
 $function$;
 
+create or replace function public.void_in_store_sale(p_order uuid)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_order public.orders%rowtype;
+  v_n     integer;
+begin
+  if not public.is_owner() then
+    raise exception 'Only the owner can void an in-store sale.' using errcode = '42501';
+  end if;
+
+  select * into v_order from public.orders where id = p_order for update;
+  if not found then
+    raise exception 'There is no such sale.' using errcode = 'P0002';
+  end if;
+  if v_order.source <> 'in_store' then
+    raise exception 'Only an in-store sale can be voided here. An online order is refunded through the payment processor.'
+      using errcode = 'P0001';
+  end if;
+  if v_order.voided_at is not null then
+    raise exception 'This sale was already voided.' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.winners where game_id = v_order.game_id) then
+    raise exception 'This drop has been drawn, so its sales can no longer be voided.' using errcode = 'P0001';
+  end if;
+
+  update public.game_spots
+     set status = 'open', order_id = null, first_name = null, last_name = null,
+         email = null, phone = null, held_at = null, sold_at = null
+   where order_id = p_order and status = 'sold';
+  get diagnostics v_n = row_count;
+
+  update public.orders
+     set status = 'cancelled', voided_at = now(),
+         voided_by_name = coalesce(public.staff_name(), 'Owner')
+   where id = p_order;
+
+  -- A drop that was full has guides to sell again.
+  update public.games g
+     set status = 'open'
+   where g.id = v_order.game_id and g.status = 'full'
+     and exists (select 1 from public.game_spots s where s.game_id = g.id and s.status <> 'sold');
+
+  return v_n;
+end;
+$function$;
+
 -- ---------------------------------------------------------------------
 -- Triggers
 -- ---------------------------------------------------------------------
@@ -2640,6 +2952,8 @@ comment on column public.orders.confirmation_expires_at is 'When the receipt lin
    bounds it. Extending an individual order means moving this date, not
    minting a new token, so an old email keeps working if someone chooses
    to let it.';
+comment on column public.orders.recorded_by_name is 'Who recorded an in-store sale, from the staff table.';
+comment on column public.orders.source is 'online: bought on the website. in_store: sold at the counter, paid at the register, recorded by staff.';
 comment on table public.staff is 'Admin access. No row, no access. Written from the SQL editor only.';
 comment on column public.winners.ticket is 'The WINNING SPOT NUMBER — what gets read aloud. This is pool[ticket_index-1].spot_number, not the index itself: the selector orders by spot id, so the index and the spot number are different numbers.';
 comment on column public.winners.ticket_index is '1-based index the selector returned, into pool. The raw output of the algorithm.';
@@ -2896,6 +3210,7 @@ revoke execute on function public.finish_checkout(p_key text, p_order text, p_ou
 revoke execute on function public.game_spots_remaining(p_game uuid) from public;
 revoke execute on function public.is_owner() from public;
 revoke execute on function public.is_staff() from public;
+revoke execute on function public.record_in_store_sale(p_game uuid, p_qty integer, p_first_name text, p_last_name text, p_email text, p_phone text, p_ack text, p_order_number text, p_token text) from public;
 revoke execute on function public.refuse_early_draw() from public;
 revoke execute on function public.refuse_pool_change() from public;
 revoke execute on function public.release_checkout(p_key text) from public;
@@ -2908,6 +3223,7 @@ revoke execute on function public.staff_role() from public;
 revoke execute on function public.stamp_activity_actor() from public;
 revoke execute on function public.stamp_authorship() from public;
 revoke execute on function public.stamp_authorship_updated_only() from public;
+revoke execute on function public.void_in_store_sale(p_order uuid) from public;
 revoke execute on function public.claim_checkout(p_key text) from anon;
 revoke execute on function public.claim_checkout(p_key text) from authenticated;
 revoke execute on function public.claim_game_spots(p_game uuid, p_qty integer) from anon;
@@ -2926,6 +3242,8 @@ grant execute on function public.is_owner() to service_role;
 revoke execute on function public.is_staff() from anon;
 grant execute on function public.is_staff() to authenticated;
 grant execute on function public.is_staff() to service_role;
+revoke execute on function public.record_in_store_sale(p_game uuid, p_qty integer, p_first_name text, p_last_name text, p_email text, p_phone text, p_ack text, p_order_number text, p_token text) from anon;
+grant execute on function public.record_in_store_sale(p_game uuid, p_qty integer, p_first_name text, p_last_name text, p_email text, p_phone text, p_ack text, p_order_number text, p_token text) to authenticated;
 revoke execute on function public.refuse_early_draw() from anon;
 revoke execute on function public.refuse_early_draw() from authenticated;
 revoke execute on function public.refuse_pool_change() from anon;
@@ -2952,6 +3270,8 @@ revoke execute on function public.stamp_authorship() from anon;
 revoke execute on function public.stamp_authorship() from authenticated;
 revoke execute on function public.stamp_authorship_updated_only() from anon;
 revoke execute on function public.stamp_authorship_updated_only() from authenticated;
+revoke execute on function public.void_in_store_sale(p_order uuid) from anon;
+grant execute on function public.void_in_store_sale(p_order uuid) to authenticated;
 
 -- ---------------------------------------------------------------------
 -- Access: every existing account becomes an owner, ONCE

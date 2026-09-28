@@ -676,6 +676,99 @@ http.createServer(async (req, res) => {
       }
       return send(res, 200, null);
     }
+    // The two in-store functions, as supabase/migrations/20260930100000
+    // writes them: staff to record, the owner to void, refused once drawn,
+    // lowest available numbers first, all or nothing.
+    if (fn === "record_in_store_sale") {
+      const caller = userFromAuth(req.headers.authorization);
+      const member = caller && db.staff.find((m) => m.user_id === caller.id);
+      const refuse = (code, message) => send(res, 400, { code, message });
+      if (!member) return refuse("42501", "Only staff can record an in-store sale.");
+      if (!(a.p_qty >= 1)) return refuse("22023", "Enter how many guides were sold.");
+      if (!String(a.p_first_name ?? "").trim() || !String(a.p_last_name ?? "").trim())
+        return refuse("22023", "Enter the buyer's first and last name.");
+      if (!String(a.p_phone ?? "").trim())
+        return refuse("22023", "Enter the buyer's phone number, so the shop can reach them if they win.");
+      if (!String(a.p_ack ?? "").trim()) return refuse("22023", "The buyer has to have been shown the rules and agreed.");
+      const g = db.games.find((x) => x.id === a.p_game);
+      if (!g) return refuse("P0002", "There is no such drop.");
+      if (g.status !== "open") {
+        const said = g.status === "full" ? "sold out" : g.status === "drawn" ? "already drawn" : g.status;
+        return refuse("P0001", `This drop is ${said}, so no more guides can be sold.`);
+      }
+      const staleBefore = Date.now() - 15 * 60 * 1000;
+      for (const sp of db.game_spots) {
+        if (sp.game_id === a.p_game && sp.status === "held" && sp.held_at &&
+            Date.parse(sp.held_at) < staleBefore) { sp.status = "open"; sp.held_at = null; }
+      }
+      const open = db.game_spots
+        .filter((sp) => sp.game_id === a.p_game && sp.status === "open")
+        .sort((x, y) => x.spot_number - y.spot_number);
+      if (open.length < a.p_qty) {
+        const held = db.game_spots.filter((sp) => sp.game_id === a.p_game && sp.status === "held").length;
+        return refuse("P0001",
+          `${a.p_qty} guide${a.p_qty === 1 ? " was" : "s were"} requested, but only ${open.length} ` +
+          `${open.length === 1 ? "is" : "are"} available${held ? ` (${held} more in an online checkout right now)` : ""}. Nothing was recorded.`);
+      }
+      const taken = open.slice(0, a.p_qty);
+      const numbers = taken.map((sp) => sp.spot_number);
+      const now = new Date().toISOString();
+      const orderId = randomUUID();
+      const email = String(a.p_email ?? "").trim() || null;
+      db.orders.unshift({
+        id: orderId, order_number: a.p_order_number, status: "paid", source: "in_store",
+        email, first_name: a.p_first_name.trim(), last_name: a.p_last_name.trim(), phone: a.p_phone.trim(),
+        subtotal_cents: a.p_qty * g.spot_price_cents, tax_cents: 0, shipping_cents: 0,
+        total_cents: a.p_qty * g.spot_price_cents, has_shipment: false, has_pickup: false,
+        game_id: a.p_game, gateway: "in_store", confirmation_token: a.p_token,
+        confirmation_expires_at: new Date(Date.now() + 365 * 864e5).toISOString(),
+        game_terms_accepted_at: now, game_terms_text: a.p_ack.trim(),
+        disclaimer_accepted_at: null, disclaimer_text: null, refund_policy_text: null,
+        recorded_by: caller.id, recorded_by_name: member.display_name,
+        voided_at: null, voided_by_name: null, confirmation_sent_at: null,
+        card_brand: null, card_last4: null, created_at: now,
+      });
+      db.order_items.push({
+        id: randomUUID(), order_id: orderId, line_type: "game_spot", game_id: a.p_game,
+        spot_numbers: numbers, item_id: null, variant_id: null, size: null, pack_id: null,
+        name: `${g.title}: ${a.p_qty === 1 ? "guide number" : "guide numbers"} ${numbers.join(", ")}`,
+        unit_price_cents: g.spot_price_cents, quantity: a.p_qty, fulfillment_type: "none",
+        line_total_cents: a.p_qty * g.spot_price_cents,
+      });
+      for (const sp of taken) {
+        Object.assign(sp, {
+          status: "sold", sold_at: now, held_at: null, order_id: orderId,
+          first_name: a.p_first_name.trim(), last_name: a.p_last_name.trim(), email, phone: a.p_phone.trim(),
+        });
+      }
+      if (!db.game_spots.some((sp) => sp.game_id === a.p_game && sp.status !== "sold")) g.status = "full";
+      return send(res, 200, { order_id: orderId, numbers });
+    }
+    if (fn === "void_in_store_sale") {
+      const caller = userFromAuth(req.headers.authorization);
+      const member = caller && db.staff.find((m) => m.user_id === caller.id);
+      const refuse = (code, message) => send(res, 400, { code, message });
+      if (!member || member.role !== "owner") return refuse("42501", "Only the owner can void an in-store sale.");
+      const o = db.orders.find((x) => x.id === a.p_order);
+      if (!o) return refuse("P0002", "There is no such sale.");
+      if (o.source !== "in_store")
+        return refuse("P0001", "Only an in-store sale can be voided here. An online order is refunded through the payment processor.");
+      if (o.voided_at) return refuse("P0001", "This sale was already voided.");
+      if (db.winners.some((w) => w.game_id === o.game_id))
+        return refuse("P0001", "This drop has been drawn, so its sales can no longer be voided.");
+      let n = 0;
+      for (const sp of db.game_spots) {
+        if (sp.order_id === o.id && sp.status === "sold") {
+          Object.assign(sp, { status: "open", order_id: null, first_name: null, last_name: null,
+            email: null, phone: null, held_at: null, sold_at: null });
+          n += 1;
+        }
+      }
+      Object.assign(o, { status: "cancelled", voided_at: new Date().toISOString(), voided_by_name: member.display_name });
+      const g = db.games.find((x) => x.id === o.game_id);
+      if (g && g.status === "full" && db.game_spots.some((sp) => sp.game_id === g.id && sp.status !== "sold")) g.status = "open";
+      return send(res, 200, n);
+    }
     if (fn === "game_spots_remaining") {
       // As the real function: a hold older than fifteen minutes is an
       // abandoned checkout and counts as available.
@@ -800,7 +893,7 @@ http.createServer(async (req, res) => {
     // no drawn_at, for instance, which crashed a page that is correct.
     const DEFAULTS = {
       winners: () => ({ drawn_at: new Date().toISOString() }),
-      orders: () => ({ created_at: new Date().toISOString() }),
+      orders: () => ({ created_at: new Date().toISOString(), source: "online", voided_at: null }),
       admin_activity: () => ({ at: new Date().toISOString() }),
       // `saveGame` lays out the board as {game_id, spot_number} and lets
       // the column default supply the rest. Without this the rows came

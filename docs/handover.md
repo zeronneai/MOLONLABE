@@ -137,6 +137,26 @@ the screen says so in red.
 **Guides sold.** Who holds which guide number, with an export to a spreadsheet.
 The export is owner only.
 
+**Record an in-store sale.** For guides sold at the shop counter and paid
+at the register, owner or manager. Enter the buyer's first and last name,
+phone, email if they give one, and how many guides, and tick that they
+were shown the rules and agreed, including that their first name and last
+initial appear in the drawing broadcast. The buyer gets the next available
+guide numbers, lowest first, the website stops selling them, and the
+buyer is in the roster and on the wheel like any online buyer. Nothing is
+charged: the money and the tax were taken at the register. With an email,
+the buyer is sent their guide numbers and a link to their guide. The sale
+shows in the orders list and the ledger marked "in store", and in the
+activity log with who recorded it. A counter sale and an online purchase
+can never be given the same guide: the database takes the numbers with
+the same row locks online checkout uses, and `tests/db/instore.mjs` races
+the two against each other.
+
+**Void an in-store sale.** Owner only, for mistakes. Returns its guides to
+sale and takes the buyer out of the drawing. Logged, and refused once the
+drop has been drawn. The database refuses it for the manager too, not just
+the screen.
+
 **Draw a winner.** Two ways: a full-screen presentation at a separate
 address for filming, or a plain button. The presentation plays what rules
 clause 14 promises. First a roster of every buyer (first name and last

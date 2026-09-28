@@ -7,6 +7,7 @@ import BackLink from "@/components/admin/BackLink";
 import PrizeClaim from "@/components/admin/PrizeClaim";
 import { loadSoldGuides } from "@/lib/draw/soldGuides";
 import { buildRoster } from "@/lib/draw/roster";
+import InStoreSale, { type InStoreSaleRow } from "@/components/admin/InStoreSale";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export default async function EditGamePage({
   const [{ data: spots }, { data: winner }] = await Promise.all([
     sb
       .from("game_spots")
-      .select("spot_number, status, first_name, last_name, email, sold_at")
+      .select("spot_number, status, first_name, last_name, email, sold_at, order_id, held_at")
       .eq("game_id", id)
       .order("spot_number"),
     sb.from("winners").select("display_name, ticket, spot_id").eq("game_id", id).maybeSingle(),
@@ -54,6 +55,31 @@ export default async function EditGamePage({
   const { data: winningOrder } = contact?.order_id
     ? await sb.from("orders").select("order_number").eq("id", contact.order_id).maybeSingle()
     : { data: null };
+
+  // Sales at the counter for this drop, voided ones included so the
+  // record of a mistake and its correction stays on the page.
+  const { data: inStoreOrders } = await sb
+    .from("orders")
+    .select("id, order_number, first_name, last_name, recorded_by_name, created_at, voided_at, voided_by_name")
+    .eq("game_id", id)
+    .eq("source", "in_store")
+    .order("created_at", { ascending: false });
+  const inStoreIds = (inStoreOrders ?? []).map((o) => o.id);
+  const { data: inStoreLines } = inStoreIds.length
+    ? await sb.from("order_items").select("order_id, spot_numbers").in("order_id", inStoreIds)
+    : { data: [] };
+  const numbersOf = new Map((inStoreLines ?? []).map((l) => [l.order_id, l.spot_numbers ?? []]));
+  const inStoreSales: InStoreSaleRow[] = (inStoreOrders ?? []).map((o) => ({
+    id: o.id,
+    orderNumber: o.order_number,
+    buyer: `${o.first_name} ${o.last_name}`,
+    numbers: numbersOf.get(o.id) ?? [],
+    recordedBy: o.recorded_by_name,
+    at: o.created_at,
+    voidedAt: o.voided_at,
+    voidedBy: o.voided_by_name,
+  }));
+  const inStoreOrderIds = new Set(inStoreIds);
 
   const rows = spots ?? [];
   const sold = rows.filter((s) => s.status === "sold");
@@ -86,8 +112,20 @@ export default async function EditGamePage({
               : null,
           email: s.status === "sold" ? s.email : null,
           soldAt: s.sold_at,
+          inStore: Boolean(s.order_id && inStoreOrderIds.has(s.order_id)),
         }))}
         gameId={game.id}
+      />
+
+      <InStoreSale
+        gameId={game.id}
+        status={game.status}
+        drawn={Boolean(winner)}
+        // What the website could sell: open guides, and holds an abandoned
+        // checkout left over fifteen minutes ago, as game_spots_remaining counts.
+        available={rows.filter((r) => r.status === "open" ||
+          (r.status === "held" && r.held_at !== null && Date.now() - Date.parse(r.held_at) > 15 * 60 * 1000)).length}
+        sales={inStoreSales}
       />
 
       <DrawPanel

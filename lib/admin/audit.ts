@@ -29,7 +29,9 @@ export type ActivityAction =
   | "draw"
   | "stock"
   | "photos"
-  | "alerts";
+  | "alerts"
+  | "sale"
+  | "void";
 
 export type ActivityEntry = {
   action: ActivityAction;

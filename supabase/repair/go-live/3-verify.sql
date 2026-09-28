@@ -45,10 +45,15 @@ select 6, 'no undrawn drop is marked full with guides still to sell',
        coalesce(string_agg(title, '; '), 'none')
 from counts where status = 'full' and sold < total_spots and id not in (select game_id from drawn)
 union all
-select 7, 'orders remaining (before going live this should be 0)',
+select 7, 'online orders remaining (before going live this should be 0)',
        'INFO',
        count(*) || coalesce(', earliest ' || min(created_at)::text, '')
-from public.orders
+from public.orders where source = 'online'
+union all
+select 7, 'in-store sales (never removed)',
+       'INFO',
+       count(*) filter (where voided_at is null) || ' recorded, ' || count(*) filter (where voided_at is not null) || ' voided'
+from public.orders where source = 'in_store'
 union all
 select 8, 'drop: ' || title,
        'INFO',

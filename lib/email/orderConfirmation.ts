@@ -97,6 +97,12 @@ export type OrderEmailData = {
    * rendered fresh every time.
    */
   guideFor?: string | null;
+  /**
+   * Sold at the shop counter and paid at the register. The website never
+   * saw the money or the tax, so no totals are printed, only that it was
+   * paid at the shop.
+   */
+  paidInStore?: boolean;
 };
 
 export type RenderedEmail = { subject: string; html: string; text: string };
@@ -349,7 +355,12 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
   ${collecting ? row(pickupBlock, "padding-top:28px") : ""}
 
   <!-- Totals -->
-  <tr><td class="ml-pad" style="padding:28px 32px 0">
+  ${
+    order.paidInStore
+      ? `<tr><td class="ml-pad" style="padding:28px 32px 0">
+    <p class="ml-muted" style="${SMALL};margin:0;color:${C.muted}">Paid at the shop counter.</p>
+  </td></tr>`
+      : `<tr><td class="ml-pad" style="padding:28px 32px 0">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
       ${totalRow("Subtotal", formatUsd(order.subtotalCents))}
       ${order.shippingCents > 0 ? totalRow("Shipping", formatUsd(order.shippingCents)) : ""}
@@ -362,7 +373,8 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
         ? `<p class="ml-muted" style="${SMALL};margin:10px 0 0;color:${C.muted}">Paid with ${escapeHtml(order.cardBrand ?? "card")} ending ${escapeHtml(order.cardLast4)}.</p>`
         : ""
     }
-  </td></tr>
+  </td></tr>`
+  }
 
   ${order.spots ? row(spotsBlock, "padding-top:28px") : ""}
   ${order.guideFor ? row(guideBlock, "padding-top:28px") : ""}
@@ -481,16 +493,20 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
       : []),
     ``,
     RULE,
-    money("Subtotal", formatUsd(order.subtotalCents)),
-    ...(order.shippingCents > 0
-      ? [money("Shipping", formatUsd(order.shippingCents))]
-      : []),
-    ...(order.taxCents > 0 ? [money("Tax", formatUsd(order.taxCents))] : []),
-    money("TOTAL", formatUsd(order.totalCents)),
-    RULE,
-    ...(order.cardLast4
-      ? [`  Paid with ${order.cardBrand ?? "card"} ending ${order.cardLast4}.`]
-      : []),
+    ...(order.paidInStore
+      ? [`  Paid at the shop counter.`, RULE]
+      : [
+          money("Subtotal", formatUsd(order.subtotalCents)),
+          ...(order.shippingCents > 0
+            ? [money("Shipping", formatUsd(order.shippingCents))]
+            : []),
+          ...(order.taxCents > 0 ? [money("Tax", formatUsd(order.taxCents))] : []),
+          money("TOTAL", formatUsd(order.totalCents)),
+          RULE,
+          ...(order.cardLast4
+            ? [`  Paid with ${order.cardBrand ?? "card"} ending ${order.cardLast4}.`]
+            : []),
+        ]),
     ...(order.spots
       ? [
           ``,

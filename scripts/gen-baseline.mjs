@@ -200,6 +200,25 @@ for (const t of tables) {
 end $$;`);
     }
   }
+  // And the other direction: a column the schema now allows to be null
+  // (orders.email, since in-store sales) is relaxed where a database
+  // still requires it. Without this, a database built before the change
+  // kept the old NOT NULL and every write relying on the new rule failed.
+  // Relaxing a constraint changes no data.
+  const nullable = cols.filter(([, , notnull]) => notnull !== "true").map(([name]) => `'${name}'`);
+  if (nullable.length > 0) {
+    w(`do $$ declare c text; begin
+  foreach c in array array[${nullable.join(", ")}] loop
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = '${t}'
+        and column_name = c and is_nullable = 'NO'
+    ) then
+      execute format('alter table public.%I alter column %I drop not null', '${t}', c);
+    end if;
+  end loop;
+end $$;`);
+  }
   w("");
 }
 

@@ -16,8 +16,11 @@ not have yet, in this order:
 1. `supabase/migrations/20260927100000_guide_image_count.sql`
 2. `supabase/migrations/20260928100000_staff_roles.sql`
 3. `supabase/migrations/20260929100000_no_early_draw.sql`
+4. `supabase/migrations/20260930100000_in_store_sales.sql`
 
 The third is what stops a winner being recorded before a drop sells out.
+The fourth adds in-store sales, and must be in place before the go-live
+cleanup in step 6, which reads it to leave counter sales alone.
 `npm run check:schema` checks columns only and will not tell you it is
 missing.
 
@@ -99,7 +102,8 @@ In the Supabase SQL editor, run the three files in
 1. **`1-preview.sql`.** Put the cutoff in it: the time just after the
    real-card test in step 5.3 finished, with its timezone, e.g.
    `'2026-09-27 14:30:00-06'`. Everything placed before the cutoff is
-   treated as a test, including that voided real-card purchase. The preview:
+   treated as a test, including that voided real-card purchase. **In-store
+   sales are never touched**, whenever they were recorded. The preview:
    - shows how many orders will be deleted and how many are kept (kept
      should be 0 if nobody else has bought yet)
    - shows which guides go back on sale, drop by drop

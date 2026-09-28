@@ -338,7 +338,8 @@ export interface Database {
           id: string;
           order_number: string;
           status: string;
-          email: string;
+          /** Null only on an in-store sale where the buyer gave none. */
+          email: string | null;
           first_name: string;
           last_name: string;
           phone: string | null;
@@ -354,10 +355,11 @@ export interface Database {
           ship_city: string | null;
           ship_region: string | null;
           ship_postal_code: string | null;
-          disclaimer_accepted_at: string;
-          disclaimer_text: string;
+          /** The website's boxes: null on an in-store sale. */
+          disclaimer_accepted_at: string | null;
+          disclaimer_text: string | null;
           disclaimer_version: string | null;
-          refund_policy_text: string;
+          refund_policy_text: string | null;
           game_id: string | null;
           gateway: string;
           gateway_transaction_id: string | null;
@@ -372,6 +374,12 @@ export interface Database {
           game_terms_text: string | null;
           confirmation_sent_at: string | null;
           created_at: string;
+          /** 'online' | 'in_store' */
+          source: string;
+          recorded_by: string | null;
+          recorded_by_name: string | null;
+          voided_at: string | null;
+          voided_by_name: string | null;
         };
         Insert: {
           id?: string;
@@ -412,6 +420,7 @@ export interface Database {
           game_terms_text?: string | null;
           confirmation_sent_at?: string | null;
           created_at?: string;
+          source?: string;
         };
         Update: {
           status?: string;
@@ -615,6 +624,29 @@ export interface Database {
       };
       game_spots_remaining: {
         Args: { p_game: string };
+        Returns: number;
+      };
+      /**
+       * A sale at the counter: the lowest available guide numbers, sold,
+       * with an in-store order, in one transaction. Staff only.
+       */
+      record_in_store_sale: {
+        Args: {
+          p_game: string;
+          p_qty: number;
+          p_first_name: string;
+          p_last_name: string;
+          p_email: string | null;
+          p_phone: string;
+          p_ack: string;
+          p_order_number: string;
+          p_token: string;
+        };
+        Returns: { order_id: string; numbers: number[] };
+      };
+      /** Owner only; refused once the drop is drawn. Guides returned. */
+      void_in_store_sale: {
+        Args: { p_order: string };
         Returns: number;
       };
       /** 'claimed' | 'in_flight' | 'done:<order number>' */

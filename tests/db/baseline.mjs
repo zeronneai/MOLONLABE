@@ -90,6 +90,12 @@ try {
   for (const f of migrations.filter((f) => !f.includes("staff_roles"))) {
     await psql(prod, ["-f", join(ROOT, "supabase/migrations", f)]);
   }
+  // As production stood before in-store sales: an order had to have an
+  // email and the website's acceptances. The baseline has to RELAX these,
+  // not just leave them, or every in-store sale without an email fails.
+  await psql(prod, ["-c", `
+    alter table public.orders alter column email set not null;
+    alter table public.orders alter column disclaimer_text set not null;`]);
   await psql(prod, ["-c", `
     insert into auth.users (id, email, raw_user_meta_data) values
       (gen_random_uuid(), 'owner@example.com', '{"full_name":"Rey Marquez"}'),

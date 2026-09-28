@@ -58,6 +58,15 @@ function describe(row: ActivityRow): string {
       return `retuned the arcade (${row.field})`;
     case "draw":
       return `drew the winner for ${label}`;
+    case "sale": {
+      const v = (row.after_value ?? {}) as { order?: string; buyer?: string; guides?: number[] };
+      const n = v.guides?.length ?? 0;
+      return `recorded an in-store sale on ${label}: ${n} ${n === 1 ? "guide" : "guides"} (${(v.guides ?? []).join(", ")}) to ${v.buyer ?? "a buyer"}, order ${v.order ?? "?"}`;
+    }
+    case "void": {
+      const v = (row.before_value ?? {}) as { order?: string; buyer?: string; guides?: number[] };
+      return `voided in-store sale ${v.order ?? "?"} on ${label} (${v.buyer ?? "a buyer"}, ${(v.guides ?? []).length === 1 ? "guide" : "guides"} ${(v.guides ?? []).join(", ")} back on sale)`;
+    }
     case "photos":
       return `changed the photos on ${label} (${plain(row.before_value)} before, ${plain(row.after_value)} now)`;
     case "stock":
@@ -89,7 +98,7 @@ function stockChange(before: unknown, after: unknown): string {
 
 /** Red for anything destructive, amber for money and live switches. */
 function tone(action: string): string {
-  if (action === "delete" || action === "archive") return "text-danger";
+  if (action === "delete" || action === "archive" || action === "void") return "text-danger";
   if (action === "price" || action === "offer" || action === "commerce")
     return "text-amber";
   return "text-muted";

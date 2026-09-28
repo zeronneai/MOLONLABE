@@ -10,6 +10,8 @@ screen, nothing more.
 | Remove a size from an item | yes | yes (the one permanent delete a manager can make) |
 | Delete an item permanently | yes | no |
 | Games: create, set spots and price, write the guide sections, rebuild the guide | yes | yes |
+| Record an in-store sale (guides sold at the counter) | yes | yes |
+| Void an in-store sale (guides back on sale, buyer out of the drawing; refused once drawn) | yes | no |
 | Run the draw, including the presentation | yes | yes |
 | See the winner's name, email and phone | yes | yes |
 | See orders, inquiries, transfer requests; mark inquiries handled | yes | yes |

@@ -64,12 +64,25 @@ export const GAME_TERMS_CONSENT =
   "I understand this drop has no end date, that the winner is drawn once every guide sells, and that my purchase is final.";
 
 /**
- * Whether the order's stored terms include the broadcast acknowledgement.
+ * What staff confirm for a sale at the counter (2026-09-28, the client's
+ * wording). A required checkbox on "Record an in-store sale", stored on
+ * the in-store order as its game_terms_text, the same place an online
+ * order keeps what its buyer agreed to.
+ */
+export const IN_STORE_ACKNOWLEDGEMENT =
+  "The buyer was shown the rules and agreed, including that their first name and last initial appear in the drawing broadcast.";
+
+/**
+ * Whether the order's stored terms include the broadcast acknowledgement:
+ * the checkout's, or the one staff confirm for a sale at the counter.
  * Anything else, including an order with no stored terms at all, is
  * treated as not having agreed.
  */
 export function hasBroadcastConsent(storedTerms: string | null | undefined): boolean {
-  return typeof storedTerms === "string" && storedTerms.includes(BROADCAST_NOTICE);
+  return (
+    typeof storedTerms === "string" &&
+    (storedTerms.includes(BROADCAST_NOTICE) || storedTerms.includes(IN_STORE_ACKNOWLEDGEMENT))
+  );
 }
 
 // SHOW_NAME_LABEL and SHOW_NAME_HELP lived here and are gone with the

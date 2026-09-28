@@ -17,6 +17,8 @@ type Row = {
   name: string | null;
   email: string | null;
   soldAt: string | null;
+  /** Sold at the shop counter rather than online. */
+  inStore?: boolean;
 };
 
 export default function SpotLedger({
@@ -77,6 +79,9 @@ export default function SpotLedger({
                 </span>
                 <span className="min-w-0 flex-1 truncate text-sm">
                   {s.name}
+                  {s.inStore && (
+                    <span data-in-store className="label ml-3 text-amber">In store</span>
+                  )}
                 </span>
                 <span className="shrink-0 truncate text-sm text-muted">
                   {s.email}

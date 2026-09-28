@@ -13,7 +13,8 @@
 --    production deployment became Ready in Vercel, with its timezone,
 --    e.g. '2026-09-27 14:05:00-06'. If you run the cleanup BEFORE
 --    switching payments to production, use the current time instead.
--- 2. Run this whole file in the Supabase SQL editor.
+-- 2. Run this whole file in the Supabase SQL editor. It needs migration
+--    20260930100000_in_store_sales.sql applied first (docs/go-live.md).
 -- 3. Note the number on the "orders to delete" row. 2-cleanup.sql asks
 --    for it and refuses to run if it has changed.
 --
@@ -24,7 +25,10 @@ with params as (
   select timestamptz 'PUT-THE-CUTOFF-HERE' as cutoff          -- CUTOFF
 ),
 sandbox as (
-  select o.id from public.orders o, params p where o.created_at < p.cutoff
+  -- Online orders only. An in-store sale is a real sale at the counter,
+  -- whenever it was recorded, and is never touched.
+  select o.id from public.orders o, params p
+  where o.created_at < p.cutoff and o.source = 'online'
 ),
 drawn as (
   select distinct game_id from public.winners
@@ -34,9 +38,9 @@ select 1 as sort, 'orders to delete' as what,
        count(*)::text as n
 from sandbox
 union all
-select 2, 'orders kept', 'placed at or after the cutoff (real)',
+select 2, 'orders kept', 'placed at or after the cutoff, or sold in store (real)',
        count(*)::text
-from public.orders o, params p where o.created_at >= p.cutoff
+from public.orders o, params p where o.created_at >= p.cutoff or o.source = 'in_store'
 union all
 select 3, 'guides to return', g.title || ' (' || g.status || ')', count(*)::text
 from public.game_spots s join public.games g on g.id = s.game_id

@@ -44,7 +44,7 @@ export async function GET(
 
   const { data: order } = await sb
     .from("orders")
-    .select("id, game_id, confirmation_expires_at")
+    .select("id, game_id, confirmation_expires_at, voided_at")
     .eq("order_number", orderNumber)
     .eq("confirmation_token", token)
     .maybeSingle();
@@ -59,6 +59,10 @@ export async function GET(
   ) {
     return notFound();
   }
+
+  // A voided in-store sale: the guides went back on sale, and so does the
+  // right to the document that came with them.
+  if (order.voided_at) return notFound();
 
   // A merchandise order has no game and therefore no guide. Not an
   // error — there is simply nothing at this address for that order.

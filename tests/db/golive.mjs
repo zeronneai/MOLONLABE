@@ -58,6 +58,7 @@ const O1 = "d0000000-0000-4000-8000-000000000001"; // sandbox, Halloween 1-2
 const O2 = "d0000000-0000-4000-8000-000000000002"; // sandbox, fills the test drop
 const O3 = "d0000000-0000-4000-8000-000000000003"; // sandbox, a tee
 const REAL = "d0000000-0000-4000-8000-000000000009"; // after the cutoff
+const INSTORE = "d0000000-0000-4000-8000-000000000008"; // at the counter, before the cutoff
 
 async function build(db) {
   await db.sql(`
@@ -108,6 +109,16 @@ async function build(db) {
       where game_id = '${HALLOWEEN}' and spot_number = 5;
     update public.game_spots set status = 'held', held_at = now()
       where game_id = '${HALLOWEEN}' and spot_number = 6;
+    -- A real sale at the counter, recorded BEFORE the cutoff. Never a test.
+    insert into public.orders (id, order_number, source, email, first_name, last_name, phone, subtotal_cents, total_cents,
+                               gateway, game_id, game_terms_accepted_at, game_terms_text, recorded_by_name,
+                               confirmation_token, created_at)
+    values ('${INSTORE}', 'MLF-S-COUNTER', 'in_store', null, 'Counter', 'Buyer', '9155550111', 2500, 2500,
+            'in_store', '${HALLOWEEN}', now(), 'The buyer was shown the rules and agreed.', 'Luis Ortega',
+            't-counter', '2026-09-25 10:00:00-06');
+    update public.game_spots set status = 'sold', order_id = '${INSTORE}', first_name = 'Counter', last_name = 'Buyer',
+      phone = '9155550111', sold_at = now()
+      where game_id = '${HALLOWEEN}' and spot_number = 7;
     insert into public.order_items (order_id, line_type, item_id, variant_id, name, quantity, unit_price_cents, line_total_cents, fulfillment_type)
       values ('${O3}', 'inventory', '${TEE}', '${TEE_M}', 'Tee', 2, 3000, 6000, 'ship');
     insert into public.order_items (order_id, line_type, game_id, name, quantity, unit_price_cents, line_total_cents, fulfillment_type, spot_numbers)
@@ -124,7 +135,8 @@ const untouched = (db) => db.sql(`
     'items', (select json_agg(row_to_json(i) order by id) from public.items i),
     'variants', (select json_agg(row_to_json(v) order by id) from public.item_variants v),
     'winners', (select json_agg(row_to_json(w) order by id) from public.winners w),
-    'real', (select row_to_json(o) from public.orders o where id = '${REAL}')
+    'real', (select row_to_json(o) from public.orders o where id = '${REAL}'),
+    'instore', (select row_to_json(o) from public.orders o where id = '${INSTORE}')
   )::text`);
 const snapshot = (db) => db.sql(`
   select json_build_object(
@@ -145,7 +157,8 @@ try {
   check("PREVIEW runs", p.ok, p.err.split("\n")[0]);
   check("PREVIEW counts three sandbox orders to delete", row("orders to delete")?.[3] === "3",
     row("orders to delete")?.join(" | "));
-  check("PREVIEW counts the real order as kept", row("orders kept")?.[3] === "1");
+  check("PREVIEW counts the real order and the in-store sale as kept", row("orders kept")?.[3] === "2",
+  row("orders kept")?.join(" | "));
   check("PREVIEW lists the test guides per drop",
     row("guides to return", "Halloween Drop (open)")?.[3] === "2" && row("guides to return", "Test Drop (full)")?.[3] === "3",
     rows.filter((r) => r[1] === "guides to return").map((r) => r.slice(2).join(" ")).join("; "));
@@ -189,9 +202,11 @@ try {
     (await db.sql(`select status || ' ' || (select count(*) from public.game_spots where game_id = '${TESTFULL}' and status = 'open') from public.games where id = '${TESTFULL}'`)) === "open 3");
   check("the drawn demo drop is untouched",
     (await db.sql(`select status || ' ' || (select count(*) from public.game_spots where game_id = '${DEMO}' and status = 'sold') from public.games where id = '${DEMO}'`)) === "drawn 3");
-  check("only the real order remains, with its lines",
-    (await db.sql(`select string_agg(order_number, ',') from public.orders`)) === "MLF-R1" &&
+  check("only the real order and the in-store sale remain",
+    (await db.sql(`select string_agg(order_number, ',' order by order_number) from public.orders`)) === "MLF-R1,MLF-S-COUNTER" &&
       (await db.sql(`select count(*) from public.order_items`)) === "0");
+  check("the in-store buyer still holds guide 7, recorded before the cutoff",
+    (await spot(HALLOWEEN, 7)).startsWith(`sold ${INSTORE}`), await spot(HALLOWEEN, 7));
   check("every drop's settings, the items, the stock, the winners and the real order are exactly as they were",
     (await untouched(db)) === keep);
 
@@ -202,7 +217,7 @@ try {
   check("VERIFY runs and every check passes", v.ok && failing.length === 0 && vrows.filter((r) => r[2] === "PASS").length === 6,
     failing.map((r) => `${r[1]}: ${r[3]}`).join("; ") || v.err.split("\n")[0]);
   check("VERIFY lists each drop's numbers",
-    vrows.some((r) => r[1] === "drop: Halloween Drop" && r[3] === "open, 10 guides at $25.00: 1 sold, 1 held, 8 available"),
+    vrows.some((r) => r[1] === "drop: Halloween Drop" && r[3] === "open, 10 guides at $25.00: 2 sold, 1 held, 7 available"),
     vrows.filter((r) => r[1]?.startsWith("drop:")).map((r) => `${r[1]} ${r[3]}`).join("; "));
 
   // ------------------------------------ run twice: the second does nothing

@@ -103,6 +103,14 @@ export default async function ConfirmationPage({
     .select("*")
     .eq("order_id", order.id);
 
+  // Sold at the shop counter and paid at the register: no totals or card
+  // here, because the website never saw the money or the tax.
+  const inStore = order.source === "in_store";
+  // Voided by the owner: the guides went back on sale and the buyer is
+  // not in the drawing, so the page says so and offers no guide.
+  const voided = Boolean(order.voided_at);
+  if (voided) guideItem = null;
+
   const all = lines ?? [];
   const shipLines = all.filter((l) => l.fulfillment_type === "ship");
   const pickupLines = all.filter((l) => l.fulfillment_type === "pickup");
@@ -115,6 +123,12 @@ export default async function ConfirmationPage({
         <br />
         {order.first_name.toUpperCase()}.
       </h1>
+      {voided && (
+        <p data-voided className="mt-6 max-w-[60ch] border-l-2 border-danger pl-5 text-bone">
+          This sale was cancelled by the shop. Its guide numbers are no longer
+          yours and are not in the drawing. Call the shop if that is a surprise.
+        </p>
+      )}
       <p className="mt-6 max-w-[60ch] text-muted">
         {order.confirmation_sent_at
           ? `A copy is on its way to ${order.email}.`
@@ -178,25 +192,33 @@ export default async function ConfirmationPage({
           </section>
         )}
 
-        <dl className="space-y-2 border-t hairline pt-6 text-sm">
-          <Row label="Subtotal" value={formatUsd(order.subtotal_cents)} />
-          {order.shipping_cents > 0 && (
-            <Row label="Shipping" value={formatUsd(order.shipping_cents)} />
-          )}
-          {order.tax_cents > 0 && (
-            <Row label="Tax" value={formatUsd(order.tax_cents)} />
-          )}
-        </dl>
-        <div className="mt-4 flex items-baseline justify-between border-t hairline pt-4">
-          <span className="label">Total</span>
-          <span className="text-xl font-extrabold tracking-[-0.02em]">
-            {formatUsd(order.total_cents)}
-          </span>
-        </div>
-        {order.card_last4 && (
-          <p className="mt-3 text-sm text-muted">
-            Paid with {order.card_brand ?? "card"} ending {order.card_last4}.
+        {inStore ? (
+          <p className="border-t hairline pt-6 text-sm text-muted" data-paid-in-store>
+            Paid at the shop counter.
           </p>
+        ) : (
+          <>
+          <dl className="space-y-2 border-t hairline pt-6 text-sm">
+            <Row label="Subtotal" value={formatUsd(order.subtotal_cents)} />
+            {order.shipping_cents > 0 && (
+              <Row label="Shipping" value={formatUsd(order.shipping_cents)} />
+            )}
+            {order.tax_cents > 0 && (
+              <Row label="Tax" value={formatUsd(order.tax_cents)} />
+            )}
+          </dl>
+          <div className="mt-4 flex items-baseline justify-between border-t hairline pt-4">
+            <span className="label">Total</span>
+            <span className="text-xl font-extrabold tracking-[-0.02em]">
+              {formatUsd(order.total_cents)}
+            </span>
+          </div>
+          {order.card_last4 && (
+            <p className="mt-3 text-sm text-muted">
+              Paid with {order.card_brand ?? "card"} ending {order.card_last4}.
+            </p>
+          )}
+          </>
         )}
 
         {/* What was bought, by number, so it can be checked against the
@@ -254,29 +276,49 @@ export default async function ConfirmationPage({
         {/* Placement 3 of 3. Shown from the order's own stored copy, not
             from the constant — this is what the buyer accepted, and it
             stays true even after the wording changes. */}
-        <div className="mt-14 border-t hairline pt-8">
-          <h2 className="label text-muted">Terms you accepted</h2>
-          <p className="mt-4 max-w-[62ch] text-sm leading-relaxed text-muted">
-            {order.disclaimer_text || FIREARM_DISCLAIMER}
-          </p>
-          <p className="mt-3 max-w-[62ch] text-sm leading-relaxed text-muted">
-            {order.refund_policy_text || REFUND_POLICY}
-          </p>
-          {order.game_terms_text && (
-            <p className="mt-3 max-w-[62ch] text-sm leading-relaxed text-muted">
+        {inStore ? (
+          <div className="mt-14 border-t hairline pt-8">
+            <h2 className="label text-muted">What you agreed to at the counter</h2>
+            <p className="mt-4 max-w-[62ch] text-sm leading-relaxed text-muted">
               {order.game_terms_text}
             </p>
-          )}
-          <p className="label mt-4 text-muted">
-            Accepted{" "}
-            {new Intl.DateTimeFormat("en-US", {
-              timeZone: "America/Denver",
-              dateStyle: "medium",
-              timeStyle: "short",
-            }).format(new Date(order.disclaimer_accepted_at))}{" "}
-            MT
-          </p>
-        </div>
+            {order.game_terms_accepted_at && (
+              <p className="label mt-4 text-muted">
+                Recorded{" "}
+                {new Intl.DateTimeFormat("en-US", {
+                  timeZone: "America/Denver",
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                }).format(new Date(order.game_terms_accepted_at))}{" "}
+                MT
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="mt-14 border-t hairline pt-8">
+            <h2 className="label text-muted">Terms you accepted</h2>
+            <p className="mt-4 max-w-[62ch] text-sm leading-relaxed text-muted">
+              {order.disclaimer_text || FIREARM_DISCLAIMER}
+            </p>
+            <p className="mt-3 max-w-[62ch] text-sm leading-relaxed text-muted">
+              {order.refund_policy_text || REFUND_POLICY}
+            </p>
+            {order.game_terms_text && (
+              <p className="mt-3 max-w-[62ch] text-sm leading-relaxed text-muted">
+                {order.game_terms_text}
+              </p>
+            )}
+            <p className="label mt-4 text-muted">
+              Accepted{" "}
+              {new Intl.DateTimeFormat("en-US", {
+                timeZone: "America/Denver",
+                dateStyle: "medium",
+                timeStyle: "short",
+              }).format(new Date(order.disclaimer_accepted_at ?? order.created_at))}{" "}
+              MT
+            </p>
+          </div>
+        )}
 
         <Link href="/shop" className="cta-secondary mt-12">
           Back to the inventory

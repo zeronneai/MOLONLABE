@@ -6,7 +6,8 @@
 -- the "orders to delete" row, and run this whole file.
 --
 -- WHAT IT DOES
---   - every order placed before the cutoff is deleted, with its lines
+--   - every ONLINE order placed before the cutoff is deleted, with its
+--     lines. In-store sales are real sales and are never touched.
 --   - every guide those orders held goes back to available, with the
 --     buyer's name, email and phone cleared from it
 --   - a guide marked sold with no order at all, or held by a checkout
@@ -50,8 +51,9 @@ begin
     raise exception 'Fill in the cutoff and the expected number of orders first. Nothing has changed.';
   end if;
 
+  -- Online orders only: an in-store sale is real whenever it happened.
   create temp table _sandbox_orders on commit drop as
-    select id from public.orders where created_at < v_cutoff;
+    select id from public.orders where created_at < v_cutoff and source = 'online';
   select count(*) into v_orders from _sandbox_orders;
   if v_orders <> v_expected then
     raise exception 'There are % orders before the cutoff, not the % you expected. Nothing has changed. Run the preview again.',

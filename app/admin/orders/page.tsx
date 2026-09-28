@@ -57,6 +57,9 @@ export default async function AdminOrders() {
                 <div className="flex items-baseline justify-between gap-4">
                   <p className="font-extrabold tracking-[-0.02em]">
                     {order.order_number}
+                    {order.source === "in_store" && (
+                      <span data-in-store className="label ml-3 text-amber">In store</span>
+                    )}
                     <span className="ml-3 font-normal text-muted">
                       {order.first_name} {order.last_name}
                     </span>
@@ -67,15 +70,33 @@ export default async function AdminOrders() {
                 </div>
 
                 <p className="mt-1 text-sm text-muted">
-                  {order.email}
+                  {order.email ?? "No email given"}
                   {order.phone ? ` · ${order.phone}` : ""}
                 </p>
                 <p className="label mt-2 text-muted">
-                  {stamp(order.created_at)} · {order.status}
-                  {order.card_last4
-                    ? ` · ${order.card_brand ?? "card"} ${order.card_last4}`
-                    : ""}
+                  {stamp(order.created_at)} ·{" "}
+                  {order.voided_at ? "voided" : order.status}
+                  {order.source === "in_store"
+                    ? ` · paid at the register · recorded by ${order.recorded_by_name ?? "staff"}`
+                    : order.card_last4
+                      ? ` · ${order.card_brand ?? "card"} ${order.card_last4}`
+                      : ""}
                 </p>
+                {order.voided_at && (
+                  <p data-voided className="label mt-1 text-danger">
+                    Voided {stamp(order.voided_at)} by {order.voided_by_name ?? "the owner"}. Its guides went back on sale.
+                  </p>
+                )}
+
+                {orderLines.some((l) => l.line_type === "game_spot") && (
+                  <ul className="mt-3 text-sm">
+                    {orderLines
+                      .filter((l) => l.line_type === "game_spot")
+                      .map((l) => (
+                        <li key={l.id}>{l.name}</li>
+                      ))}
+                  </ul>
+                )}
 
                 {pickup.length > 0 && (
                   <div className="mt-3">
@@ -124,8 +145,14 @@ export default async function AdminOrders() {
                     buried, because it is the thing the client would need
                     to produce if a sale were ever questioned. */}
                 <p className="label mt-3 text-muted">
-                  Terms accepted {stamp(order.disclaimer_accepted_at)}
-                  {order.confirmation_sent_at ? "" : " · email NOT sent"}
+                  {order.source === "in_store"
+                    ? `Rules shown and agreed at the counter, ${stamp(order.game_terms_accepted_at ?? order.created_at)}`
+                    : `Terms accepted ${stamp(order.disclaimer_accepted_at ?? order.created_at)}`}
+                  {order.confirmation_sent_at
+                    ? ""
+                    : order.source === "in_store" && !order.email
+                      ? " · no email to send the guide to"
+                      : " · email NOT sent"}
                 </p>
               </article>
             );
