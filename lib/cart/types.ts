@@ -64,6 +64,16 @@ export type PricedLine = {
   quantity: number;
   fulfillment: FulfillmentType;
   lineTotalCents: number;
+  /**
+   * The most this line can hold right now: the guides left in the drop,
+   * the stock of that size, or one for a single unit. The cart's + button
+   * stops here; the pricer enforces it regardless.
+   */
+  maxQuantity: number;
+  /** On a guide line: the drop's title, shown under the line. */
+  dropTitle?: string | null;
+  /** On a guide line: the drop's featured piece, which the guide is about. */
+  pieceName?: string | null;
 };
 
 /** A line the server refused, and why, so the cart can say so out loud. */

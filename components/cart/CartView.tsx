@@ -5,12 +5,15 @@
 // arrives in the post, and some of it means a drive to Montana Ave and a
 // background check.
 //
-// Every figure here comes back from the server. The component holds no
-// pricing logic at all.
+// Every figure here comes back from the server, with one exception made
+// for speed: when a quantity changes, the line and the subtotal show the
+// new figure at once (unit price times quantity, nothing to decide), and
+// tax, shipping and the total are dimmed until the server's re-quote
+// arrives a moment later. The server's figures are always what is paid.
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import CartThumb from "@/components/cart/CartThumb";
 import { useCart } from "@/lib/cart/store";
 import { quoteCart } from "@/app/actions/cart";
 import { formatUsd } from "@/lib/money";
@@ -23,8 +26,16 @@ export default function CartView() {
   const [cart, setCart] = useState<PricedCart | null>(null);
   const [pending, start] = useTransition();
 
+  // Only the newest quote is applied. Tapping + three times fires three
+  // quotes, and an older one arriving last must not put a stale total
+  // back on screen.
+  const latest = useRef(0);
   const refresh = useCallback(() => {
-    start(async () => setCart(await quoteCart(lines)));
+    const mine = ++latest.current;
+    start(async () => {
+      const quote = await quoteCart(lines);
+      if (mine === latest.current) setCart(quote);
+    });
   }, [lines]);
 
   useEffect(() => {
@@ -46,6 +57,30 @@ export default function CartView() {
       />
     );
   }
+
+  // What the buyer just asked for, applied to the server's lines at once:
+  // a removed line disappears, a changed quantity shows, bounded by what
+  // the server said is available.
+  const wanted = new Map(lines.map((l) => [lineKey(l), Math.floor(l.quantity)]));
+  const current = (group: PricedLine[]) =>
+    group
+      .filter((l) => wanted.has(lineKey(l)))
+      .map((l) => {
+        const quantity = Math.max(1, Math.min(wanted.get(lineKey(l)) ?? l.quantity, l.maxQuantity));
+        return { ...l, quantity, lineTotalCents: l.unitPriceCents * quantity };
+      });
+  const guideLines = current(cart.lines.filter((l) => l.gameId));
+  const shipLines = current(cart.shipLines);
+  const pickupLines = current(cart.pickupLines);
+  const shown = [...guideLines, ...shipLines, ...pickupLines];
+  const subtotalCents = shown.reduce((sum, l) => sum + l.lineTotalCents, 0);
+  // The quote on screen no longer matches what is in the cart: a change
+  // is on its way to the server.
+  const stale =
+    pending ||
+    shown.length !== cart.lines.length ||
+    shown.some((l) => l.quantity !== cart.lines.find((c) => lineKey(c) === lineKey(l))?.quantity);
+  const guideCount = guideLines.reduce((n, l) => n + l.quantity, 0);
 
   return (
     <div className="mt-10 lg:grid lg:grid-cols-[1fr_22rem] lg:gap-16">
@@ -74,23 +109,34 @@ export default function CartView() {
           </div>
         )}
 
-        {cart.shipLines.length > 0 && (
+        {guideLines.length > 0 && (
           <Group
-            title="Ships to you"
-            note={SHIPPING_NOTICE}
-            tone="muted"
-            lines={cart.shipLines}
+            title="Guides"
+            note="Each guide is one entry into the drawing. Guide numbers are assigned when you pay."
+            tone="acid"
+            lines={guideLines}
             onQuantity={setQuantity}
             onRemove={remove}
           />
         )}
 
-        {cart.pickupLines.length > 0 && (
+        {shipLines.length > 0 && (
+          <Group
+            title="Ships to you"
+            note={SHIPPING_NOTICE}
+            tone="muted"
+            lines={shipLines}
+            onQuantity={setQuantity}
+            onRemove={remove}
+          />
+        )}
+
+        {pickupLines.length > 0 && (
           <Group
             title="Collect at the shop"
             note={PICKUP_NOTICE}
             tone="amber"
-            lines={cart.pickupLines}
+            lines={pickupLines}
             onQuantity={setQuantity}
             onRemove={remove}
           />
@@ -100,30 +146,36 @@ export default function CartView() {
       <aside className="mt-14 lg:sticky lg:top-24 lg:mt-0 lg:self-start">
         <div className="border hairline p-6">
           <h2 className="label text-muted">Order</h2>
-          <dl className="mt-5 space-y-2 text-sm">
-            <Row label="Subtotal" value={formatUsd(cart.subtotalCents)} />
-            {cart.shippingCents > 0 && (
-              <Row label="Shipping" value={formatUsd(cart.shippingCents)} />
-            )}
-            {cart.taxCents > 0 && (
-              <Row label="Tax" value={formatUsd(cart.taxCents)} />
-            )}
+          <dl className="mt-5 space-y-2 text-sm" aria-busy={stale} data-cart-totals={stale ? "updating" : "settled"}>
+            <Row label="Subtotal" value={formatUsd(subtotalCents)} testId="subtotal" />
+            <div className={stale ? "opacity-50 transition-opacity" : "transition-opacity"}>
+              {cart.shippingCents > 0 && (
+                <Row label="Shipping" value={formatUsd(cart.shippingCents)} />
+              )}
+              {cart.taxCents > 0 && (
+                <Row label="Tax" value={formatUsd(cart.taxCents)} />
+              )}
+            </div>
           </dl>
           <div className="mt-5 flex items-baseline justify-between border-t hairline pt-5">
             <span className="label">Total</span>
-            <span className="text-xl font-extrabold tracking-[-0.02em]">
+            <span
+              data-cart-total
+              className={`text-xl font-extrabold tracking-[-0.02em] transition-opacity ${stale ? "opacity-50" : ""}`}
+            >
               {formatUsd(cart.totalCents)}
             </span>
           </div>
+          {stale && <p className="label mt-2 text-right text-muted">Updating…</p>}
 
           {/* Spots are the reason most of these carts exist, so the
               cart says what is about to happen to them rather than
               leaving it to the checkout. The terms are repeated at
               checkout as a blocking checkbox. */}
-          {cart.spotGame && cart.spotCount > 0 && (
+          {cart.spotGame && guideCount > 0 && (
             <div className="mt-5 border-t hairline pt-5">
               <p className="text-sm text-acid">
-                {cart.spotCount} {cart.spotCount === 1 ? "guide" : "guides"} from{" "}
+                {guideCount} {guideCount === 1 ? "guide" : "guides"} from{" "}
                 {cart.spotGame.title}.{" "}
                 <span className="text-muted">
                   {cart.spotGame.remaining}{" "}
@@ -155,11 +207,11 @@ export default function CartView() {
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value, testId }: { label: string; value: string; testId?: string }) {
   return (
     <div className="flex items-baseline justify-between">
       <dt className="text-muted">{label}</dt>
-      <dd>{value}</dd>
+      <dd data-cart-row={testId}>{value}</dd>
     </div>
   );
 }
@@ -174,88 +226,113 @@ function Group({
 }: {
   title: string;
   note: string;
-  tone: "muted" | "amber";
+  tone: "muted" | "amber" | "acid";
   lines: PricedLine[];
   onQuantity: (key: string, q: number) => void;
   onRemove: (key: string) => void;
 }) {
+  const color = tone === "amber" ? "text-amber" : tone === "acid" ? "text-acid" : "text-muted";
   return (
     <section className="mb-12">
-      <h2 className={`label ${tone === "amber" ? "text-amber" : "text-muted"}`}>
-        {title}
-      </h2>
-      <p
-        className={`mt-3 max-w-[62ch] text-sm ${
-          tone === "amber" ? "text-amber" : "text-muted"
-        }`}
-      >
+      <h2 className={`label ${color}`}>{title}</h2>
+      <p className={`mt-3 max-w-[62ch] text-sm ${tone === "amber" ? "text-amber" : "text-muted"}`}>
         {note}
       </p>
-      <ul className="mt-6 border-t hairline">
+      <ul className="mt-5 border-t hairline">
         {lines.map((line) => (
-          <li
-            key={lineKey(line)}
-            className="flex items-start gap-5 border-b hairline py-5"
-          >
-            <div className="relative h-20 w-20 shrink-0 bg-surface">
-              {line.image && (
-                <Image
-                  src={line.image}
-                  alt=""
-                  fill
-                  sizes="80px"
-                  className="object-cover"
-                />
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <Link
-                href={`/inventory/${line.slug}`}
-                className="font-extrabold tracking-[-0.02em] hover:text-acid"
-              >
-                {line.name}
-              </Link>
-              {line.size && (
-                <p className="label mt-1 text-acid">Size {line.size}</p>
-              )}
-              <p className="mt-1 text-sm text-muted">
-                {formatUsd(line.unitPriceCents)}
-                {line.quantity > 1 ? ` each` : ""}
-              </p>
-              <div className="mt-3 flex items-center gap-3">
-                {/* Firearms are single units, so there is nothing to
-                    choose — showing a stepper stuck at one would just
-                    invite people to try. */}
-                {line.fulfillment === "ship" ? (
-                  <label className="flex items-center gap-2 text-sm text-muted">
-                    <span className="sr-only">Quantity for {line.name}</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={10}
-                      value={line.quantity}
-                      onChange={(e) =>
-                        onQuantity(lineKey(line), Number(e.target.value))
-                      }
-                      className="field-input !h-11 w-20"
-                    />
-                  </label>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => onRemove(lineKey(line))}
-                  className="control control-sm control-danger"
-                >
-                  Remove
-                </button>
-              </div>
-            </div>
-            <p className="shrink-0 font-extrabold tracking-[-0.02em]">
-              {formatUsd(line.lineTotalCents)}
-            </p>
-          </li>
+          <CartLineRow key={lineKey(line)} line={line} onQuantity={onQuantity} onRemove={onRemove} />
         ))}
       </ul>
     </section>
+  );
+}
+
+/**
+ * One line: a small square picture, then what it is, then the controls.
+ * Laid out for a phone first: the picture and the price keep their width,
+ * and the name wraps rather than pushing either off the screen.
+ */
+function CartLineRow({
+  line,
+  onQuantity,
+  onRemove,
+}: {
+  line: PricedLine;
+  onQuantity: (key: string, q: number) => void;
+  onRemove: (key: string) => void;
+}) {
+  const key = lineKey(line);
+  const guide = Boolean(line.gameId);
+  const name = guide
+    ? line.pieceName
+      ? `Guide to the ${line.pieceName}`
+      : "Guide"
+    : line.name;
+  const href = guide ? "/games" : `/inventory/${line.slug}`;
+  // A single unit (a firearm to collect) is always exactly one.
+  const fixed = line.maxQuantity <= 1 && line.fulfillment === "pickup";
+
+  return (
+    <li
+      data-cart-line={key}
+      className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-4 gap-y-3 border-b hairline py-4"
+    >
+      <CartThumb src={line.image} label={guide && line.pieceName ? line.pieceName : name} />
+      <div className="min-w-0">
+        <Link href={href} className="block font-extrabold leading-snug tracking-[-0.02em] hover:text-acid">
+          {name}
+        </Link>
+        {guide && line.dropTitle && (
+          <p className="mt-1 truncate text-sm text-muted" data-cart-drop>{line.dropTitle}</p>
+        )}
+        {line.size && <p className="label mt-1 text-acid" data-cart-size>Size {line.size}</p>}
+        <p className="mt-1 text-sm text-muted">
+          {formatUsd(line.unitPriceCents)} each
+        </p>
+      </div>
+      <p className="font-extrabold tabular-nums tracking-[-0.02em]" data-cart-line-total>
+        {formatUsd(line.lineTotalCents)}
+      </p>
+
+      <div className="col-span-2 col-start-2 flex flex-wrap items-center gap-3">
+        {fixed ? (
+          <span className="label text-muted" data-cart-qty-fixed>Qty 1</span>
+        ) : (
+          <div role="group" aria-label={`Quantity of ${name}`} className="inline-flex items-center border hairline">
+            <button
+              type="button"
+              aria-label={`One fewer ${name}`}
+              disabled={line.quantity <= 1}
+              onClick={() => onQuantity(key, line.quantity - 1)}
+              className="flex h-11 w-11 items-center justify-center text-lg hover:text-acid disabled:opacity-35"
+              data-cart-minus
+            >
+              −
+            </button>
+            <span aria-live="polite" className="w-10 text-center tabular-nums" data-cart-qty>
+              {line.quantity}
+            </span>
+            <button
+              type="button"
+              aria-label={`One more ${name}`}
+              disabled={line.quantity >= line.maxQuantity}
+              onClick={() => onQuantity(key, line.quantity + 1)}
+              className="flex h-11 w-11 items-center justify-center text-lg hover:text-acid disabled:opacity-35"
+              data-cart-plus
+            >
+              +
+            </button>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => onRemove(key)}
+          className="label flex h-11 items-center px-2 text-muted hover:text-danger"
+          data-cart-remove
+        >
+          Remove
+        </button>
+      </div>
+    </li>
   );
 }

@@ -168,10 +168,20 @@ export async function priceCart(
 
     const { data: game, error: gameError } = await sb
       .from("games")
-      .select("id, title, status, total_spots, spot_price_cents")
+      .select("id, title, status, total_spots, spot_price_cents, item_id")
       .eq("id", firstGameId)
       .maybeSingle();
     if (gameError) logDbError("priceCart game", gameError);
+
+    // The featured piece, for the line's thumbnail and to say what the
+    // guide is about. A piece the public cannot read (archived) simply
+    // has no photo here, and the cart shows its placeholder.
+    const { data: piece } = game?.item_id
+      ? await sb.from("items").select("name, images").eq("id", game.item_id).maybeSingle()
+      : { data: null };
+    const pieceImages = Array.isArray(piece?.images)
+      ? piece.images.filter((u): u is string => typeof u === "string")
+      : [];
 
     if (!game) {
       rejectedSpots.push({
@@ -229,7 +239,10 @@ export async function priceCart(
           size: null,
           slug: `game-${game.id}`,
           name: `${game.title}: ${spotCount === 1 ? "1 guide" : `${spotCount} guides`}`,
-          image: null,
+          image: pieceImages[0] ?? null,
+          maxQuantity: remaining,
+          dropTitle: game.title,
+          pieceName: piece?.name ?? null,
           unitPriceCents: game.spot_price_cents,
           quantity: spotCount,
           // Not posted, not collected. See FulfillmentType.
@@ -388,6 +401,7 @@ export async function priceCart(
       slug: item.slug,
       name: item.name,
       image: itemImages(item)[0] ?? null,
+      maxQuantity: Math.max(1, cap),
       unitPriceCents: item.price_cents,
       quantity,
       fulfillment,
