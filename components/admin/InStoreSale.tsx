@@ -11,11 +11,11 @@
 // wrong number of guides), it returns the guides to sale and takes the
 // buyer out of the drawing, and once the drop is drawn it cannot happen.
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { recordInStoreSale, voidInStoreSale, type InStoreState } from "@/app/admin/instore";
+import { voidInStoreSale, type InStoreState } from "@/app/admin/instore";
+import InStoreSaleForm from "@/components/admin/InStoreSaleForm";
 import { OwnerOnlyNote, useIsOwner } from "@/components/admin/Role";
-import { IN_STORE_ACKNOWLEDGEMENT } from "@/lib/games/terms";
 
 export type InStoreSaleRow = {
   id: string;
@@ -51,20 +51,11 @@ export default function InStoreSale({
   drawn: boolean;
   sales: InStoreSaleRow[];
 }) {
-  const [state, action, pending] = useActionState(recordInStoreSale, idle);
-  const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
-
-  // A recorded sale clears the form, so the next buyer at the counter
-  // starts from blank rather than from the last one's details.
-  useEffect(() => {
-    if (state.status === "success") {
-      formRef.current?.reset();
-      router.refresh();
-    }
-  }, [state, router]);
-
   const open = status === "open" && !drawn;
+  // Kept once the drop fills, so the sale that filled it still shows its
+  // numbers after the page refreshes around it.
+  const [started, setStarted] = useState(false);
 
   return (
     <section data-in-store-sale className="mt-14 border-t hairline pt-8">
@@ -76,7 +67,7 @@ export default function InStoreSale({
         is charged here.
       </p>
 
-      {!open ? (
+      {!open && (
         <p className="mt-4 text-sm text-muted" data-in-store-closed>
           {drawn
             ? "This drop has been drawn. No more guides can be sold."
@@ -84,51 +75,19 @@ export default function InStoreSale({
               ? "This drop is sold out. There are no guides left to sell."
               : "This drop is not on sale."}
         </p>
-      ) : (
-        <form ref={formRef} action={action} className="mt-6 grid gap-4 sm:grid-cols-2">
-          <input type="hidden" name="game_id" value={gameId} />
-          <Field label="First name" name="first_name" autoComplete="off" required />
-          <Field label="Last name" name="last_name" autoComplete="off" required />
-          <Field label="Phone" name="phone" type="tel" autoComplete="off" required />
-          <Field label="Email (for the guide; optional)" name="email" type="email" autoComplete="off" />
-          <label className="block">
-            <span className="label text-muted">Number of guides</span>
-            <input
-              name="quantity"
-              type="number"
-              min={1}
-              max={Math.max(1, available)}
-              defaultValue={1}
-              required
-              className="field-input mt-2 w-full"
-            />
-            <span className="label mt-2 block text-muted">{available} available right now</span>
-          </label>
-          <label className="flex items-start gap-3 sm:col-span-2">
-            <input
-              type="checkbox"
-              name="agreed"
-              required
-              className="mt-1 h-5 w-5 shrink-0 accent-[var(--color-acid)]"
-            />
-            <span className="text-sm leading-relaxed">{IN_STORE_ACKNOWLEDGEMENT}</span>
-          </label>
-          <div className="sm:col-span-2">
-            <button type="submit" disabled={pending} className="cta-primary control-go">
-              {pending ? "Recording…" : "Record the sale"}
-            </button>
-          </div>
-        </form>
       )}
-
-      {state.status !== "idle" && state.message && (
-        <p
-          role={state.status === "error" ? "alert" : "status"}
-          data-in-store-result={state.status}
-          className={`mt-4 max-w-[60ch] text-sm ${state.status === "error" ? "text-danger" : "text-acid"}`}
-        >
-          {state.message}
-        </p>
+      {(open || started) && (
+        <div className="mt-6">
+          <InStoreSaleForm
+            gameId={gameId}
+            available={available}
+            onRecorded={() => {
+              setStarted(true);
+              // The ledger and the sales list below are the server's.
+              router.refresh();
+            }}
+          />
+        </div>
       )}
 
       {sales.length > 0 && (
@@ -211,32 +170,5 @@ function SaleRow({ sale, drawn }: { sale: InStoreSaleRow; drawn: boolean }) {
         </p>
       )}
     </div>
-  );
-}
-
-function Field({
-  label,
-  name,
-  type = "text",
-  required = false,
-  autoComplete,
-}: {
-  label: string;
-  name: string;
-  type?: string;
-  required?: boolean;
-  autoComplete?: string;
-}) {
-  return (
-    <label className="block">
-      <span className="label text-muted">{label}</span>
-      <input
-        name={name}
-        type={type}
-        required={required}
-        autoComplete={autoComplete}
-        className="field-input mt-2 w-full"
-      />
-    </label>
   );
 }

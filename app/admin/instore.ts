@@ -34,6 +34,12 @@ export type InStoreState = {
   message?: string;
   /** On success, what was recorded, so the screen can say it back. */
   sale?: { orderNumber: string; numbers: number[]; emailed: boolean | null };
+  /**
+   * The drop after the sale: guides the website can still sell, counted
+   * exactly as the public page counts them, how many are sold, and its
+   * status. Returned so a screen can update without reloading.
+   */
+  drop?: { remaining: number; sold: number; status: string };
 };
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -203,7 +209,17 @@ export async function recordInStoreSale(
   revalidatePath("/games");
   revalidatePath("/");
 
+  const [{ data: remaining }, { count: soldCount }] = await Promise.all([
+    sb.rpc("game_spots_remaining", { p_game: gameId }),
+    sb.from("game_spots").select("id", { count: "exact", head: true }).eq("game_id", gameId).eq("status", "sold"),
+  ]);
+
   return {
+    drop: {
+      remaining: typeof remaining === "number" ? remaining : 0,
+      sold: soldCount ?? 0,
+      status: game?.status ?? "open",
+    },
     status: "success",
     message:
       `Recorded: ${sale.numbers.length === 1 ? "guide" : "guides"} ${sale.numbers.join(", ")} ` +

@@ -26,6 +26,25 @@ export default async function AdminGames() {
     .select("game_id, sold");
   const soldMap = new Map((score ?? []).map((s) => [s.game_id, s.sold] as const));
 
+  // What each open drop can still sell, counted as game_spots_remaining
+  // (and so the public page) counts it: open guides, plus holds an
+  // abandoned checkout left over fifteen minutes ago.
+  const openIds = (games ?? []).filter((g) => g.status === "open").map((g) => g.id);
+  const { data: unsold } = openIds.length
+    ? await sb
+        .from("game_spots")
+        .select("game_id, status, held_at")
+        .in("game_id", openIds)
+        .neq("status", "sold")
+    : { data: [] };
+  const staleBefore = Date.now() - 15 * 60 * 1000;
+  const availableMap = new Map<string, number>();
+  for (const s of unsold ?? []) {
+    if (s.status === "open" || (s.status === "held" && s.held_at && Date.parse(s.held_at) < staleBefore)) {
+      availableMap.set(s.game_id, (availableMap.get(s.game_id) ?? 0) + 1);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-2xl">
       <div className="flex items-center justify-between gap-4">
@@ -42,6 +61,7 @@ export default async function AdminGames() {
             game={g}
             itemName={g.item_id ? itemName.get(g.item_id) : undefined}
             sold={soldMap.get(g.id) ?? 0}
+            available={availableMap.get(g.id) ?? 0}
           />
         ))}
         {(games ?? []).length === 0 && (

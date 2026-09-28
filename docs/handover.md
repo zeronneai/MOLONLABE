@@ -152,6 +152,15 @@ can never be given the same guide: the database takes the numbers with
 the same row locks online checkout uses, and `tests/db/instore.mjs` races
 the two against each other.
 
+The same form opens as a popup from the drops list: each open drop's row
+has a "Record in-store sale" button beside Open and CSV, and shows how
+many guides are left. On a phone it is a full-screen sheet. It keeps what
+was typed if the sale is refused, shows the guide numbers in large type
+once it is recorded (to write on the customer's receipt), offers "Record
+another sale" or Close, and updates the row's count without reloading.
+Closing it before saving records nothing. Sold-out and drawn drops have
+no button.
+
 **Void an in-store sale.** Owner only, for mistakes. Returns its guides to
 sale and takes the buyer out of the drawing. Logged, and refused once the
 drop has been drawn. The database refuses it for the manager too, not just
