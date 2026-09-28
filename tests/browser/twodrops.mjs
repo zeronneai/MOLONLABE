@@ -133,9 +133,12 @@ const manager = await managerPage(b, { viewport: { width: 1280, height: 1000 } }
 await manager.goto(`${APP}/admin/games`, { waitUntil: "networkidle" });
 check("MANAGER sees which drop is on the home page",
   (await manager.locator(`[data-drop-row="${OLDER}"] [data-home-drop-badge]`).count()) === 1);
+// The note is a .label, set in capitals by CSS, so innerText is capitals.
+const managerButtons = await manager.locator("[data-feature-on-home]").count();
+const managerRow = await manager.locator(`[data-drop-row="${NEWER}"]`).innerText();
 check("but has no control to change it, only the owner-only note",
-  (await manager.locator("[data-feature-on-home]").count()) === 0 &&
-    /Home page · owner only/.test(await manager.locator(`[data-drop-row="${NEWER}"]`).innerText()));
+  managerButtons === 0 && /Home page · owner only/i.test(managerRow),
+  `${managerButtons} buttons; ${managerRow.replace(/\s+/g, " ").slice(0, 160)}`);
 
 // ------------------------------------------------------------ the cart
 await p.goto(`${APP}/games/${NEWER}`, { waitUntil: "networkidle" });
