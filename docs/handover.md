@@ -166,6 +166,14 @@ sale and takes the buyer out of the drawing. Logged, and refused once the
 drop has been drawn. The database refuses it for the manager too, not just
 the screen.
 
+**Passwords.** Nobody knows anyone else's password. Every account is
+created with a temporary password and must choose its own at its first
+sign-in before the admin shows anything; the owner and the manager are
+asked at their next sign-in after the migration. Anyone can change theirs
+from Password in the header. Changes are in the activity log, never the
+password. How to create an account, force a change, and whether to add a
+"Forgot password?" email: `docs/passwords.md`.
+
 **Draw a winner.** Two ways: a full-screen presentation at a separate
 address for filming, or a plain button. The presentation plays what rules
 clause 14 promises. First a roster of every buyer (first name and last

@@ -72,6 +72,13 @@ export default function AdminShell({
             <span data-signed-in-as className="label hidden text-muted sm:inline">
               {who} · {role === "owner" ? "Owner" : "Manager"}
             </span>
+            <Link
+              href="/admin/password"
+              className="label flex h-11 items-center text-muted transition-colors hover:text-bone"
+              data-change-password
+            >
+              Password
+            </Link>
             <button
               type="button"
               onClick={signOut}

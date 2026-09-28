@@ -31,11 +31,12 @@ export type ActivityAction =
   | "photos"
   | "alerts"
   | "sale"
-  | "void";
+  | "void"
+  | "password";
 
 export type ActivityEntry = {
   action: ActivityAction;
-  entity: "item" | "game" | "settings" | "inquiry";
+  entity: "item" | "game" | "settings" | "inquiry" | "staff";
   entityId?: string | null;
   /** Name or title as it was, so a deleted record stays identifiable. */
   entityLabel?: string | null;

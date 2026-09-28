@@ -87,7 +87,8 @@ try {
 
   // ----------------------------------------------- production today
   const prod = await fresh("bl_prod");
-  for (const f of migrations.filter((f) => !f.includes("staff_roles"))) {
+  // Everything but roles and what is built on the staff table they bring.
+  for (const f of migrations.filter((f) => !f.includes("staff_roles") && !f.includes("own_passwords"))) {
     await psql(prod, ["-f", join(ROOT, "supabase/migrations", f)]);
   }
   // As production stood before in-store sales: an order had to have an

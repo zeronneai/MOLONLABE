@@ -102,9 +102,11 @@ try {
       ('${OWNER}', 'owner@example.com'),
       ('${MANAGER}', 'manager@example.com'),
       ('${STRANGER}', 'stranger@example.com');
-    insert into public.staff (user_id, role, display_name) values
-      ('${OWNER}', 'owner', 'Rey Marquez'),
-      ('${MANAGER}', 'manager', 'Luis Ortega');
+    -- Both have set their own passwords (must_change_password defaults
+    -- to true; tests/db/passwords.mjs covers the flagged state).
+    insert into public.staff (user_id, role, display_name, must_change_password) values
+      ('${OWNER}', 'owner', 'Rey Marquez', false),
+      ('${MANAGER}', 'manager', 'Luis Ortega', false);
 
     insert into public.items (id, slug, name, category, price_cents, fulfillment_type, status)
       values ('${ITEM}', 'test-tee', 'Test Tee', 'apparel', 3200, 'ship', 'available');

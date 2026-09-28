@@ -85,9 +85,12 @@ Do this **after** the migration has been applied. An account that
 already exists when the migration runs is made an owner.
 
 1. Supabase dashboard, **Authentication, Users, Add user, Create new
-   user.** His email and a password. Tick auto-confirm, so he does not
-   need to click a link first. Give him the password in person or by
-   phone, not in the same message as the address of the admin.
+   user.** His email and a **temporary** password. Tick auto-confirm, so
+   he does not need to click a link first. Give him the password in
+   person or by phone, not in the same message as the address of the
+   admin. The first time he signs in he must choose his own before the
+   admin shows him anything; the staff row below is flagged for that
+   automatically. See `docs/passwords.md`.
 2. **SQL editor.** Replace the name and email:
 
    ```sql
@@ -102,15 +105,18 @@ already exists when the migration runs is made an owner.
 3. **Check:**
 
    ```sql
-   select s.display_name, s.role from public.staff s
+   select s.display_name, s.role, s.must_change_password from public.staff s
    join auth.users u on u.id = s.user_id
    where u.email = 'manager@example.com';
    ```
 
-   One row, `manager`.
-4. **Sign in as him once**, in a private window. The header reads
-   "Luis Ortega · Manager", Tax & Shipping shows the owner-only line,
-   and Delete on an item is greyed out. Sign out.
+   One row, `manager`, `true`.
+4. **Do not sign in as him to try it.** His first sign-in asks for a new
+   password, and whoever answers it is the person who knows it. Check
+   the row instead: `must_change_password` in step 3 should be `true`.
+   Once he has signed in and chosen his password, his header reads
+   "Luis Ortega · Manager", Tax & Shipping shows the owner-only line, and
+   Delete on an item is greyed out.
 
 The name in `display_name` is the one on every line of the activity log
 and on every record he touches. It is not the name in his Supabase

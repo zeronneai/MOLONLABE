@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import AdminLogin from "@/components/admin/AdminLogin";
 import AdminShell from "@/components/admin/AdminShell";
 import NoAccess from "@/components/admin/NoAccess";
+import ForcedPassword from "@/components/admin/ForcedPassword";
 import { ROLES_MIGRATION, getStaff } from "@/lib/admin/staff";
 
 export const metadata: Metadata = {
@@ -41,6 +42,9 @@ export default async function AdminLayout({
   if (!who.ok) return <NoAccess reason={who.reason === "no-access" ? "no-access" : "error"} />;
 
   const { staff } = who;
+  // Signed in with a password somebody else set: nothing but choosing
+  // their own until they have. Whatever page was asked for is not shown.
+  if (staff.mustChangePassword) return <ForcedPassword name={staff.name} />;
   return (
     <AdminShell
       who={staff.name}

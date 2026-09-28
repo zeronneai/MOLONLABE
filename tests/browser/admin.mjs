@@ -43,7 +43,7 @@ const visit = async (path) => {
 // ------------------------------------------------------------- sign in
 await page.goto(`${APP}/admin`, { waitUntil: "networkidle" });
 await page.fill('input[type="email"]', EMAIL);
-await page.fill('input[type="password"]', "whatever");
+await page.fill('input[type="password"]', "x"); // the double now checks passwords
 await page.click('button[type="submit"]');
 await page.waitForTimeout(2500);
 const landed = await page.locator("body").innerText();

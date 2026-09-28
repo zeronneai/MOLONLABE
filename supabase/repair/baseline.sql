@@ -1315,7 +1315,8 @@ create table if not exists public.staff (
   user_id uuid not null,
   role text not null,
   display_name text not null,
-  created_at timestamp with time zone default now() not null
+  created_at timestamp with time zone default now() not null,
+  must_change_password boolean default true not null
 );
 alter table public.staff add column if not exists user_id uuid;
 do $$ begin
@@ -1372,6 +1373,66 @@ do $$ begin
       alter table public.staff alter column created_at set not null;
     end if;
   end if;
+end $$;
+alter table public.staff add column if not exists must_change_password boolean default true;
+do $$ begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'staff'
+      and column_name = 'must_change_password' and is_nullable = 'YES'
+  ) then
+    if exists (select 1 from public.staff where must_change_password is null) then
+      raise notice 'public.staff.must_change_password holds nulls; left nullable. Fill them, then: alter table public.staff alter column must_change_password set not null;';
+    else
+      alter table public.staff alter column must_change_password set not null;
+    end if;
+  end if;
+end $$;
+
+create table if not exists public.staff_password_marks (
+  user_id uuid not null,
+  fingerprint text,
+  marked_at timestamp with time zone default now() not null
+);
+alter table public.staff_password_marks add column if not exists user_id uuid;
+do $$ begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'staff_password_marks'
+      and column_name = 'user_id' and is_nullable = 'YES'
+  ) then
+    if exists (select 1 from public.staff_password_marks where user_id is null) then
+      raise notice 'public.staff_password_marks.user_id holds nulls; left nullable. Fill them, then: alter table public.staff_password_marks alter column user_id set not null;';
+    else
+      alter table public.staff_password_marks alter column user_id set not null;
+    end if;
+  end if;
+end $$;
+alter table public.staff_password_marks add column if not exists fingerprint text;
+alter table public.staff_password_marks add column if not exists marked_at timestamp with time zone default now();
+do $$ begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'staff_password_marks'
+      and column_name = 'marked_at' and is_nullable = 'YES'
+  ) then
+    if exists (select 1 from public.staff_password_marks where marked_at is null) then
+      raise notice 'public.staff_password_marks.marked_at holds nulls; left nullable. Fill them, then: alter table public.staff_password_marks alter column marked_at set not null;';
+    else
+      alter table public.staff_password_marks alter column marked_at set not null;
+    end if;
+  end if;
+end $$;
+do $$ declare c text; begin
+  foreach c in array array['fingerprint'] loop
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'staff_password_marks'
+        and column_name = c and is_nullable = 'NO'
+    ) then
+      execute format('alter table public.%I alter column %I drop not null', 'staff_password_marks', c);
+    end if;
+  end loop;
 end $$;
 
 create table if not exists public.winners (
@@ -1690,6 +1751,20 @@ begin
   elsif current_def is distinct from 'PRIMARY KEY (user_id)' then
     alter table staff drop constraint staff_pkey;
     alter table staff add constraint staff_pkey PRIMARY KEY (user_id);
+  end if;
+end $$;
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'staff_password_marks_pkey'
+    and c.conrelid = 'staff_password_marks'::regclass;
+  if current_def is null then
+    alter table staff_password_marks add constraint staff_password_marks_pkey PRIMARY KEY (user_id);
+  elsif current_def is distinct from 'PRIMARY KEY (user_id)' then
+    alter table staff_password_marks drop constraint staff_password_marks_pkey;
+    alter table staff_password_marks add constraint staff_password_marks_pkey PRIMARY KEY (user_id);
   end if;
 end $$;
 do $$
@@ -2285,6 +2360,20 @@ declare current_def text;
 begin
   select pg_get_constraintdef(c.oid) into current_def
   from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+  where n.nspname = 'public' and c.conname = 'staff_password_marks_user_id_fkey'
+    and c.conrelid = 'staff_password_marks'::regclass;
+  if current_def is null then
+    alter table staff_password_marks add constraint staff_password_marks_user_id_fkey FOREIGN KEY (user_id) REFERENCES staff(user_id) ON DELETE CASCADE;
+  elsif current_def is distinct from 'FOREIGN KEY (user_id) REFERENCES staff(user_id) ON DELETE CASCADE' then
+    alter table staff_password_marks drop constraint staff_password_marks_user_id_fkey;
+    alter table staff_password_marks add constraint staff_password_marks_user_id_fkey FOREIGN KEY (user_id) REFERENCES staff(user_id) ON DELETE CASCADE;
+  end if;
+end $$;
+do $$
+declare current_def text;
+begin
+  select pg_get_constraintdef(c.oid) into current_def
+  from pg_constraint c join pg_namespace n on n.oid = c.connamespace
   where n.nspname = 'public' and c.conname = 'winners_game_id_fkey'
     and c.conrelid = 'winners'::regclass;
   if current_def is null then
@@ -2531,7 +2620,8 @@ create or replace function public.is_owner()
  SET search_path TO ''
 AS $function$
   select exists (
-    select 1 from public.staff s where s.user_id = auth.uid() and s.role = 'owner'
+    select 1 from public.staff s
+    where s.user_id = auth.uid() and s.role = 'owner' and not s.must_change_password
   )
 $function$;
 
@@ -2541,7 +2631,47 @@ create or replace function public.is_staff()
  STABLE SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-  select exists (select 1 from public.staff s where s.user_id = auth.uid())
+  select exists (
+    select 1 from public.staff s
+    where s.user_id = auth.uid() and not s.must_change_password
+  )
+$function$;
+
+create or replace function public.mark_password_for_change()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+begin
+  if new.must_change_password
+     and (tg_op = 'INSERT' or not coalesce(old.must_change_password, false)) then
+    insert into public.staff_password_marks (user_id, fingerprint, marked_at)
+    values (new.user_id, public.password_fingerprint(new.user_id), now())
+    on conflict (user_id) do update
+      set fingerprint = excluded.fingerprint, marked_at = excluded.marked_at;
+  end if;
+  return new;
+end;
+$function$;
+
+create or replace function public.password_fingerprint(p_user uuid)
+ RETURNS text
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v text;
+begin
+  begin
+    execute 'select md5(coalesce(encrypted_password, '''')) from auth.users where id = $1'
+      into v using p_user;
+  exception when others then
+    v := null;
+  end;
+  return v;
+end;
 $function$;
 
 create or replace function public.record_in_store_sale(p_game uuid, p_qty integer, p_first_name text, p_last_name text, p_email text, p_phone text, p_ack text, p_order_number text, p_token text)
@@ -2655,6 +2785,47 @@ begin
      and not exists (select 1 from public.game_spots where game_id = p_game and status <> 'sold');
 
   return jsonb_build_object('order_id', v_order, 'numbers', to_jsonb(v_numbers));
+end;
+$function$;
+
+create or replace function public.record_password_change()
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_uid   uuid := auth.uid();
+  v_staff public.staff%rowtype;
+  v_mark  text;
+  v_now   text;
+  v_forced boolean;
+begin
+  if v_uid is null then
+    raise exception 'Not signed in.' using errcode = '42501';
+  end if;
+  select * into v_staff from public.staff where user_id = v_uid;
+  if not found then
+    raise exception 'This account has no access to the admin.' using errcode = '42501';
+  end if;
+
+  v_forced := v_staff.must_change_password;
+  if v_forced then
+    select fingerprint into v_mark from public.staff_password_marks where user_id = v_uid;
+    v_now := public.password_fingerprint(v_uid);
+    if v_mark is not null and v_now is not null and v_mark = v_now then
+      raise exception 'Your password has not been changed yet. Set a new one first.'
+        using errcode = 'P0001';
+    end if;
+    update public.staff set must_change_password = false where user_id = v_uid;
+    delete from public.staff_password_marks where user_id = v_uid;
+  end if;
+
+  insert into public.admin_activity (actor_id, actor_name, action, entity, entity_id, entity_label, field)
+  values (v_uid, v_staff.display_name, 'password', 'staff', v_uid, v_staff.display_name,
+          case when v_forced then 'first password' else 'password' end);
+
+  return v_forced;
 end;
 $function$;
 
@@ -2796,7 +2967,8 @@ create or replace function public.staff_role()
  STABLE SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-  select s.role from public.staff s where s.user_id = auth.uid()
+  select s.role from public.staff s
+  where s.user_id = auth.uid() and not s.must_change_password
 $function$;
 
 create or replace function public.stamp_activity_actor()
@@ -2931,6 +3103,8 @@ drop trigger if exists settings_set_updated_at on public.settings;
 CREATE TRIGGER settings_set_updated_at BEFORE UPDATE ON public.settings FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 drop trigger if exists settings_stamp_authorship on public.settings;
 CREATE TRIGGER settings_stamp_authorship BEFORE INSERT OR UPDATE ON public.settings FOR EACH ROW EXECUTE FUNCTION stamp_authorship_updated_only();
+drop trigger if exists staff_mark_password_for_change on public.staff;
+CREATE TRIGGER staff_mark_password_for_change AFTER INSERT OR UPDATE OF must_change_password ON public.staff FOR EACH ROW EXECUTE FUNCTION mark_password_for_change();
 drop trigger if exists winners_refuse_early_draw on public.winners;
 CREATE TRIGGER winners_refuse_early_draw BEFORE INSERT OR UPDATE OF game_id ON public.winners FOR EACH ROW EXECUTE FUNCTION refuse_early_draw();
 
@@ -2955,6 +3129,8 @@ comment on column public.orders.confirmation_expires_at is 'When the receipt lin
 comment on column public.orders.recorded_by_name is 'Who recorded an in-store sale, from the staff table.';
 comment on column public.orders.source is 'online: bought on the website. in_store: sold at the counter, paid at the register, recorded by staff.';
 comment on table public.staff is 'Admin access. No row, no access. Written from the SQL editor only.';
+comment on column public.staff.must_change_password is 'True until the person sets their own password. Defaults to true, so every new account must. Set it again to force a change.';
+comment on table public.staff_password_marks is 'A fingerprint of each flagged account''s password hash at the moment it was flagged. Read only by record_password_change().';
 comment on column public.winners.ticket is 'The WINNING SPOT NUMBER — what gets read aloud. This is pool[ticket_index-1].spot_number, not the index itself: the selector orders by spot id, so the index and the spot number are different numbers.';
 comment on column public.winners.ticket_index is '1-based index the selector returned, into pool. The raw output of the algorithm.';
 comment on column public.winners.unsold_spots is 'How many spots were still unsold at the moment of the draw. Zero or null on a full game.';
@@ -2979,6 +3155,7 @@ alter table public.order_items enable row level security;
 alter table public.orders enable row level security;
 alter table public.settings enable row level security;
 alter table public.staff enable row level security;
+alter table public.staff_password_marks enable row level security;
 alter table public.winners enable row level security;
 
 -- Policies are dropped and recreated, because unlike a constraint a
@@ -3210,7 +3387,10 @@ revoke execute on function public.finish_checkout(p_key text, p_order text, p_ou
 revoke execute on function public.game_spots_remaining(p_game uuid) from public;
 revoke execute on function public.is_owner() from public;
 revoke execute on function public.is_staff() from public;
+revoke execute on function public.mark_password_for_change() from public;
+revoke execute on function public.password_fingerprint(p_user uuid) from public;
 revoke execute on function public.record_in_store_sale(p_game uuid, p_qty integer, p_first_name text, p_last_name text, p_email text, p_phone text, p_ack text, p_order_number text, p_token text) from public;
+revoke execute on function public.record_password_change() from public;
 revoke execute on function public.refuse_early_draw() from public;
 revoke execute on function public.refuse_pool_change() from public;
 revoke execute on function public.release_checkout(p_key text) from public;
@@ -3242,8 +3422,14 @@ grant execute on function public.is_owner() to service_role;
 revoke execute on function public.is_staff() from anon;
 grant execute on function public.is_staff() to authenticated;
 grant execute on function public.is_staff() to service_role;
+revoke execute on function public.mark_password_for_change() from anon;
+revoke execute on function public.mark_password_for_change() from authenticated;
+revoke execute on function public.password_fingerprint(p_user uuid) from anon;
+revoke execute on function public.password_fingerprint(p_user uuid) from authenticated;
 revoke execute on function public.record_in_store_sale(p_game uuid, p_qty integer, p_first_name text, p_last_name text, p_email text, p_phone text, p_ack text, p_order_number text, p_token text) from anon;
 grant execute on function public.record_in_store_sale(p_game uuid, p_qty integer, p_first_name text, p_last_name text, p_email text, p_phone text, p_ack text, p_order_number text, p_token text) to authenticated;
+revoke execute on function public.record_password_change() from anon;
+grant execute on function public.record_password_change() to authenticated;
 revoke execute on function public.refuse_early_draw() from anon;
 revoke execute on function public.refuse_early_draw() from authenticated;
 revoke execute on function public.refuse_pool_change() from anon;

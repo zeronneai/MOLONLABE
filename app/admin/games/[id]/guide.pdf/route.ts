@@ -37,6 +37,12 @@ export async function GET(
       { status: who.reason === "signed-out" ? 401 : 403 },
     );
   }
+  // Signed in with a password someone else set: nothing until they have
+  // chosen their own. This route uses the service role, so the database
+  // cannot refuse it on their behalf; this check has to.
+  if (who.staff.mustChangePassword) {
+    return new NextResponse("Choose your own password first.", { status: 403 });
+  }
 
   const sb = getServiceSupabase();
   if (!sb) return new NextResponse("Storage is not configured.", { status: 503 });

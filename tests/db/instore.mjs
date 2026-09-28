@@ -58,8 +58,9 @@ try {
     grant all on all sequences in schema public to anon, authenticated, service_role;
     insert into auth.users (id, email) values
       ('${OWNER}', 'owner@example.com'), ('${MANAGER}', 'manager@example.com'), ('${STRANGER}', 'x@example.com');
-    insert into public.staff (user_id, role, display_name) values
-      ('${OWNER}', 'owner', 'Rey Marquez'), ('${MANAGER}', 'manager', 'Luis Ortega');
+    -- Both have set their own passwords (must_change_password defaults to true).
+    insert into public.staff (user_id, role, display_name, must_change_password) values
+      ('${OWNER}', 'owner', 'Rey Marquez', false), ('${MANAGER}', 'manager', 'Luis Ortega', false);
     insert into public.games (id, title, total_spots, spot_price_cents, status)
       values ('${GAME}', 'Halloween Drop', 10, 2500, 'open');
     insert into public.game_spots (game_id, spot_number) select '${GAME}', n from generate_series(1, 10) n;

@@ -58,6 +58,12 @@ function describe(row: ActivityRow): string {
       return `retuned the arcade (${row.field})`;
     case "draw":
       return `drew the winner for ${label}`;
+    // Written by the database (record_password_change), never with the
+    // password in it: there is nothing to show but that it happened.
+    case "password":
+      return row.field === "first password"
+        ? "set their own password for the first time"
+        : "changed their password";
     case "sale": {
       const v = (row.after_value ?? {}) as { order?: string; buyer?: string; guides?: number[] };
       const n = v.guides?.length ?? 0;

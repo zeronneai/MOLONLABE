@@ -49,12 +49,14 @@ export const PG = {
 
 /** The seeded admin login the double accepts. */
 export const OWNER = {
+  id: "9f1c0d2e-4b6a-4c8d-9e10-2f3a4b5c6d7e",
   email: "owner@molonlabe.example",
   password: "x",
 };
 
 /** The manager, whose staff name is Luis Ortega. */
 export const MANAGER = {
+  id: "7a2b3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d",
   email: "manager@molonlabe.example",
   password: "x",
 };

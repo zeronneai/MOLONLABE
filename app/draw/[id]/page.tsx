@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getStaff } from "@/lib/admin/staff";
 import { buildRoster } from "@/lib/draw/roster";
 import { loadSoldGuides } from "@/lib/draw/soldGuides";
@@ -35,6 +35,9 @@ export default async function DrawPresentation({
   // pool and the draw are for the owner and the manager.
   const who = await getStaff();
   if (!who.ok) notFound();
+  // Signed in with a password someone else set: back to the admin, which
+  // asks them to choose their own before anything else.
+  if (who.staff.mustChangePassword) redirect("/admin");
   const { sb } = who.staff;
 
   const { data: game } = await sb

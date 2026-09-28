@@ -34,6 +34,9 @@ create table if not exists auth.users (
   raw_user_meta_data jsonb
 );
 alter table auth.users add column if not exists raw_user_meta_data jsonb;
+-- Supabase's own column for the bcrypt hash. The own-passwords migration
+-- fingerprints it to tell a real password change from a claimed one.
+alter table auth.users add column if not exists encrypted_password text;
 
 create table if not exists storage.buckets (
   id text primary key, name text, public boolean,

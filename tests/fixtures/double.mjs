@@ -148,13 +148,16 @@ const seed = () => ({
   orders: [], order_items: [], inquiries: [], winners: [],
   emails: [], notifications: [], charges: [], checkout_attempts: [],
   admin_activity: [],
+  // What happened at Supabase Auth: password updates and sign-outs, by
+  // account. Never a password.
+  auth_events: [],
   // Who may use the admin. The stranger signs in and has no row, which
   // is the case roles exist to refuse.
   staff: [
     { user_id: USERS.owner.id, role: "owner", display_name: "Rey Marquez",
-      created_at: "2026-01-01T00:00:00Z" },
+      created_at: "2026-01-01T00:00:00Z", must_change_password: false },
     { user_id: USERS.manager.id, role: "manager", display_name: "Luis Ortega",
-      created_at: "2026-09-20T00:00:00Z" },
+      created_at: "2026-09-20T00:00:00Z", must_change_password: false },
   ],
 });
 
@@ -176,6 +179,15 @@ let mailRefuses = false;
 // name would make that untestable.
 const BUCKETS = new Set(["product-images", "game-guides"]);
 let storage = new Map();
+// Each account's password, as Supabase Auth would hold it (as a hash;
+// here as text, because it is a test). Every fixture account starts on
+// "x", the password the tests sign in with.
+const startingPasswords = () => Object.fromEntries(Object.keys(USERS).map((k) => [k, "x"]));
+let passwords = startingPasswords();
+// The password each flagged account had when it was flagged, as the
+// own-passwords migration's staff_password_marks keeps a fingerprint.
+let passwordMarks = {};
+const keyOf = (userId) => Object.keys(USERS).find((k) => USERS[k].id === userId);
 /** Every object key deleted since the last reset, in order. */
 let storageDeletes = [];
 
@@ -370,6 +382,8 @@ http.createServer(async (req, res) => {
     db = seed();
     storage = new Map();
     storageDeletes = [];
+    passwords = startingPasswords();
+    passwordMarks = {};
     mailRefuses = false;
     return send(res, 200, { ok: true });
   }
@@ -475,6 +489,35 @@ http.createServer(async (req, res) => {
   // user_metadata exactly as Supabase carries it; the email is present
   // and deliberately different from the name, so a test can prove the
   // admin renders the name and never the mailbox.
+  // Supabase's own password update for the signed-in user, with its two
+  // refusals (too short by its own setting, and the same password).
+  if (path === "/auth/v1/user" && req.method === "PUT") {
+    const u = userFromAuth(req.headers.authorization);
+    if (!u) return send(res, 401, { message: "no session" });
+    const body = (await readBody(req)) ?? {};
+    const key = keyOf(u.id);
+    if (typeof body.password === "string") {
+      if (body.password.length < 6) {
+        return send(res, 422, { code: "weak_password", error_code: "weak_password",
+          message: "Password should be at least 6 characters.", weak_password: { reasons: ["length"] } });
+      }
+      if (body.password === passwords[key]) {
+        return send(res, 422, { code: "same_password", error_code: "same_password",
+          message: "New password should be different from the old password." });
+      }
+      passwords[key] = body.password;
+      db.auth_events.push({ kind: "password_updated", user_id: u.id, at: new Date().toISOString() });
+    }
+    return send(res, 200, { id: u.id, aud: "authenticated", role: "authenticated", email: u.email,
+      user_metadata: u.meta, app_metadata: { provider: "email" }, identities: [] });
+  }
+  if (path === "/auth/v1/logout") {
+    const u = userFromAuth(req.headers.authorization);
+    db.auth_events.push({ kind: "logout", scope: url.searchParams.get("scope") ?? "global",
+      user_id: u?.id ?? null, at: new Date().toISOString() });
+    res.writeHead(204);
+    return res.end();
+  }
   if (path === "/auth/v1/user" || path === "/auth/v1/token") {
     const auth = req.headers.authorization ?? "";
     if (!auth.includes(".") && path === "/auth/v1/user") {
@@ -489,7 +532,10 @@ http.createServer(async (req, res) => {
         u = USERS[who] ?? USERS.owner;
       } else {
         u = Object.values(USERS).find((x) => x.email === body.email);
-        if (!u) return send(res, 400, { error: "invalid_grant", error_description: "Invalid login credentials" });
+        if (!u || body.password !== passwords[keyOf(u.id)]) {
+          return send(res, 400, { error: "invalid_grant", error_description: "Invalid login credentials",
+            code: "invalid_credentials", msg: "Invalid login credentials" });
+        }
       }
     } else {
       u = userFromAuth(auth) ?? USERS.owner;
@@ -769,6 +815,26 @@ http.createServer(async (req, res) => {
       if (g && g.status === "full" && db.game_spots.some((sp) => sp.game_id === g.id && sp.status !== "sold")) g.status = "open";
       return send(res, 200, n);
     }
+    if (fn === "record_password_change") {
+      const caller = userFromAuth(req.headers.authorization);
+      const member = caller && db.staff.find((m) => m.user_id === caller.id);
+      if (!member) return send(res, 400, { code: "42501", message: "This account has no access to the admin." });
+      const forced = member.must_change_password === true;
+      if (forced) {
+        if (passwordMarks[caller.id] !== undefined && passwordMarks[caller.id] === passwords[keyOf(caller.id)]) {
+          return send(res, 400, { code: "P0001", message: "Your password has not been changed yet. Set a new one first." });
+        }
+        member.must_change_password = false;
+        delete passwordMarks[caller.id];
+      }
+      db.admin_activity.push({
+        id: randomUUID(), actor_id: caller.id, actor_name: member.display_name, action: "password",
+        entity: "staff", entity_id: caller.id, entity_label: member.display_name,
+        field: forced ? "first password" : "password", before_value: null, after_value: null,
+        at: new Date().toISOString(),
+      });
+      return send(res, 200, forced);
+    }
     if (fn === "game_spots_remaining") {
       // As the real function: a hold older than fifteen minutes is an
       // abandoned checkout and counts as available.
@@ -973,6 +1039,11 @@ http.createServer(async (req, res) => {
     }
     const hit = db[table].filter((r) => matches(r, params));
     for (const row of hit) Object.assign(row, body);
+    // As the migration's trigger does: flagging an account remembers the
+    // password it has now, so only a real change clears the flag.
+    if (table === "staff" && body?.must_change_password === true) {
+      for (const row of hit) passwordMarks[row.user_id] = passwords[keyOf(row.user_id)];
+    }
     if (!(req.headers.prefer ?? "").includes("return=representation")) return send(res, 204);
     if (singular(req)) return hit.length ? send(res, 200, hit[0]) : send(res, 406, { code: "PGRST116" });
     return send(res, 200, hit);

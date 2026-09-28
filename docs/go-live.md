@@ -17,6 +17,10 @@ not have yet, in this order:
 2. `supabase/migrations/20260928100000_staff_roles.sql`
 3. `supabase/migrations/20260929100000_no_early_draw.sql`
 4. `supabase/migrations/20260930100000_in_store_sales.sql`
+5. `supabase/migrations/20261001100000_own_passwords.sql`: from the next
+   sign-in, the owner and the manager each choose their own password
+   before the admin opens (`docs/passwords.md`). Tell them before it
+   runs, so the screen is not a surprise.
 
 The third is what stops a winner being recorded before a drop sells out.
 The fourth adds in-store sales, and must be in place before the go-live

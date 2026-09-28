@@ -28,6 +28,9 @@ export async function GET(
   const { id } = await params;
   const who = await getStaff();
   if (!who.ok) return new NextResponse("Not signed in", { status: 401 });
+  if (who.staff.mustChangePassword) {
+    return new NextResponse("Choose your own password first.", { status: 403 });
+  }
   if (who.staff.role !== "owner") {
     console.warn(`Refused for a manager (${who.staff.name}): buyer list export`);
     return new NextResponse(OWNER_ONLY, {

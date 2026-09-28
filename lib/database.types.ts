@@ -536,12 +536,15 @@ export interface Database {
           role: "owner" | "manager";
           display_name: string;
           created_at: string;
+          /** True until the person sets their own password. Defaults to true. */
+          must_change_password: boolean;
         };
         Insert: {
           user_id: string;
           role: "owner" | "manager";
           display_name: string;
           created_at?: string;
+          must_change_password?: boolean;
         };
         Update: {
           role?: "owner" | "manager";
@@ -648,6 +651,15 @@ export interface Database {
       void_in_store_sale: {
         Args: { p_order: string };
         Returns: number;
+      };
+      /**
+       * After Supabase has stored a new password: clears the forced-change
+       * flag (only if the password really changed) and logs it. Returns
+       * whether it was the forced first change.
+       */
+      record_password_change: {
+        Args: Record<string, never>;
+        Returns: boolean;
       };
       /** 'claimed' | 'in_flight' | 'done:<order number>' */
       claim_checkout: {
