@@ -100,8 +100,11 @@ const browser = await chromium.launch({ executablePath: CHROMIUM });
   const take = page.getByRole("link", { name: /^get your guide/i });
   check("HOME: the primary buy control is gone",
     (await take.count()) === 0, `${await take.count()} found`);
-  check("HOME: a way through to the board remains",
-    (await page.getByRole("link", { name: /see the board/i }).count()) > 0);
+  // To the drop's own page, never to a page that picks one.
+  const through = page.getByRole("link", { name: /see this drop/i });
+  check("HOME: a way through to the drop remains, to its own page",
+    (await through.count()) > 0 && /^\/games\/[0-9a-f-]{36}$/.test((await through.first().getAttribute("href")) ?? ""),
+    (await through.first().getAttribute("href").catch(() => null)) ?? "NO LINK");
 
   await page.context().close();
 }

@@ -101,14 +101,14 @@ await reset();
   check("first add asks for 2", first === "2", `control showed ${first}`);
   const afterFirst = await page.locator("body").innerText();
   check("the page says 2 spots are in the cart",
-    /\b2 guides in your cart/i.test(afterFirst),
+    /\b2 guides for .+ in your cart/i.test(afterFirst),
     (afterFirst.match(/[^\n]*in your cart[^\n]*/i) ?? ["NOT SAID"])[0].slice(0, 50));
 
   const second = await takeSpots(page, `${APP}/featured`, 3);
   check("second add asks for 3", second === "3", `control showed ${second}`);
   const afterSecond = await page.locator("body").innerText();
   check("the page now says 5 — the running total, not the 3 just added",
-    /\b5 guides in your cart/i.test(afterSecond),
+    /\b5 guides for .+ in your cart/i.test(afterSecond),
     (afterSecond.match(/[^\n]*in your cart[^\n]*/i) ?? ["NOT SAID"])[0].slice(0, 50));
 
   const stored = await page.evaluate(() =>
@@ -168,7 +168,7 @@ for (let n = 1; n <= BIG_SPOTS; n++) {
   await page.waitForTimeout(600);
   const msg = await page.locator("body").innerText();
   check("it confirms 40 in the cart",
-    /\b40 guides in your cart/i.test(msg),
+    /\b40 guides for .+ in your cart/i.test(msg),
     (msg.match(/[^\n]*in your cart[^\n]*/i) ?? ["NOT SAID"])[0].slice(0, 50));
 
   // And take more on top, over the old cap in a single line.
@@ -179,7 +179,7 @@ for (let n = 1; n <= BIG_SPOTS; n++) {
   await page.waitForTimeout(600);
   const msg2 = await page.locator("body").innerText();
   check("40 + 15 confirms 55",
-    /\b55 guides in your cart/i.test(msg2),
+    /\b55 guides for .+ in your cart/i.test(msg2),
     (msg2.match(/[^\n]*in your cart[^\n]*/i) ?? ["NOT SAID"])[0].slice(0, 50));
 
   check("paying for 55 spots completes", await pay(page, "Ray"));

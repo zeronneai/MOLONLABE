@@ -404,7 +404,9 @@ check("the guide is cleared before the purchase",
   JSON.stringify((await storage()).map((o) => o.key)));
 
 const buyer = await shopper();
-await buyer.goto(`${APP}/featured`, { waitUntil: "networkidle" });
+// The drop's own page. Two drops are running by now (the seeded one and
+// the one created above), so /featured correctly goes to the list.
+await buyer.goto(`${APP}/games/${game.id}`, { waitUntil: "networkidle" });
 await buyer.waitForTimeout(400);
 await buyer.getByRole("button", { name: /^get /i }).click();
 await buyer.waitForTimeout(500);
