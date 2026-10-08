@@ -50,21 +50,19 @@ number and what happened instead.
 
 ## 2. The hero — the highest-risk part of the build
 
-1. On the home page, scroll slowly from the top.
-2. **Expect:** the image scrubs frame by frame as you scroll, the three
-   copy lines appear one at a time, then the headline and CTAs at the
-   bottom.
-3. **Expect:** no stutter, no blank frames, no jump back to the first
-   frame.
-4. Scroll to the very bottom of the hero and wait five seconds.
-5. **Expect:** the looping video takes over with no visible seam, and
-   keeps looping without a jump when it restarts.
-6. **Check the Vercel logs** for `[hero]`. You should see **nothing**. If
-   you see `could not measure`, Cloudinary's `fl_getinfo` is not
-   available on this account — tell me, it means the scrub is running on
-   the fallback 5-second constant rather than a measured value.
-7. Repeat 1–5 on your phone, in **portrait**. **Expect:** the mobile clip,
-   not a letterboxed desktop one, and the shorter middle copy line.
+1. Open the home page.
+2. **Expect:** the recap playing silently behind the headline straight
+   away, with the headline and both buttons already there. No scrolling
+   needed, no sound.
+3. **Expect:** after 43 seconds it starts again from the beginning.
+4. Scroll down past the hero and back up. **Expect:** it carries on
+   playing.
+5. Repeat on your phone, held upright. **Expect:** the vertical cut,
+   filling the screen, not the horizontal one cropped or letterboxed.
+   Turn the phone sideways: **expect** the horizontal cut.
+6. With iPhone Low Power Mode on, **expect** the first frame as a still
+   instead of the video. That is iOS refusing autoplay, and it is the
+   designed fallback.
 
 ## 3. Inventory, from the real database
 

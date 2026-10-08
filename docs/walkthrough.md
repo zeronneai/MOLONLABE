@@ -34,7 +34,7 @@ running against an empty local setup.
 | --- | --- |
 | 01 Intro game | Fresh browser so the game actually runs, two seconds into the round, cursor on the field and shots fired so the frame has a hit in it |
 | 02 Age gate | Intro marked as seen, age answer cleared — the one moment the gate stands alone |
-| 03 Hero | Three scroll positions across the scrub, so the pull-back reads as a sequence |
+| 03 Hero | The recap playing behind the headline, a few seconds in |
 | 04 Inventory | A row hovered so the image panel on the right is showing something |
 | 05 Item page | Top, then scrolled, to show the gallery staying put |
 | 06 Featured | Top, then the entry form scrolled into view |

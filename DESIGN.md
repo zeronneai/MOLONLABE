@@ -97,12 +97,12 @@ inconsistency by unifying them; the two contexts want different things.
 
 Build in this exact order, top to bottom. Note the deliberate asymmetry.
 
-**A. Hero — scroll-scrubbed sequence** *(revised 2026-08-12; supersedes the original video-loop hero)*
-A sticky full-viewport canvas scrubs through ~100 Cloudinary-extracted stills of the scope-view clip (`so_<seconds>` frame extraction against the video resource — never ship the video; scrubbing `currentTime` stutters on iOS). Scroll-driven, never scroll-hijacked: the scrub consumes ~150vh of scroll on desktop, ~120vh on mobile, sequence chosen by viewport **orientation** and re-resolved on rotation. Frames ease toward scroll progress on rAF rather than snapping. Assets and tuning live in `lib/hero/assets.ts`.
-Three copy lines surface one at a time at fixed progress (0.10–0.30, 0.35–0.55, 0.60–0.80), Archivo 800 `clamp(2rem, 5vw, 4rem)`, tracking `-0.035em`, bone, left-aligned to the page margin, each fading in while rising 12px then dissolving. At 0.85–1.00 the headline + CTAs land **bottom left** as before (tiny label, short-line headline, two CTAs; right side empty). All copy lives in `content/en.ts`; "IN THE CASE." is one shared constant with the `/inventory` headline so the echo can never drift.
-After the scrub completes, an optional looping video (first frame identical to the last scrub frame) takes over as the background; until those clips exist — or when autoplay is refused (iOS Low Power Mode) — the final frame holds.
-The scrub's first frame is the same scope view the intro game resolves into, so the game's exit wipe reads as one continuous shot. Body scroll is locked while the game overlay is open and scroll resets to top when it closes, so the scrub always starts at frame 0.
-Fallbacks, all deliberate: reduced motion or frame failure → final frame with the headline already visible (failures logged). The first frame is the LCP element, preloaded at priority; the full sequence stays under 2.5MB transferred.
+**A. Hero: the recap video** *(revised 2026-10-08; supersedes the scroll-scrubbed sequence of 2026-08-12)*
+One full-viewport section (no scroll budget) with the Molon Labe Recap playing muted, looping, behind the copy: the vertical cut when the viewport is portrait, the horizontal cut otherwise, re-resolved on rotation. Delivered by Cloudinary sized and silent (`f_auto,q_auto,vc_auto,ac_none,w_<width>`, about 8MB), never the raw upload; ids, versions and widths live in `lib/hero/assets.ts`. Muted because browsers only autoplay silent video; there is no sound control, by the client's choice.
+The video's first frame, as a still, paints first and is the LCP element (`<picture>`, portrait or landscape by media query, so it is right before any script runs). The video fades in over it on `playing`, so a slow connection or a refused autoplay (iOS Low Power Mode) shows the still, never black. It pauses when the hero is off screen.
+The headline + CTAs sit **bottom left** from the first paint (tiny label, short-line headline, two CTAs; right side empty). All copy lives in `content/en.ts`; "IN THE CASE." is one shared constant with the `/inventory` headline. The three lines that surfaced during the scrub went with it.
+The intro game waits for the hero's still to paint before its exit wipe. The recap opens on the range, not on the scope view the game resolves into, so the wipe is a cut rather than one continuous shot.
+Fallbacks, all deliberate: reduced motion or data saver → the still only, no video requested.
 Bottom right corner: the scroll-indicator rule, as before.
 
 **B. Currently featured, ~85vh, split**

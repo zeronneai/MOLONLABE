@@ -174,10 +174,9 @@ which is its own argument for the move:
 
 Unreachable from the sandbox — every proxied host 403s at CONNECT. All
 game art and product images are served by route interception in tests.
-The real assets have never been loaded by the real site. The hero video
-duration probe (`fl_getinfo`) fails here and falls back to a configured
-5s; if that is wrong on the real asset the tail frames 404 and the scrub
-goes static.
+The real assets have never been loaded by the real site. The hero recap
+video was reached through Cloudinary on 8 October; what the site does
+with it is checked by `tests/browser/herovideo.mjs`.
 
 ---
 

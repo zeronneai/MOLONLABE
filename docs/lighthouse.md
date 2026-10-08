@@ -57,18 +57,15 @@ both:
 
 ## What I expect to fail, and why it may not be a defect
 
-**1. LCP on the home page — the most likely miss.**
-The hero is a ~100-frame scrubbed sequence. The LCP element is the first
-frame, preloaded with `priority`, but the sequence behind it competes for
-bandwidth. Watch:
-- If **LCP > 2.5s but the first frame renders fast**, the problem is
-  contention, not the image. Fix by lowering `FRAME_COUNT` in
-  `lib/hero/assets.ts` (100 → 60 is barely visible in motion) or dropping
-  the width (1600 → 1280).
-- Lighthouse will likely flag **"Enormous network payloads"** on home.
-  Expected: the frame sequence is the payload. Check it against the 2.5MB
-  target we set — the number to look at is the *total* of the
-  `res.cloudinary.com` webp requests in the Network tab.
+**1. LCP on the home page.**
+The hero is the recap video (about 8MB, `lib/hero/assets.ts`). The LCP
+element is its first frame as a still (about 50KB), requested at high
+priority. The video downloads alongside it. Watch:
+- If **LCP > 2.5s but the still renders fast**, the video is competing
+  for bandwidth. Fix by lowering the width in `HERO_VIDEOS` (1600 → 1280
+  on desktop, 900 → 720 on mobile).
+- Lighthouse will likely flag **"Avoid enormous network payloads"** on
+  home. Expected: the video is the payload.
 
 **2. "Serve images in next-gen formats" / "Properly size images".**
 Should not fire — everything goes through Cloudinary `f_auto,q_auto` and
@@ -81,10 +78,7 @@ Expected. The game preloads its art up front by design, with a stated
 could.
 
 **4. Console errors under Best Practices.**
-Two are ours and are informational, not faults:
-- `[hero] could not measure <id>` — only if Cloudinary's `fl_getinfo`
-  endpoint is unreachable; the scrub falls back to the configured
-  duration.
+One is ours and is informational, not a fault:
 - `[handoff] …` debug lines — `console.debug`, hidden unless Verbose is
   on. They should not affect the score.
 Anything else in the console is worth sending to me.

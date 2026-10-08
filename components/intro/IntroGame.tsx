@@ -48,16 +48,17 @@ import { markIntroResolved } from "@/lib/intro/introSignal";
  */
 const CLAIMED_KEY = "mlf_intro_code_claimed";
 
-// The ending is one continuous shot. The round resolves by cross-fading the
-// shop interior into the hero scrub's already-painted frame 0 — the scope
-// view — and everything after that sits on top of that same image: result
-// card, code, buttons. Closing fades the card off it. Nothing underneath
-// ever changes, so scrolling simply pulls the camera back out of the scope.
+// The round resolves by cross-fading the shop interior into the hero,
+// already painted underneath (the recap's first frame, then the recap
+// itself), and everything after that sits on top of it: result card, code,
+// buttons. Closing fades the card off it. Until 8 October the hero opened
+// on the same scope view as the game, so this read as one continuous shot;
+// the recap opens on the range, so it is now a cut.
 type Phase =
   | "idle"
   | "loading"
   | "arcade"
-  | "resolving" // the one cross-fade: shop interior → scrub frame 0
+  | "resolving" // the one cross-fade: shop interior → the hero
   | "result" // win/lose card, sitting on frame 0
   | "closing" // card (and, on a mid-round skip, the game) fades off
   | "done";
@@ -430,9 +431,8 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
     };
   }, [phase, skip]);
 
-  // Body scroll stays locked for the overlay's whole lifetime — otherwise
-  // scrolling behind the game advances the hero scrub underneath, and the
-  // site would be revealed mid-sequence.
+  // Body scroll stays locked for the overlay's whole lifetime, so the
+  // site is never scrolled away underneath the game.
   useEffect(() => {
     if (phase === "idle" || phase === "done") return;
     // html AND body: overflow on body alone doesn't stop window scrolling
@@ -535,8 +535,7 @@ export default function IntroGame({ settings }: { settings?: GameSettings }) {
       style={phase === "closing" ? { pointerEvents: "none" } : undefined}
     >
       {/* The shop interior. The only transition in the ending: this layer
-          dissolves into the hero scrub's frame 0, already painted behind
-          the overlay. Everything below sits on that image and never
+          dissolves into the hero, already painted behind the overlay. Everything below sits on that image and never
           replaces it. */}
       <div
         className="intro-game-layer"

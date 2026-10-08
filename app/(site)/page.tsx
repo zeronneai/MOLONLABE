@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import HeroScrub from "@/components/home/HeroScrub";
-import { getClipDurations } from "@/lib/hero/duration";
+import HeroVideo from "@/components/home/HeroVideo";
 import { getHomeDrop } from "@/lib/games/queries";
 import { dropPath } from "@/lib/games/paths";
 import { heroCopy } from "@/content/en";
@@ -26,8 +25,7 @@ import VisitSection from "@/components/home/VisitSection";
  * a date on it says the draws are real in a way no sentence does.
  */
 export default async function Home() {
-  // Measured once per hour on the server, so the client never pays for it.
-  const [durations, { featured }] = await Promise.all([getClipDurations(), getHomeDrop()]);
+  const { featured } = await getHomeDrop();
   // The hero's second button goes to the featured drop's own page, or to
   // the list of drops when none is featured. Never to a page that picks.
   const feature = featured
@@ -35,7 +33,7 @@ export default async function Home() {
     : { href: "/games", label: "See the drops" };
   return (
     <>
-      <HeroScrub durations={durations} feature={feature} />
+      <HeroVideo feature={feature} />
       <FreshArrivals />
       <CaseSection />
       <Featured />

@@ -57,20 +57,12 @@ The client decided (26 September) that WhatsApp stays off for good. All
 contact is by email or (915) 497-0541. `WHATSAPP_ENABLED` in
 `lib/brand.ts` stays `false`.
 
-### 2.3 ~~Hero clip durations~~ — MEASURED, NOT ASSUMED
-`lib/hero/duration.ts` reads the real duration from Cloudinary's
-`fl_getinfo` at request time (cached hourly) and passes it to the scrub.
-`HERO_CLIPS.seconds` is now only a fallback; a mismatch logs a warning
-naming the constant to fix, and an unreachable endpoint logs loudly and
-falls back rather than silently truncating the scrub.
-
-Still worth confirming once on the preview: that `fl_getinfo` is enabled
-for this Cloudinary account. It is a standard delivery flag, but I could
-not reach Cloudinary from the sandbox to prove it. If it 404s you will
-see `[hero] could not measure` in the Vercel logs — send me the real
-durations and I will set the constants.
-
----
+### 2.3 ~~Hero clip durations~~: GONE (8 October)
+The scroll-scrubbed hero was replaced by the recap video, which plays
+rather than being cut into stills, so its duration no longer matters.
+`lib/hero/duration.ts` was removed. For the record, Cloudinary's
+`fl_getinfo` answered 400 for the old clip as well, so the scrub had been
+running on its 5-second constant all along.
 
 ## 3. Deviations from the brief — deliberate, listed so nobody is surprised
 
