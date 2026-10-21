@@ -148,6 +148,11 @@ export default function PrivacyPage() {
             only page paths, item identifiers and counts.
           </p>
           <p className="mt-4">
+            We also use Vercel Web Analytics, from the company that hosts this
+            site, to count page visits. It sets no cookies and collects no
+            names, emails or phone numbers.
+          </p>
+          <p className="mt-4">
             Analytics does not run on the shop&apos;s own admin pages.
           </p>
           <p className="mt-4">

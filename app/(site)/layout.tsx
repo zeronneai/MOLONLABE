@@ -2,6 +2,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import IntroGame from "@/components/intro/IntroGame";
 import Analytics from "@/components/analytics/Analytics";
+import { Analytics as VercelAnalytics } from "@vercel/analytics/next";
 import AgeGate from "@/components/compliance/AgeGate";
 import { LocalBusinessJsonLd } from "@/components/seo/StructuredData";
 import { getGameSettings } from "@/lib/game/settings";
@@ -27,6 +28,8 @@ export default async function SiteLayout({
       {/* Waits on the intro game; never stacks with it. */}
       <AgeGate />
       <Analytics />
+      {/* Vercel Web Analytics: anonymous page views, no cookies. */}
+      <VercelAnalytics />
     </div>
     </CartProvider>
   );
