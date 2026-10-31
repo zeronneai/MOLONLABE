@@ -73,6 +73,8 @@ function describe(row: ActivityRow): string {
       const v = (row.before_value ?? {}) as { order?: string; buyer?: string; guides?: number[] };
       return `voided in-store sale ${v.order ?? "?"} on ${label} (${v.buyer ?? "a buyer"}, ${(v.guides ?? []).length === 1 ? "guide" : "guides"} ${(v.guides ?? []).join(", ")} back on sale)`;
     }
+    case "close sales":
+      return `closed sales on ${label} (${plain(row.after_value)})`;
     case "home drop":
       return row.after_value
         ? `put ${plain(row.after_value)} on the home page${row.before_value ? ` (was ${plain(row.before_value)})` : ""}`

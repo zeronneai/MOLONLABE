@@ -182,6 +182,8 @@ export type GameSummary = {
   drawnAt: string | null;
   drawnEarly: boolean;
   unsoldAtDraw: number | null;
+  /** Staff ended sales before the drop sold out. */
+  salesClosed: boolean;
   createdAt: string | null;
 };
 
@@ -251,6 +253,7 @@ export async function getAllGames(): Promise<{
       drawnAt: w?.drawn_at ?? null,
       drawnEarly: w?.drawn_early ?? false,
       unsoldAtDraw: w?.unsold_spots ?? null,
+      salesClosed: Boolean(g.sales_closed_at),
       createdAt: g.created_at,
     };
   });

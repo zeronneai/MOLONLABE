@@ -251,8 +251,9 @@ export default async function ConfirmationPage({
               of {spots.totalSpots} in this drop.
             </p>
             <p className="mt-2 max-w-[56ch] text-sm text-muted">
-              The draw happens once the last guide sells. There is no end
-              date. The drop runs until it sells out.{" "}
+              The draw happens once the last guide sells, or once the shop
+              closes sales. There is no end date. Every guide sold is in the
+              drawing.{" "}
               <Link href={dropPath(spots.gameId)} className="underline hover:text-bone">
                 Watch this drop
               </Link>

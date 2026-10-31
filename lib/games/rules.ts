@@ -62,7 +62,7 @@ export const RULES_APPROVED = {
   holds:
     "Guide numbers are set aside when the buyer submits payment and are held while the payment is processed. If the payment does not go through, they are released at once. If the payment is interrupted, they are released after 15 minutes. A guide belongs to the buyer only once payment succeeds.",
   pool:
-    "A drop is drawn only after every guide has been sold, and every guide sold is in the drawing.",
+    "A drop is drawn after every guide has been sold, or after the shop closes sales early. Every guide sold is in the drawing.",
   odds:
     "Each guide is one entry, and every entry has the same chance of winning. A person holding five guides has five times the chance of a person holding one, and five times the share of the wheel.",
   publicNames:
@@ -92,9 +92,9 @@ export const CLIENT_ELIGIBILITY =
 export const CLIENT_DRAW_METHOD =
   "The winner is selected by an electronic name wheel, weighted by the number of guides each person holds. The drawing is run at the shop, broadcast live on our Instagram, @molonlabe.fa, and saved as a reel. Before the wheel is spun, every entry is shown on screen so viewers can confirm all buyers were included. The result is recorded.";
 
-/** The Drops page's description. The client's wording, 2026-09-25, verbatim. */
+/** The Drops page's description. The client's wording, 2026-09-25, with the early close added 2026-10-30. */
 export const DROPS_INTRO =
-  "Every drop sells a set number of guides to its featured piece, at a set price, and each guide comes with entry into the drawing. When the last guide goes, the winner is drawn. No end date, no countdown. It runs until all guides are out.";
+  "Every drop sells a set number of guides to its featured piece, at a set price, and each guide comes with entry into the drawing. When the last guide goes, the winner is drawn. No end date, no countdown. It runs until all guides are out, unless the shop closes sales early, in which case the winner is drawn from every guide sold.";
 
 /** Stated plainly and prominently, at the client's instruction. */
 export const NO_REFUNDS = "No refunds or exchanges.";
@@ -161,7 +161,11 @@ export const RULES: RuleSection[] = [
   {
     heading: "When a drop closes",
     clauses: [
-      { text: "A drop runs until every guide is purchased." },
+      {
+        // The early close added 30 October 2026 (CloseSales), in this
+        // clause rather than a new one so no clause number moves.
+        text: "A drop runs until every guide is purchased, unless the shop closes sales earlier. The drawing then includes every guide sold up to that moment, and no more guides can be bought.",
+      },
     ],
   },
   {

@@ -690,6 +690,9 @@ http.createServer(async (req, res) => {
         if (sp.game_id === a.p_game && sp.status === "held" && sp.held_at &&
             Date.parse(sp.held_at) < staleBefore) { sp.status = "open"; sp.held_at = null; }
       }
+      // 20261031100000_close_sales.sql: nothing in a closed drop can be held.
+      if (db.games.find((x) => x.id === a.p_game)?.sales_closed_at)
+        return send(res, 400, { code: "P0001", message: "Sales for this drop are closed." });
       const open = db.game_spots
         .filter((sp) => sp.game_id === a.p_game && sp.status === "open")
         .sort((x, y) => x.spot_number - y.spot_number);
@@ -813,8 +816,27 @@ http.createServer(async (req, res) => {
       }
       Object.assign(o, { status: "cancelled", voided_at: new Date().toISOString(), voided_by_name: member.display_name });
       const g = db.games.find((x) => x.id === o.game_id);
-      if (g && g.status === "full" && db.game_spots.some((sp) => sp.game_id === g.id && sp.status !== "sold")) g.status = "open";
+      if (g && g.status === "full" && !g.sales_closed_at &&
+          db.game_spots.some((sp) => sp.game_id === g.id && sp.status !== "sold")) g.status = "open";
       return send(res, 200, n);
+    }
+    // 20261031100000_close_sales.sql: owner or manager; an open drop with
+    // at least one guide sold. Returns how many sold.
+    if (fn === "close_drop_sales") {
+      const caller = userFromAuth(req.headers.authorization);
+      const member = caller && db.staff.find((m) => m.user_id === caller.id);
+      const refuse = (code, message) => send(res, 400, { code, message });
+      if (!member || member.must_change_password) return refuse("42501", "Only staff can close a drop.");
+      const g = db.games.find((x) => x.id === a.p_game);
+      if (!g) return refuse("P0002", "There is no such drop.");
+      if (g.sales_closed_at) return refuse("P0001", "Sales for this drop are already closed.");
+      if (g.status !== "open") return refuse("P0001", "This drop is not open, so there are no sales to close.");
+      const sold = db.game_spots.filter((sp) => sp.game_id === g.id && sp.status === "sold").length;
+      if (sold < 1)
+        return refuse("P0001", "No guides have sold yet, so there is nobody to draw from. Close sales once at least one guide has sold.");
+      Object.assign(g, { status: "full", sales_closed_at: new Date().toISOString(),
+        sales_closed_by_name: member.display_name });
+      return send(res, 200, sold);
     }
     // 20261002100000_home_drop.sql: owner only, one drop at a time, never
     // a drawn one; null clears.

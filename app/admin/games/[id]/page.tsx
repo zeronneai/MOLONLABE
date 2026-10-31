@@ -10,6 +10,7 @@ import PrizeClaim from "@/components/admin/PrizeClaim";
 import { loadSoldGuides } from "@/lib/draw/soldGuides";
 import { buildRoster } from "@/lib/draw/roster";
 import InStoreSale, { type InStoreSaleRow } from "@/components/admin/InStoreSale";
+import CloseSales from "@/components/admin/CloseSales";
 
 export const dynamic = "force-dynamic";
 
@@ -146,11 +147,24 @@ export default async function EditGamePage({
         sales={inStoreSales}
       />
 
+      {!winner && (
+        <CloseSales
+          gameId={game.id}
+          gameTitle={game.title}
+          status={game.status}
+          closedAt={game.sales_closed_at ?? null}
+          closedBy={game.sales_closed_by_name ?? null}
+          sold={sold.length}
+          total={game.total_spots}
+        />
+      )}
+
       <DrawPanel
         gameId={game.id}
         gameTitle={game.title}
         spotsSold={sold.length}
         totalSpots={game.total_spots}
+        salesClosed={Boolean(game.sales_closed_at)}
         buyers={buyers}
         unnamedBuyers={unnamedBuyers}
         winnerName={winner?.display_name ?? null}

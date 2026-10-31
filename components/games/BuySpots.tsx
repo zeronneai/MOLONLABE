@@ -27,6 +27,7 @@ export default function BuySpots({
   dropTitle,
   spotPriceCents,
   remaining,
+  salesClosed = false,
   dropTitles = {},
 }: {
   gameId: string;
@@ -34,6 +35,8 @@ export default function BuySpots({
   dropTitle: string;
   spotPriceCents: number;
   remaining: number;
+  /** Staff ended sales before the drop sold out. */
+  salesClosed?: boolean;
   /** Every running drop's title by id, to name the one already in the cart. */
   dropTitles?: Record<string, string>;
 }) {
@@ -56,6 +59,18 @@ export default function BuySpots({
   const otherInCart = ready ? lines.find((l) => l.gameId && l.gameId !== gameId) : undefined;
   const otherTitle = otherInCart?.gameId ? dropTitles[otherInCart.gameId] ?? "another drop" : null;
   const clamped = Math.max(1, Math.min(count, cap));
+
+  if (remaining === 0 && salesClosed) {
+    return (
+      <div className="mt-10 border-l-2 border-amber pl-5">
+        <p className="display text-2xl">SALES CLOSED.</p>
+        <p className="mt-3 max-w-[52ch] text-sm text-muted">
+          This drop is no longer selling guides. The winner is drawn from
+          every guide sold, posted here and announced on Instagram.
+        </p>
+      </div>
+    );
+  }
 
   if (remaining === 0) {
     return (

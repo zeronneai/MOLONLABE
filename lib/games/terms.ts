@@ -17,12 +17,16 @@
 // refuses it), so the third line no longer says the shop may draw
 // earlier. The broadcast acknowledgement is new.
 //
+// 2026-10-agency-5: the shop may close sales before a drop sells out
+// (30 October, after BOOM STICK was drawn for Halloween at 44 of 66).
+// The first and third lines and the checkbox say so.
+//
 // Orders placed before keep the wording they were shown, because it is
 // stored on the order, which is the point of storing it.
 export const GAME_TERMS = [
-  "This drop runs until every guide is sold. There is no end date and no countdown.",
+  "This drop runs until every guide is sold, unless the shop closes sales earlier. There is no end date and no countdown.",
   "All guide purchases are final. No refunds, no exchanges, no transfers.",
-  "The winner is drawn once the last guide sells.",
+  "The winner is drawn once the last guide sells, or once the shop closes sales. Every guide sold is in the drawing.",
 ] as const;
 
 /**
@@ -57,11 +61,11 @@ export const GAME_TERMS_TEXT = [...GAME_TERMS, BROADCAST_NOTICE].join(" ");
  * orders can be grouped by which wording was in force without diffing
  * strings.
  */
-export const GAME_TERMS_VERSION = "2026-09-agency-4";
+export const GAME_TERMS_VERSION = "2026-10-agency-5";
 
 /** The checkbox label. Says what is being agreed to, not "I agree". */
 export const GAME_TERMS_CONSENT =
-  "I understand this drop has no end date, that the winner is drawn once every guide sells, and that my purchase is final.";
+  "I understand this drop has no fixed end date, that the shop may close sales before every guide sells, that the winner is drawn from every guide sold, and that my purchase is final.";
 
 /**
  * What staff confirm for a sale at the counter (2026-09-28, the client's

@@ -118,6 +118,10 @@ export interface Database {
           // The owner's choice for the home page; at most one is true.
           // Missing (undefined) until 20261002100000_home_drop.sql runs.
           featured_on_home: boolean;
+          // Set when staff close sales before the drop sells out.
+          // See 20261031100000_close_sales.sql.
+          sales_closed_at: string | null;
+          sales_closed_by_name: string | null;
           created_by: string | null;
           created_by_name: string | null;
           updated_by: string | null;
@@ -142,6 +146,8 @@ export interface Database {
           guide_images_wanted?: number | null;
           guide_images_used?: number | null;
           featured_on_home?: boolean;
+          sales_closed_at?: string | null;
+          sales_closed_by_name?: string | null;
           created_by_name?: string | null;
           updated_by_name?: string | null;
           created_at?: string | null;
@@ -164,6 +170,8 @@ export interface Database {
           guide_images_wanted?: number | null;
           guide_images_used?: number | null;
           featured_on_home?: boolean;
+          sales_closed_at?: string | null;
+          sales_closed_by_name?: string | null;
           created_by_name?: string | null;
           updated_by_name?: string | null;
           created_at?: string | null;
@@ -665,6 +673,11 @@ export interface Database {
       record_password_change: {
         Args: Record<string, never>;
         Returns: boolean;
+      };
+      /** Owner or manager. Ends an open drop's sales; returns guides sold. */
+      close_drop_sales: {
+        Args: { p_game: string };
+        Returns: number;
       };
       /** Owner only. Null clears the home page's drop. */
       set_home_drop: {

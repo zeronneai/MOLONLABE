@@ -42,7 +42,7 @@ export default async function DrawPresentation({
 
   const { data: game } = await sb
     .from("games")
-    .select("id, title, item_id, total_spots")
+    .select("id, title, item_id, total_spots, sales_closed_at")
     .eq("id", id)
     .maybeSingle();
   if (!game) notFound();
@@ -77,11 +77,17 @@ export default async function DrawPresentation({
       gameId={game.id}
       prizeName={item?.name ?? game.title}
       prizeImage={prizeImage}
-      closesLabel={`${shownGuides.length} of ${game.total_spots} guides sold`}
+      closesLabel={
+        game.sales_closed_at
+          ? `${shownGuides.length} of ${game.total_spots} guides sold · sales closed`
+          : `${shownGuides.length} of ${game.total_spots} guides sold`
+      }
       roster={roster}
       shownGuides={shownGuides}
       alreadyDrawn={Boolean(winner)}
-      unsoldSpots={Math.max(0, game.total_spots - shownGuides.length)}
+      // A closed drop is complete with what it sold: nothing is "unsold"
+      // that could still be bought, so the presentation is not held back.
+      unsoldSpots={game.sales_closed_at ? 0 : Math.max(0, game.total_spots - shownGuides.length)}
     />
   );
 }

@@ -56,7 +56,7 @@ for (const [who, open] of [["OWNER", adminPage], ["MANAGER", managerPage]]) {
   check(`${who} ADMIN: no draw button on a drop that has not sold out`,
     (await p.getByRole("button", { name: /draw without ceremony|draw anyway|^draw$/i }).count()) === 0);
   check(`${who} ADMIN: says how many are sold and when it will be drawn`,
-    new RegExp(`${SOLD} of ${TOTAL} guides sold`, "i").test(panel) && /drawn once\s+every guide sells/i.test(panel),
+    new RegExp(`${SOLD} of ${TOTAL} guides sold`, "i").test(panel) && /drawn once\s+every guide sells,\s+or once sales are closed/i.test(panel),
     (panel.match(/[^\n]*guides sold[^\n]*/i) ?? ["NOT SHOWN"])[0].slice(0, 100));
   check(`${who} ADMIN: nothing on the page offers an early draw`,
     !/draw (anyway|short|early)|draw before/i.test(panel),
@@ -129,7 +129,7 @@ for (const [who, open] of [["OWNER", adminPage], ["MANAGER", managerPage]]) {
   check("TERMS: the buy control no longer says the shop may draw early",
     !/draw earlier|at its discretion/i.test(buy));
   check("TERMS: it says the winner is drawn once the last guide sells",
-    /drawn once the last guide sells\./i.test(buy));
+    /drawn once the last guide sells, or once the shop closes sales/i.test(buy));
   await p.context().close();
 }
 

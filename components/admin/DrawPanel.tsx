@@ -4,10 +4,10 @@
 // five chances and the winning number is a guide number. Irreversible in
 // practice, so it sits behind a confirmation that names the drop.
 //
-// Only once every guide is sold. There is no early draw: the rules say a
-// drop runs until the last guide goes. Until then the draw controls are
-// not rendered at all (presentation mode stays open, for rehearsal), and
-// the server action and the database refuse it regardless.
+// Only once every guide is sold, or once staff have closed sales
+// (CloseSales). Until then the draw controls are not rendered at all
+// (presentation mode stays open, for rehearsal), and the server action and
+// the database refuse it regardless.
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -18,6 +18,7 @@ export default function DrawPanel({
   gameTitle,
   spotsSold,
   totalSpots,
+  salesClosed = false,
   buyers,
   unnamedBuyers,
   winnerName,
@@ -27,6 +28,8 @@ export default function DrawPanel({
   gameTitle: string;
   spotsSold: number;
   totalSpots: number;
+  /** Staff closed sales early: the drop is drawn from what sold. */
+  salesClosed?: boolean;
   buyers: number;
   /**
    * Buyers who have not agreed to be named on the broadcast, and so
@@ -42,7 +45,9 @@ export default function DrawPanel({
   // which meant the dialog closed and nothing visibly happened.
   const [refusal, setRefusal] = useState<string | null>(null);
   const router = useRouter();
-  const soldOut = totalSpots > 0 && spotsSold >= totalSpots;
+  // "Ready" rather than sold out: a drop whose sales were closed early is
+  // drawn from what it sold, the same as one that sold out.
+  const soldOut = (totalSpots > 0 && spotsSold >= totalSpots) || (salesClosed && spotsSold > 0);
 
   if (winnerName) {
     return (
@@ -88,7 +93,8 @@ export default function DrawPanel({
         ) : (
           <span data-not-sold-out>
             {spotsSold} of {totalSpots} guides sold. The drop is drawn once
-            every guide sells. Presentation mode can be rehearsed now.
+            every guide sells, or once sales are closed. Presentation mode
+            can be rehearsed now.
           </span>
         )}
       </p>

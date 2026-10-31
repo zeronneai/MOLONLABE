@@ -24,6 +24,7 @@ export type ActivityAction =
   | "price"
   | "featured"
   | "home drop"
+  | "close sales"
   | "offer"
   | "difficulty"
   | "commerce"

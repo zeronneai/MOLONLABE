@@ -79,6 +79,8 @@ export default async function DropPage({ params }: Props) {
   });
   const finished = state === "finished";
   const awaiting = state === "awaiting";
+  // Staff ended sales before it sold out: it is drawn from what sold.
+  const closed = Boolean(game.sales_closed_at);
   const image = game.item ? itemImages(game.item)[0] : undefined;
   const title = demoStrippedTitle(game.title);
   const piece = game.item?.name ?? null;
@@ -102,7 +104,9 @@ export default async function DropPage({ params }: Props) {
             {finished
               ? `Drawn${winner ? ` ${fmtDate(winner.drawn_at)}` : ""}`
               : awaiting
-                ? "Sold out, awaiting the draw"
+                ? closed
+                  ? "Sales closed, awaiting the draw"
+                  : "Sold out, awaiting the draw"
                 : "Open now"}
           </p>
           <h1
@@ -134,11 +138,15 @@ export default async function DropPage({ params }: Props) {
                   finished ? "text-muted" : awaiting ? "text-amber" : "text-bone"
                 }`}
               >
-                {counts.remaining}
+                {closed ? counts.sold : counts.remaining}
                 <span className="text-muted">/{counts.total}</span>
               </div>
               <div className="label mt-4 text-muted">
-                {finished || awaiting ? "Every guide sold" : "Guides left"}
+                {closed
+                  ? "Guides sold · sales closed"
+                  : finished || awaiting
+                    ? "Every guide sold"
+                    : "Guides left"}
               </div>
             </div>
             {!finished && (
@@ -171,6 +179,7 @@ export default async function DropPage({ params }: Props) {
                   dropTitle={title}
                   spotPriceCents={game.spot_price_cents}
                   remaining={game.status === "open" ? counts.remaining : 0}
+                  salesClosed={closed}
                   dropTitles={Object.fromEntries(
                     running.map((g) => [g.id, demoStrippedTitle(g.title)]),
                   )}

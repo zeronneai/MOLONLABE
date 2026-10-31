@@ -1162,7 +1162,7 @@ export async function commitDraw(
   // drawn: guessing the total is how a short drop would get through.
   const { data: gameRow, error: gameError } = await sb
     .from("games")
-    .select("total_spots, title, item_id")
+    .select("total_spots, title, item_id, sales_closed_at")
     .eq("id", gameId)
     .maybeSingle();
   if (gameError || !gameRow) {
@@ -1174,12 +1174,14 @@ export async function commitDraw(
   }
   const totalSpots = gameRow.total_spots;
   const unsold = Math.max(0, totalSpots - spots.length);
-  if (unsold > 0) {
+  // A drop is drawn when it sells out, or once staff have closed its
+  // sales (closeDropSales). A drop that is simply short is refused.
+  if (unsold > 0 && !gameRow.sales_closed_at) {
     return {
       ok: false,
       error:
-        `This drop has ${spots.length} of ${totalSpots} guides sold. A drop is ` +
-        "drawn once every guide sells. Nothing has been drawn.",
+        `This drop has ${spots.length} of ${totalSpots} guides sold. Sell every ` +
+        "guide, or close sales first. Nothing has been drawn.",
     };
   }
 
@@ -1258,8 +1260,10 @@ export async function commitDraw(
       ticket_index: result.ticket,
       pool,
       entry_total: result.total,
-      drawn_early: false,
-      unsold_spots: 0,
+      // The database sets these too (refuse_early_draw); written here so
+      // the row reads the same whichever wrote it.
+      drawn_early: unsold > 0,
+      unsold_spots: unsold,
     })
     .select("drawn_at")
     .maybeSingle();
@@ -1596,6 +1600,53 @@ export async function sendTestAlert(
 // ---------------------------------------------------------------------
 // After the draw
 // ---------------------------------------------------------------------
+
+/**
+ * End a drop's sales before it sells out. Owner and manager alike: the
+ * manager runs drops, and closing one is part of running it.
+ *
+ * Only an open drop with at least one guide sold. After this nobody can
+ * buy into it, online or at the counter, and it can be drawn from the
+ * guides sold so far. Not reversible from here: buyers may already have
+ * seen the drop as closed.
+ */
+export async function closeDropSales(gameId: string): Promise<ActionState> {
+  const session = await requireSession();
+  if (!session) return { status: "error", message: "Not signed in." };
+  const { sb } = session;
+
+  const { data: game } = await sb
+    .from("games").select("title, status, total_spots").eq("id", gameId).maybeSingle();
+  if (!game) return { status: "error", message: "That drop no longer exists." };
+
+  const { data: sold, error } = await sb.rpc("close_drop_sales", { p_game: gameId });
+  if (error) {
+    logDbError("closeDropSales", error);
+    const known =
+      /already closed|not open|No guides have sold|Only staff/.test(error.message);
+    return {
+      status: "error",
+      message: known
+        ? error.message
+        : /close_drop_sales|sales_closed/.test(error.message)
+          ? "Closing sales needs the latest database update (20261031100000_close_sales.sql). Nothing changed."
+          : "Sales were not closed. Try again.",
+    };
+  }
+  await logActivity(sb, session, {
+    action: "close sales", entity: "game", entityId: gameId, entityLabel: game.title,
+    field: "sales", before: `${game.status}`,
+    after: `closed at ${sold ?? "?"} of ${game.total_spots} guides sold`,
+  });
+  revalidatePublic();
+  revalidatePath("/admin/games");
+  revalidatePath(`/admin/games/${gameId}`);
+  revalidatePath("/admin/inventory");
+  return {
+    status: "success",
+    message: `Sales closed with ${sold ?? "the"} ${sold === 1 ? "guide" : "guides"} sold. Nobody else can buy in. The drop can now be drawn.`,
+  };
+}
 
 /**
  * The winner has claimed the prize: its item becomes sold.

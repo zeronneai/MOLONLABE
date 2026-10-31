@@ -352,7 +352,9 @@ create table if not exists public.games (
   guide_generated_at timestamp with time zone,
   guide_images_wanted integer,
   guide_images_used integer,
-  featured_on_home boolean default false not null
+  featured_on_home boolean default false not null,
+  sales_closed_at timestamp with time zone,
+  sales_closed_by_name text
 );
 alter table public.games add column if not exists id uuid default gen_random_uuid();
 do $$ begin
@@ -454,8 +456,10 @@ do $$ begin
     end if;
   end if;
 end $$;
+alter table public.games add column if not exists sales_closed_at timestamp with time zone;
+alter table public.games add column if not exists sales_closed_by_name text;
 do $$ declare c text; begin
-  foreach c in array array['item_id', 'description', 'winner_note', 'created_at', 'created_by', 'created_by_name', 'updated_by', 'updated_by_name', 'guide_why', 'guide_care', 'guide_pairs', 'guide_path', 'guide_fingerprint', 'guide_generated_at', 'guide_images_wanted', 'guide_images_used'] loop
+  foreach c in array array['item_id', 'description', 'winner_note', 'created_at', 'created_by', 'created_by_name', 'updated_by', 'updated_by_name', 'guide_why', 'guide_care', 'guide_pairs', 'guide_path', 'guide_fingerprint', 'guide_generated_at', 'guide_images_wanted', 'guide_images_used', 'sales_closed_at', 'sales_closed_by_name'] loop
     if exists (
       select 1 from information_schema.columns
       where table_schema = 'public' and table_name = 'games'
@@ -2569,6 +2573,49 @@ begin
 end;
 $function$;
 
+create or replace function public.close_drop_sales(p_game uuid)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_game public.games%rowtype;
+  v_sold integer;
+begin
+  if not public.is_staff() then
+    raise exception 'Only staff can close a drop.' using errcode = '42501';
+  end if;
+
+  select * into v_game from public.games where id = p_game for update;
+  if not found then
+    raise exception 'There is no such drop.' using errcode = 'P0002';
+  end if;
+  if v_game.sales_closed_at is not null then
+    raise exception 'Sales for this drop are already closed.' using errcode = 'P0001';
+  end if;
+  if v_game.status <> 'open' then
+    raise exception 'This drop is not open, so there are no sales to close.' using errcode = 'P0001';
+  end if;
+
+  select count(*) into v_sold
+    from public.game_spots
+   where game_id = p_game and status = 'sold';
+  if v_sold < 1 then
+    raise exception 'No guides have sold yet, so there is nobody to draw from. Close sales once at least one guide has sold.'
+      using errcode = 'P0001';
+  end if;
+
+  update public.games
+     set status = 'full',
+         sales_closed_at = now(),
+         sales_closed_by_name = coalesce(public.staff_name(), 'Staff')
+   where id = p_game;
+
+  return v_sold;
+end;
+$function$;
+
 create or replace function public.create_game(p_title text, p_description text, p_winner_note text, p_item_id uuid, p_guide_why text, p_guide_care text, p_guide_pairs text, p_total_spots integer, p_spot_price_cents integer)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -2845,6 +2892,22 @@ begin
 end;
 $function$;
 
+create or replace function public.refuse_closed_drop_hold()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if old.status = 'open' and new.status <> 'open'
+     and exists (select 1 from public.games g
+                  where g.id = new.game_id and g.sales_closed_at is not null) then
+    raise exception 'Sales for this drop are closed.' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$function$;
+
 create or replace function public.refuse_early_draw()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -2852,10 +2915,12 @@ create or replace function public.refuse_early_draw()
  SET search_path TO 'public'
 AS $function$
 declare
-  v_total integer;
-  v_sold  integer;
+  v_total  integer;
+  v_closed timestamptz;
+  v_sold   integer;
 begin
-  select total_spots into v_total from public.games where id = new.game_id;
+  select total_spots, sales_closed_at into v_total, v_closed
+    from public.games where id = new.game_id;
   if v_total is null then
     raise exception 'There is no drop with id %.', new.game_id
       using errcode = 'P0001';
@@ -2863,13 +2928,17 @@ begin
   select count(*) into v_sold
     from public.game_spots
    where game_id = new.game_id and status = 'sold';
-  if v_sold < v_total then
-    raise exception 'This drop has % of % guides sold. A drop is drawn only once every guide is sold.',
+  if v_sold < 1 then
+    raise exception 'This drop has no guides sold, so there is nobody to draw from.'
+      using errcode = 'P0001';
+  end if;
+  if v_sold < v_total and v_closed is null then
+    raise exception 'This drop has % of % guides sold. Sell every guide, or close sales, before drawing.',
       v_sold, v_total
       using errcode = 'P0001';
   end if;
-  new.drawn_early := false;
-  new.unsold_spots := 0;
+  new.drawn_early := v_sold < v_total;
+  new.unsold_spots := greatest(v_total - v_sold, 0);
   return new;
 end;
 $function$;
@@ -3136,10 +3205,12 @@ begin
          voided_by_name = coalesce(public.staff_name(), 'Owner')
    where id = p_order;
 
-  -- A drop that was full has guides to sell again.
+  -- A drop that was full has guides to sell again, unless its sales were
+  -- closed: a closed drop stays closed whatever is voided.
   update public.games g
      set status = 'open'
    where g.id = v_order.game_id and g.status = 'full'
+     and g.sales_closed_at is null
      and exists (select 1 from public.game_spots s where s.game_id = g.id and s.status <> 'sold');
 
   return v_n;
@@ -3156,6 +3227,8 @@ $function$;
 
 drop trigger if exists admin_activity_stamp_actor on public.admin_activity;
 CREATE TRIGGER admin_activity_stamp_actor BEFORE INSERT ON public.admin_activity FOR EACH ROW EXECUTE FUNCTION stamp_activity_actor();
+drop trigger if exists game_spots_refuse_closed_drop on public.game_spots;
+CREATE TRIGGER game_spots_refuse_closed_drop BEFORE UPDATE OF status ON public.game_spots FOR EACH ROW EXECUTE FUNCTION refuse_closed_drop_hold();
 drop trigger if exists campaigns_stamp_authorship on public.games;
 CREATE TRIGGER campaigns_stamp_authorship BEFORE INSERT OR UPDATE ON public.games FOR EACH ROW EXECUTE FUNCTION stamp_authorship();
 drop trigger if exists games_refuse_home_choice on public.games;
@@ -3449,6 +3522,7 @@ grant select on public.game_scoreboard to authenticated;
 revoke execute on function public.claim_checkout(p_key text) from public;
 revoke execute on function public.claim_game_spots(p_game uuid, p_qty integer) from public;
 revoke execute on function public.claim_variant_stock(p_variant uuid, p_qty integer) from public;
+revoke execute on function public.close_drop_sales(p_game uuid) from public;
 revoke execute on function public.create_game(p_title text, p_description text, p_winner_note text, p_item_id uuid, p_guide_why text, p_guide_care text, p_guide_pairs text, p_total_spots integer, p_spot_price_cents integer) from public;
 revoke execute on function public.finish_checkout(p_key text, p_order text, p_outcome text) from public;
 revoke execute on function public.game_spots_remaining(p_game uuid) from public;
@@ -3458,6 +3532,7 @@ revoke execute on function public.mark_password_for_change() from public;
 revoke execute on function public.password_fingerprint(p_user uuid) from public;
 revoke execute on function public.record_in_store_sale(p_game uuid, p_qty integer, p_first_name text, p_last_name text, p_email text, p_phone text, p_ack text, p_order_number text, p_token text) from public;
 revoke execute on function public.record_password_change() from public;
+revoke execute on function public.refuse_closed_drop_hold() from public;
 revoke execute on function public.refuse_early_draw() from public;
 revoke execute on function public.refuse_home_choice() from public;
 revoke execute on function public.refuse_pool_change() from public;
@@ -3479,6 +3554,8 @@ revoke execute on function public.claim_game_spots(p_game uuid, p_qty integer) f
 revoke execute on function public.claim_game_spots(p_game uuid, p_qty integer) from authenticated;
 revoke execute on function public.claim_variant_stock(p_variant uuid, p_qty integer) from anon;
 revoke execute on function public.claim_variant_stock(p_variant uuid, p_qty integer) from authenticated;
+revoke execute on function public.close_drop_sales(p_game uuid) from anon;
+grant execute on function public.close_drop_sales(p_game uuid) to authenticated;
 revoke execute on function public.create_game(p_title text, p_description text, p_winner_note text, p_item_id uuid, p_guide_why text, p_guide_care text, p_guide_pairs text, p_total_spots integer, p_spot_price_cents integer) from anon;
 grant execute on function public.create_game(p_title text, p_description text, p_winner_note text, p_item_id uuid, p_guide_why text, p_guide_care text, p_guide_pairs text, p_total_spots integer, p_spot_price_cents integer) to authenticated;
 revoke execute on function public.finish_checkout(p_key text, p_order text, p_outcome text) from anon;
@@ -3499,6 +3576,8 @@ revoke execute on function public.record_in_store_sale(p_game uuid, p_qty intege
 grant execute on function public.record_in_store_sale(p_game uuid, p_qty integer, p_first_name text, p_last_name text, p_email text, p_phone text, p_ack text, p_order_number text, p_token text) to authenticated;
 revoke execute on function public.record_password_change() from anon;
 grant execute on function public.record_password_change() to authenticated;
+revoke execute on function public.refuse_closed_drop_hold() from anon;
+revoke execute on function public.refuse_closed_drop_hold() from authenticated;
 revoke execute on function public.refuse_early_draw() from anon;
 revoke execute on function public.refuse_early_draw() from authenticated;
 revoke execute on function public.refuse_home_choice() from anon;

@@ -18,7 +18,8 @@ export default async function NewGame() {
       <h1 className="display text-2xl">NEW DROP</h1>
       <p className="mt-4 max-w-[60ch] text-sm text-muted">
         A drop runs until every guide sells. There is no end date to set and
-        no countdown to run out. It sells out or it stays open.
+        no countdown to run out. If it has to end sooner, close its sales
+        from the drop&apos;s page and it is drawn from what sold.
       </p>
       <div className="mt-10">
         <GameForm items={items ?? []} />

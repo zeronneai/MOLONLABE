@@ -274,7 +274,7 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
          } of ${order.spots.totalSpots}.
          <div style="height:10px;line-height:10px">&nbsp;</div>
          <span style="${SMALL};color:${C.muted}">The draw happens once the last
-         guide sells. There is no end date.
+         guide sells, or once the shop closes sales. There is no end date.
          <a href="${SITE_URL}/games/${order.spots.gameId}" style="color:${C.acid};text-decoration:underline">Watch this drop</a>.</span>`,
       )
     : "";
@@ -529,7 +529,7 @@ export function renderOrderConfirmation(order: OrderEmailData): RenderedEmail {
             : []),
           `${order.spots.numbers.length === 1 ? "Guide number" : "Guide numbers"} ${order.spots.numbers.join(", ")} of ${order.spots.totalSpots} in this drop.`,
           ``,
-          `The draw happens once the last guide sells. There is no end date.`,
+          `The draw happens once the last guide sells, or once the shop closes sales. There is no end date.`,
           `Watch this drop: ${SITE_URL}/games/${order.spots.gameId}`,
         ]
       : []),

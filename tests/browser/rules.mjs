@@ -81,7 +81,7 @@ const exact = [
   [5, "No refunds or exchanges."],
   [6, "A person may buy as many guides as they want, up to the total offered in that drop."],
   [10, "Entry requires purchasing a guide. There are no free entries."],
-  [11, "A drop runs until every guide is purchased."],
+  [11, "A drop runs until every guide is purchased, unless the shop closes sales earlier. The drawing then includes every guide sold up to that moment, and no more guides can be bought."],
   [15, "A drop is drawn once. A drop that already has a winner cannot be drawn again."],
   [16, "By purchasing a guide, the buyer agrees to provide their full name, email and phone number so the shop can contact them if they win."],
   [17, "The winner has one week from being contacted to confirm and claim the prize. If they do not, the prize returns to the shop."],
@@ -109,7 +109,7 @@ const APPROVED = [
   [7, "Each guide in a drop has a number, from 1 up to the number of guides offered. Numbers are assigned automatically at checkout from those still available, lowest first. A buyer cannot choose them, and a buyer who gets several may not get consecutive numbers."],
   [8, "Adding more guides from the same drop to a cart adds them to the guides already there, and the cart shows the running total before payment. A cart holds guides from one drop at a time. If fewer guides are left than the cart holds, the cart is reduced to the number left before payment."],
   [9, "Guide numbers are set aside when the buyer submits payment and are held while the payment is processed. If the payment does not go through, they are released at once. If the payment is interrupted, they are released after 15 minutes. A guide belongs to the buyer only once payment succeeds."],
-  [12, "A drop is drawn only after every guide has been sold, and every guide sold is in the drawing."],
+  [12, "A drop is drawn after every guide has been sold, or after the shop closes sales early. Every guide sold is in the drawing."],
   [13, "Each guide is one entry, and every entry has the same chance of winning. A person holding five guides has five times the chance of a person holding one, and five times the share of the wheel."],
   [22, "This website shows how many guides a drop has left, never who bought them. During the drawing, each buyer's first name and last initial appear on screen, as stated at checkout. A buyer who bought before checkout stated this appears by guide number instead. Email addresses, phone numbers and full surnames are never shown."],
 ];
@@ -188,7 +188,7 @@ const buy = await page.locator("body").innerText();
 // The early draw is gone everywhere (2026-09-26), so the checkout terms
 // and the rules now say the same thing: drawn when the last guide sells.
 check("the buy control says the winner is drawn once the last guide sells",
-  /drawn once the last guide sells\./i.test(buy));
+  /drawn once the last guide sells, or once the shop closes sales/i.test(buy));
 check("and no longer says the shop may draw earlier",
   !/draw earlier|at its discretion/i.test(buy));
 check("the buy control shows the broadcast notice the rules refer to",

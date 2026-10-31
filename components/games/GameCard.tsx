@@ -85,7 +85,9 @@ export default function GameCard({
           {finished
             ? `Drawn${drawnOn ? ` ${drawnOn}` : ""}`
             : awaiting
-              ? "Sold out, awaiting the draw"
+              ? game.salesClosed
+                ? "Sales closed, awaiting the draw"
+                : "Sold out, awaiting the draw"
               : "Open now"}
         </p>
         {/* The title is the drop's own link. Every link on this card goes
@@ -109,7 +111,9 @@ export default function GameCard({
           {finished
             ? `${game.sold} ${game.sold === 1 ? "guide" : "guides"} sold`
             : awaiting
-              ? "Every guide sold"
+              ? game.salesClosed
+                ? `${game.sold} ${game.sold === 1 ? "guide" : "guides"} sold · sales closed`
+                : "Every guide sold"
               : `${remaining} left`}
         </p>
 
