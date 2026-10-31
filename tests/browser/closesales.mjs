@@ -52,7 +52,9 @@ for (const [who, open, name] of [["MANAGER", managerPage, "Luis Ortega"], ["OWNE
   check(`${who}: and nothing has closed yet`,
     !(await dump()).games.find((g) => g.id === GAME)?.sales_closed_at);
   await confirm.click();
-  await p.getByText(/Sales closed with/i).waitFor({ timeout: 10000 });
+  // The action answers, then the page refreshes into its closed state;
+  // wait for that state rather than the passing message.
+  await p.locator("[data-sales-closed]").waitFor({ timeout: 10000 });
 
   const g = (await dump()).games.find((x) => x.id === GAME);
   check(`${who}: the drop is now closed, stamped with who`,
