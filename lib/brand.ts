@@ -1,8 +1,9 @@
 // Brand assets and shop contact details — reference from here, never
 // inline. See DESIGN.md section 0.
 
-export const LOGO_URL =
-  "https://res.cloudinary.com/dsprn0ew4/image/upload/v1786206690/molon-labe-logo-transparent_fvttuz.png";
+// The mark lives in public/brand: logo.png (512px, transparent) for the
+// site, plus fixed sizes for the admin manifest and the order email.
+export const LOGO_URL = "/brand/logo.png";
 
 // The shop's public line. One source of truth: display form for humans,
 // E.164 for tel: hrefs and structured data. Never write either inline.
@@ -89,3 +90,6 @@ export const INSTAGRAM_URL = "https://instagram.com/molonlabe.fa";
 export const SITE_URL = (
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://molonlabeguns.com"
 ).replace(/\/$/, "");
+
+/** The logo with its origin, for places a path cannot reach: structured data and email. */
+export const LOGO_ABSOLUTE_URL = `${SITE_URL}${LOGO_URL}`;

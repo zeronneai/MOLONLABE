@@ -3,7 +3,7 @@
 // actually says.
 
 import {
-  LOGO_URL,
+  LOGO_ABSOLUTE_URL,
   SHOP_ADDRESS,
   SHOP_HOURS,
   SHOP_NAME,
@@ -35,8 +35,8 @@ export function LocalBusinessJsonLd() {
         "@id": `${SITE_URL}/#business`,
         name: SHOP_NAME,
         url: SITE_URL,
-        image: LOGO_URL,
-        logo: LOGO_URL,
+        image: LOGO_ABSOLUTE_URL,
+        logo: LOGO_ABSOLUTE_URL,
         telephone: SHOP_PHONE_E164,
         priceRange: "$$",
         address: {

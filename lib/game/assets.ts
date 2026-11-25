@@ -4,33 +4,18 @@
 // magic positions elsewhere.
 // ---------------------------------------------------------------------------
 
-const cld = (url: string, width: number) =>
-  url.replace("/upload/", `/upload/f_auto,q_auto,w_${width}/`);
-
 // Budget: backgrounds ≤2000px wide, sprites ≤900px, total transfer <700KB.
 // Only one background loads per session (picked by orientation).
 export const GAME_ASSETS = {
-  bgDesktop: cld(
-    "https://res.cloudinary.com/dsprn0ew4/image/upload/v1786484074/Firearms_showroom_interior_with___202608111530_rctfrd.jpg",
-    2000,
-  ),
-  bgMobile: cld(
-    "https://res.cloudinary.com/dsprn0ew4/image/upload/v1786484199/Firearms_showroom_interior_with___202608111535_a42wut.jpg",
-    1080,
-  ),
+  bgDesktop: "/game/bg-desktop.webp",
+  bgMobile: "/game/bg-mobile.webp",
   // The target. One sprite for every spawn point — the three depth slots
   // are still distinguished by tint and by how much help each gets against
   // a bright backdrop, but they are the same artwork now, so the round
   // fetches one image instead of three. That matters more than it used to:
   // the game runs on every visit rather than only the first.
-  target: cld(
-    "https://res.cloudinary.com/dsprn0ew4/image/upload/v1788969345/ChatGPT_Image_Sep_9_2026_09_52_39_AM_cmyn3b.png",
-    900,
-  ),
-  pistol: cld(
-    "https://res.cloudinary.com/dsprn0ew4/image/upload/v1786484323/pistol_1_pqjirg.webp",
-    900,
-  ),
+  target: "/game/target.webp",
+  pistol: "/game/pistol.webp",
 };
 
 // --- Spawn anchors, normalized to the viewport -----------------------------

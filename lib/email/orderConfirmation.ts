@@ -36,7 +36,6 @@ import {
   SHIPPING_NOTICE,
 } from "@/lib/legal";
 import {
-  LOGO_URL,
   SHOP_ADDRESS,
   SHOP_NAME,
   SHOP_PHONE_DISPLAY,
@@ -121,13 +120,14 @@ const escapeHtml = (s: string) =>
 const SHOP_LINE = `${SHOP_ADDRESS.street}, ${SHOP_ADDRESS.city}, ${SHOP_ADDRESS.region} ${SHOP_ADDRESS.postalCode}`;
 
 /**
- * The skull, sized by Cloudinary rather than by the browser.
+ * The skull, pre-sized rather than scaled by the mail client. An absolute
+ * URL, because an email has no origin to resolve a path against.
  *
- * PNG explicitly, not `f_auto`: several mail clients still have no WebP,
+ * PNG explicitly, not WebP: several mail clients still have no WebP,
  * and the one that matters here is Outlook. Served at 2x and displayed at
  * 72px so it is not soft on a phone.
  */
-const LOGO_EMAIL = LOGO_URL.replace("/upload/", "/upload/f_png,q_auto,w_144/");
+const LOGO_EMAIL = `${SITE_URL}/brand/logo-144.png`;
 
 /** Outer content width. 600px is the widest that survives Outlook. */
 const WIDTH = 600;

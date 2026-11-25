@@ -188,7 +188,7 @@ function coverFit(img: HTMLImageElement, w: number, h: number) {
 
 /**
  * Mean perceived luminance (0..1) of a region of the background, sampled
- * from the decoded image. Cloudinary serves CORS headers and the image is
+ * from the decoded image. The art is same-origin (public/game) and still
  * loaded crossOrigin=anonymous, so the canvas is not tainted; if a future
  * host stops sending them, getImageData throws and we fall back to the
  * anchor's own darkDrop flag.
