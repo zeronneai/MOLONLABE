@@ -2,12 +2,11 @@ import Image from "next/image";
 import Reveal from "@/components/motion/Reveal";
 import { SHOP_ADDRESS } from "@/lib/brand";
 
-// Served through Cloudinary's transform pipeline rather than raw: the
-// source is a 2K JPEG and the frame never renders wider than ~40vw.
-// f_auto/q_auto negotiate the format and weight per browser.
+// A local file in public/media, already cut down to 1600px wide: the
+// frame never renders wider than ~40vw and next/image sizes it per screen.
 // Set this to null and the neutral held frame below comes back.
 const SHOP_IMAGE: string | null =
-  "https://res.cloudinary.com/dsprn0ew4/image/upload/f_auto,q_auto,w_1600/v1786661115/Armored_silhouette_emerges_throu__2K_202608131645_fapqho.jpg";
+  "/media/shop-story.webp";
 
 export default function ShopStory() {
   return (

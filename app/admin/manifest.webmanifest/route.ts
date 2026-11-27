@@ -1,9 +1,7 @@
-import { LOGO_URL } from "@/lib/brand";
 
 // Scoped manifest so the owner can install /admin to a phone home screen
 // and it opens standalone — docs/admin-decisions.md.
-const icon = (size: number) =>
-  LOGO_URL.replace("/upload/", `/upload/c_fit,w_${size},h_${size},f_png/`);
+const icon = (size: 192 | 512) => `/brand/logo-${size}.png`;
 
 export function GET() {
   return Response.json(
